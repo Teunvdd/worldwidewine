@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bedankt voor je bestelling — WorldWideWine.nl</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#5c1621">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="shop.css">
+</head>
+<body class="checkout-page">
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="index.html" aria-label="WorldWideWine.nl — home">
+        <img src="assets/logo.svg" alt="" width="36" height="36" class="brand-mark">
+        <span class="brand-name">WorldWide<em>Wine</em><small>.nl</small></span>
+      </a>
+      <a class="link-arrow back-link" href="webshop.html">Naar de webshop</a>
+    </div>
+  </header>
+
+  <main id="main" class="wrap thanks">
+    <div class="thanks-card">
+      <div class="thanks-icon" aria-hidden="true">✓</div>
+      <h1 id="thanks-title">Bedankt voor je bestelling!</h1>
+      <p class="lead" id="thanks-lead">We hebben je bestelling ontvangen en gaan ermee aan de slag.</p>
+      <p class="order-no" id="order-no" hidden></p>
+      <div id="next-steps"></div>
+      <pre class="order-text" id="order-text" hidden></pre>
+      <p>Vragen? Bel of app ons op <a href="tel:+31683172704">06 83 17 27 04</a> of mail naar <a href="mailto:info@worldwidewine.nl">info@worldwidewine.nl</a>.</p>
+      <a class="btn" href="webshop.html">Verder winkelen</a>
+    </div>
+  </main>
+
+  <script src="data/products.js"></script>
+  <script src="data/config.js"></script>
+  <script src="js/shop.js"></script>
+  <script src="js/thanks.js"></script>
+</body>
+</html>

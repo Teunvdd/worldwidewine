@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Webshop — WorldWideWine.nl</title>
+  <meta name="description" content="Bestel rechtstreeks geïmporteerde wijnen van kleine wijnhuizen online. Afhalen in Zaandam of Weesp, bezorging in de regio of verzending met PostNL door heel Nederland.">
+  <meta name="theme-color" content="#5c1621">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="shop.css">
+</head>
+<body>
+  <a class="skip" href="#main">Naar de inhoud</a>
+
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="index.html" aria-label="WorldWideWine.nl — home">
+        <img src="assets/logo.svg" alt="" width="36" height="36" class="brand-mark">
+        <span class="brand-name">WorldWide<em>Wine</em><small>.nl</small></span>
+      </a>
+      <div class="header-actions">
+        <button class="cart-btn" data-cart-open aria-label="Winkelwagen openen">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="20.5" r="1.3" fill="currentColor"/><circle cx="17" cy="20.5" r="1.3" fill="currentColor"/></svg>
+          <span class="cart-count" data-cart-count hidden>0</span>
+        </button>
+        <button class="nav-toggle" aria-expanded="false" aria-controls="nav" aria-label="Menu openen">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+      <nav id="nav" class="nav" aria-label="Hoofdmenu">
+        <a href="index.html#over">Over ons</a>
+        <a href="index.html#producenten">Producenten</a>
+        <a href="index.html#proeverijen">Proeverijen</a>
+        <a href="index.html#zakelijk">Zakelijk</a>
+        <a href="index.html#bezoek">Bezoek</a>
+        <a href="index.html#contact">Contact</a>
+        <a class="btn btn-small" href="webshop.html" aria-current="page">Webshop</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="shop-hero">
+      <div class="wrap">
+        <p class="eyebrow">Webshop</p>
+        <h1>Onze wijnen</h1>
+        <p class="lead">Rechtstreeks geïmporteerd van de wijnhuizen. Afhalen in Zaandam of Weesp is gratis, in de regio bezorgen we zelf, en met PostNL versturen we door heel Nederland.</p>
+        <ul class="usp">
+          <li>Gratis afhalen</li>
+          <li>Bezorging in de regio</li>
+          <li>Tot 18 flessen met PostNL</li>
+          <li>Doosvoordeel</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="wrap shop">
+      <aside class="filters" id="filters" aria-label="Filters">
+        <div class="filters-head">
+          <h2>Filteren</h2>
+          <button class="link-btn" id="filters-reset" type="button">Wis alles</button>
+        </div>
+        <label class="search">
+          <span class="sr-only">Zoeken</span>
+          <input type="search" id="q" placeholder="Zoek op wijn, druif, streek…" autocomplete="off">
+        </label>
+        <fieldset>
+          <legend>Soort</legend>
+          <div id="f-type"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Land</legend>
+          <div id="f-country"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Prijs</legend>
+          <div id="f-price"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Overig</legend>
+          <label class="check"><input type="checkbox" id="f-sale"> Alleen acties</label>
+          <label class="check"><input type="checkbox" id="f-case"> Per doos</label>
+        </fieldset>
+        <button class="btn btn-block filters-done" type="button" id="filters-done">Toon resultaten</button>
+      </aside>
+
+      <div class="results">
+        <div class="results-bar">
+          <p id="result-count" aria-live="polite"></p>
+          <div class="results-tools">
+            <button class="btn btn-ghost btn-small filters-open" type="button" id="filters-open">Filters</button>
+            <label>
+              <span class="sr-only">Sorteren</span>
+              <select id="sort">
+                <option value="aanbevolen">Aanbevolen</option>
+                <option value="prijs-op">Prijs laag – hoog</option>
+                <option value="prijs-af">Prijs hoog – laag</option>
+                <option value="naam">Naam A – Z</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="product-grid" id="grid"></div>
+        <div class="empty" id="empty" hidden>
+          <p>Geen wijnen gevonden met deze filters.</p>
+          <button class="btn btn-ghost" type="button" data-reset>Filters wissen</button>
+        </div>
+        <p class="shop-note">In de winkel staat een nog veel groter assortiment. Zoek je iets specifieks? <a href="index.html#contact">Vraag het ons</a>.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Productdetail -->
+  <div class="modal" id="product-modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <article class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="pm-title">
+      <button class="icon-btn modal-close" data-close aria-label="Sluiten">×</button>
+      <div class="pm" id="pm"></div>
+    </article>
+  </div>
+
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <div>
+        <a class="brand brand-light" href="index.html">
+          <img src="assets/logo-light.svg" alt="" width="32" height="32" class="brand-mark">
+          <span class="brand-name">WorldWide<em>Wine</em><small>.nl</small></span>
+        </a>
+        <p>Wijnimporteur met eigen winkel.<br>Westzijde 358, 1506 GK Zaandam</p>
+      </div>
+      <div>
+        <h4>Webshop</h4>
+        <a href="webshop.html">Alle wijnen</a>
+        <a href="afrekenen.html">Afrekenen</a>
+        <a href="voorwaarden.html">Voorwaarden &amp; privacy</a>
+      </div>
+      <div>
+        <h4>Contact</h4>
+        <a href="tel:+31683172704">06 83 17 27 04</a>
+        <a href="mailto:info@worldwidewine.nl">info@worldwidewine.nl</a>
+        <a href="https://www.facebook.com/WorldWideWine.nl" target="_blank" rel="noopener">Facebook</a>
+      </div>
+      <div class="nix18">
+        <strong>NIX18</strong>
+        <p>Geen 18, geen alcohol. Wij verkopen geen alcohol aan personen onder de 18 jaar en controleren de leeftijd bij afhalen en bezorgen.</p>
+      </div>
+    </div>
+    <div class="wrap footer-bottom">
+      <span>© <span id="year">2026</span> WorldWideWine.nl · KvK 32134785</span>
+      <span>Alle prijzen zijn inclusief btw.</span>
+    </div>
+  </footer>
+
+  <div class="age-gate" id="age-gate" role="dialog" aria-modal="true" aria-labelledby="age-title" hidden>
+    <div class="age-box">
+      <img src="assets/logo.svg" alt="" width="48" height="48">
+      <h2 id="age-title">Ben je 18 jaar of ouder?</h2>
+      <p>Op deze website bieden we alcoholhoudende dranken aan. Je moet 18 jaar of ouder zijn om verder te gaan.</p>
+      <div class="age-actions">
+        <button class="btn" id="age-yes">Ja, ik ben 18+</button>
+        <a class="btn btn-ghost" href="https://www.nix18.nl">Nee</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="data/products.js"></script>
+  <script src="data/config.js"></script>
+  <script src="js/site.js"></script>
+  <script src="js/shop.js"></script>
+  <script src="js/webshop.js"></script>
+</body>
+</html>
