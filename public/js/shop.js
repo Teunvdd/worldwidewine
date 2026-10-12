@@ -279,16 +279,16 @@
     closeBuyMenus(menuBtn && menuBtn.parentNode);
     if (menuBtn) {
       e.preventDefault();
-      var split = menuBtn.parentNode, open = !split.classList.contains("open");
-      split.classList.toggle("open", open);
+      var split = menuBtn.parentNode, show = !split.classList.contains("open");
+      split.classList.toggle("open", show);
       var menu = split.querySelector(".buy-menu");
-      menu.hidden = !open;
-      menuBtn.setAttribute("aria-expanded", String(open));
+      menu.hidden = !show;
+      menuBtn.setAttribute("aria-expanded", String(show));
       // Te weinig ruimte onder de knop? Dan klapt het menu naar boven uit. Valt het links buiten
       // het scherm (smalle telefoon), dan schuift het naar rechts.
       split.classList.remove("up");
       menu.style.right = "";
-      if (open) {
+      if (show) {
         var r = menu.getBoundingClientRect();
         if (r.bottom > window.innerHeight - 8) split.classList.add("up");
         if (r.left < 8) menu.style.right = (r.left - 8) + "px";

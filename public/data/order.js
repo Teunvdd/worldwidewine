@@ -73,44 +73,32 @@
     return out;
   }
 
-  // Lijst met dagen waarop afgehaald kan worden: [{ date: "2026-10-16", label: "vrijdag 16 oktober", times: ["09:00", …] }]
-  // Afhalen kan op dagen dat de winkel open is of op afspraak, binnen die tijden.
+  // ---- Afhaalmomenten ----
+  // Tijdvakken waarin klanten kunnen afhalen (een afspraak maken), los van de openingstijden:
+  // pickup.week per weekdag [["10:00", "18:00"], …], pickup.dates per datum (gaat voor; [] = geen afhalen).
+  function pickupWindows(config, iso, wd) {
+    var p = (config && config.pickup) || {};
+    var v = p.dates && p.dates[iso] ? p.dates[iso] : (p.week && p.week[wd]) || [];
+    return v.filter(function (w) { return w && w[0] && w[1] && toMin(w[1]) > toMin(w[0]); });
+  }
+  // [{ date: "2026-10-16", label: "vrijdag 16 oktober", year, times: ["09:00", "09:30", …] }]
   function pickupDays(config, now) {
     var p = (config && config.pickup) || {};
     var slot = p.slotMinutes || 30, t = amsterdamNow(now), out = [];
+    var earliest = t.minutes + (p.leadMinutes || 0); // in minuten vanaf vandaag 00:00
     for (var i = 0; i <= (p.daysAhead || 42); i++) {
-      var d = dayInfo(addDays(t.date, i)), h = dayHours(config, d.date, d.wd);
-      if (h.s === "dicht") continue;
-      var from = toMin(h.from), to = toMin(h.to), times = [];
-      if (i === 0) from = Math.max(from, Math.ceil((t.minutes + (p.leadMinutes || 0)) / slot) * slot);
-      for (var m = from; m + slot <= to; m += slot) times.push(hhmm(m));
+      var d = dayInfo(addDays(t.date, i)), times = [];
+      pickupWindows(config, d.date, d.wd).forEach(function (w) {
+        var from = toMin(w[0]), to = toMin(w[1]);
+        if (i * 1440 + from < earliest) from = Math.ceil((earliest - i * 1440) / slot) * slot;
+        for (var m = from; m + slot <= to; m += slot) if (times.indexOf(hhmm(m)) < 0) times.push(hhmm(m));
+      });
+      times.sort();
       if (times.length) out.push({ date: d.date, label: d.label, year: d.year, times: times });
     }
     return out;
   }
   function pickupLabel(day, time) { return day.label + " " + day.year + " om " + time + " uur"; }
-
-  // ---- Bezorgmomenten (eigen bezorging in de regio) ----
-  // Tijdvakken van één dag: [["17:00", "21:00"], …]; een lege lijst = die dag niet bezorgen.
-  function deliveryWindows(config, iso, wd) {
-    var b = (config && config.deliveryTimes) || {};
-    var v = b.dates && b.dates[iso] ? b.dates[iso] : (b.week && b.week[wd]) || [];
-    return v.filter(function (w) { return w && w[0] && w[1] && toMin(w[1]) > toMin(w[0]); });
-  }
-  // [{ date, label, year, windows: ["17:00-21:00", …] }] vanaf leadDays dagen na vandaag.
-  function deliveryDays(config, now) {
-    var b = (config && config.deliveryTimes) || {};
-    var t = amsterdamNow(now), out = [];
-    for (var i = Math.max(0, b.leadDays || 0); i <= (b.daysAhead || 21); i++) {
-      var d = dayInfo(addDays(t.date, i));
-      var windows = deliveryWindows(config, d.date, d.wd)
-        .filter(function (w) { return i > 0 || toMin(w[0]) >= t.minutes + 60; }) // vandaag: minstens een uur van tevoren
-        .map(function (w) { return w[0] + "-" + w[1]; });
-      if (windows.length) out.push({ date: d.date, label: d.label, year: d.year, windows: windows });
-    }
-    return out;
-  }
-  function deliveryLabel(day, win) { var w = win.split("-"); return day.label + " " + day.year + " tussen " + w[0] + " en " + w[1] + " uur"; }
 
   function vatRate(p) {
     if (typeof p.vat === "number") return p.vat;
@@ -263,7 +251,7 @@
   var api = { computeOrder: computeOrder, isAvailable: isAvailable, vatRate: vatRate, round: round,
     caseSize: caseSize, casePrice: casePrice, lineKey: lineKey,
     deliversTo: deliversTo, postcodeNumber: postcodeNumber, dayHours: dayHours, weekHours: weekHours,
-    pickupDays: pickupDays, pickupLabel: pickupLabel, deliveryWindows: deliveryWindows, deliveryDays: deliveryDays, deliveryLabel: deliveryLabel };
+    pickupWindows: pickupWindows, pickupDays: pickupDays, pickupLabel: pickupLabel };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.WWW_ORDER = api;
 })(this);

@@ -1,4 +1,4 @@
-/* Winkel: openingstijden (per week), bezorgtijden en bezorggebied.
+/* Winkel: openingstijden (per week), afhaaltijden (per week) en bezorggebied.
  * De website, het afrekenen en de server gebruiken deze instellingen direct. */
 (function () {
   var e = A.esc, O = window.WWW_ORDER;
@@ -27,7 +27,7 @@
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
   var settings = null, defaults = null;
-  var shownWeek = { hours: null, delivery: null };
+  var shownWeek = { hours: null, pickup: null };
   function load() {
     return A.api("GET", "shop-settings").then(function (r) { settings = r.settings; defaults = r.defaults; return r; });
   }
@@ -68,20 +68,20 @@
   };
   function clean(v) { return v && v.s && v.s !== "dicht" ? { s: v.s, from: v.from, to: v.to } : { s: "dicht" }; }
 
-  // Bezorgtijden: [["17:00", "21:00"], …]
+  // Afhaaltijden: [["10:00", "18:00"], …]
   function windowHtml(key, w) {
     return "<span class='win'><input type='time' step='900' data-w='from' value='" + e(w[0]) + "' aria-label='Van'><span>–</span>" +
       "<input type='time' step='900' data-w='to' value='" + e(w[1]) + "' aria-label='Tot'>" +
       "<button type='button' class='win-x' data-win-remove aria-label='Tijdvak verwijderen'>×</button></span>";
   }
-  var DELIVERY = {
-    part: "deliveryTimes",
-    std: function (wd) { return settings.deliveryTimes.week[wd] || []; },
-    dates: function () { return settings.deliveryTimes.dates || {}; },
+  var PICKUP = {
+    part: "pickup",
+    std: function (wd) { return settings.pickup.week[wd] || []; },
+    dates: function () { return settings.pickup.dates || {}; },
     cell: function (v, key) {
       v = v || [];
       return "<td class='wk-state'><label class='switch switch-sm'><input type='checkbox' data-k='" + key + "' data-f='on'" + (v.length ? " checked" : "") + "><span class='slider' aria-hidden='true'></span>" +
-        "<span class='set-text'>" + (v.length ? "Bezorgen" : "Geen bezorging") + "</span></label></td>" +
+        "<span class='set-text'>" + (v.length ? "Afhalen" : "Geen afhalen") + "</span></label></td>" +
         "<td class='wk-times'><div class='wins' data-k='" + key + "' data-f='wins'" + (v.length ? "" : " hidden") + ">" + v.map(function (w) { return windowHtml(key, w); }).join("") +
         "<button type='button' class='btn btn-sm btn-ghost' data-win-add>+ Tijdvak</button></div></td>";
     },
@@ -96,8 +96,8 @@
         if (ev.target.dataset.f !== "on") return;
         var tr = ev.target.closest("tr"), wins = tr.querySelector(".wins");
         wins.hidden = !ev.target.checked;
-        tr.querySelector(".set-text").textContent = ev.target.checked ? "Bezorgen" : "Geen bezorging";
-        if (ev.target.checked && !wins.querySelector(".win")) wins.querySelector("[data-win-add]").insertAdjacentHTML("beforebegin", windowHtml("", ["17:00", "21:00"]));
+        tr.querySelector(".set-text").textContent = ev.target.checked ? "Afhalen" : "Geen afhalen";
+        if (ev.target.checked && !wins.querySelector(".win")) wins.querySelector("[data-win-add]").insertAdjacentHTML("beforebegin", windowHtml("", ["10:00", "17:00"]));
       });
       root.addEventListener("click", function (ev) {
         var add = ev.target.closest("[data-win-add]"), rm = ev.target.closest("[data-win-remove]");
@@ -115,7 +115,7 @@
         }
       });
     },
-    summary: function (v) { return v.length ? v.map(function (w) { return w[0] + " – " + w[1]; }).join(", ") : "Geen bezorging"; }
+    summary: function (v) { return v.length ? v.map(function (w) { return w[0] + " – " + w[1]; }).join(", ") : "Geen afhalen"; }
   };
 
   // Tabel met zeven dagen. rows: [{ key, label, sub, value, badge }]
@@ -128,7 +128,7 @@
 
   // ---- Pagina met weekoverzicht + standaardweek ----
   function weekPage(el, kind, opts) {
-    var which = kind === HOURS ? "hours" : "delivery";
+    var which = kind === HOURS ? "hours" : "pickup";
     var monday = shownWeek[which] || mondayOf(todayIso());
     var dirty = false;
 
@@ -230,7 +230,7 @@
         ev.preventDefault();
         var v = current();
         ORDER_WD.forEach(function (wd) { v.week[wd] = kind.read(sf, "w" + wd); });
-        if (kind === DELIVERY) ORDER_WD.forEach(function (wd) { if (!v.week[wd].length) delete v.week[wd]; });
+        if (kind === PICKUP) ORDER_WD.forEach(function (wd) { if (!v.week[wd].length) delete v.week[wd]; });
         if (opts.collect) Object.assign(v, opts.collect(sf));
         var btn = el.querySelector("#std-save"); A.busy(btn, true, "Opslaan…");
         // Afwijkende dagen die nu gelijk zijn aan de nieuwe standaard zijn niet meer nodig.
@@ -252,42 +252,45 @@
     return load().then(function () {
       weekPage(el, HOURS, {
         title: "Openingstijden",
-        intro: "Stel per week in wanneer de winkel open is. De website toont deze tijden en klanten kunnen binnen deze tijden een afhaalmoment kiezen (ook op dagen ‘op afspraak’).",
+        intro: "Stel per week in wanneer de winkel open is. Deze tijden staan op de website. Wanneer klanten kunnen afhalen stel je in bij Afhaaltijden.",
         aside: function () {
           return "<section class='card'><h2>Zo werkt het</h2><ul class='help-list'>" +
             "<li><strong>Open</strong>: de winkel is open; zo staat het op de website.</li>" +
-            "<li><strong>Op afspraak</strong>: op de website staat ‘op afspraak’. Klanten kunnen binnen deze tijden wel een afhaalmoment kiezen.</li>" +
-            "<li><strong>Dicht</strong>: geen afhalen mogelijk.</li>" +
+            "<li><strong>Op afspraak</strong>: op de website staat ‘op afspraak’.</li>" +
+            "<li><strong>Dicht</strong>: op de website staat ‘gesloten’.</li>" +
+            "<li>Afhaalafspraken via de webshop stel je apart in bij <a href='#afhaaltijden'>Afhaaltijden</a>.</li>" +
             "<li>Wijkt een week af (vakantie, feestdag)? Ga naar die week en pas de dagen aan. De standaardweek blijft gewoon gelden voor de andere weken.</li></ul></section>";
         }
       });
     });
   }
 
-  // ---- Bezorgtijden ----
-  function renderDelivery(el) {
+  // ---- Afhaaltijden ----
+  function renderPickup(el) {
     return load().then(function () {
-      var b = settings.deliveryTimes;
-      var leadOpts = [[0, "Dezelfde dag (vanaf een uur van tevoren)"], [1, "De volgende dag"], [2, "Over 2 dagen"], [3, "Over 3 dagen"], [7, "Over een week"]];
+      var b = settings.pickup;
+      var leadOpts = [[0, "Direct"], [60, "Een uur na bestellen"], [120, "Twee uur na bestellen"], [240, "Vier uur na bestellen"], [1440, "Een dag na bestellen"], [2880, "Twee dagen na bestellen"]];
       var aheadOpts = [[7, "1 week"], [14, "2 weken"], [21, "3 weken"], [28, "4 weken"], [42, "6 weken"], [60, "2 maanden"], [90, "3 maanden"]];
-      function opt(list, cur) {
-        if (!list.some(function (o) { return o[0] === cur; })) list = list.concat([[cur, cur + " dagen"]]);
+      var slotOpts = [[15, "Elk kwartier"], [30, "Elk halfuur"], [60, "Elk uur"]];
+      function opt(list, cur, unit) {
+        if (!list.some(function (o) { return o[0] === cur; })) list = list.concat([[cur, cur + " " + unit]]);
         return list.map(function (o) { return "<option value='" + o[0] + "'" + (o[0] === cur ? " selected" : "") + ">" + o[1] + "</option>"; }).join("");
       }
-      weekPage(el, DELIVERY, {
-        title: "Bezorgtijden",
-        intro: "Op deze dagen en tijdvakken bezorgen we zelf in Amsterdam en omstreken. Klanten kiezen bij het afrekenen een dag en tijdvak.",
+      weekPage(el, PICKUP, {
+        title: "Afhaaltijden",
+        intro: "Binnen deze tijden kunnen klanten bij het afrekenen een afhaalmoment (afspraak) kiezen. Dit staat los van de openingstijden: zo kun je ook buiten de openingstijden afhaalafspraken toestaan.",
         extra: function () {
-          return "<div class='set-row'><span class='set-label'>Vroegst bezorgen<small>Hoe snel na het bestellen kan een klant een moment kiezen?</small></span><select name='leadDays'>" + opt(leadOpts, b.leadDays) + "</select></div>" +
-            "<div class='set-row'><span class='set-label'>Vooruit bestellen<small>Hoe ver vooruit kan een klant een moment kiezen?</small></span><select name='daysAhead'>" + opt(aheadOpts, b.daysAhead) + "</select></div>";
+          return "<div class='set-row'><span class='set-label'>Tijden om te kiezen<small>Om de hoeveel minuten een afhaalmoment begint.</small></span><select name='slotMinutes'>" + opt(slotOpts, b.slotMinutes, "minuten") + "</select></div>" +
+            "<div class='set-row'><span class='set-label'>Vroegst afhalen<small>Hoe snel na het bestellen kan een klant komen?</small></span><select name='leadMinutes'>" + opt(leadOpts, b.leadMinutes, "minuten") + "</select></div>" +
+            "<div class='set-row'><span class='set-label'>Vooruit plannen<small>Hoe ver vooruit kan een klant een moment kiezen?</small></span><select name='daysAhead'>" + opt(aheadOpts, b.daysAhead, "dagen") + "</select></div>";
         },
-        collect: function (f) { return { leadDays: Number(f.leadDays.value), daysAhead: Number(f.daysAhead.value) }; },
+        collect: function (f) { return { slotMinutes: Number(f.slotMinutes.value), leadMinutes: Number(f.leadMinutes.value), daysAhead: Number(f.daysAhead.value) }; },
         aside: function () {
-          var days = O.deliveryDays({ deliveryTimes: settings.deliveryTimes }).slice(0, 6);
+          var days = O.pickupDays({ pickup: settings.pickup }).slice(0, 6);
           return "<section class='card'><h2>Wat de klant nu ziet</h2>" + (days.length ? "<ul class='wk-list'>" + days.map(function (d) {
-            return "<li><strong>" + cap(d.label) + "</strong><span class='muted'>" + d.windows.map(function (w) { return w.replace("-", " – "); }).join(", ") + "</span></li>";
-          }).join("") + "</ul>" : "<p class='muted small'>Er zijn de komende tijd geen bezorgmomenten. Klanten kunnen dan niet kiezen voor bezorgen in de regio.</p>") +
-          "<p class='muted small'>Bezorggebied en -kosten stel je in bij <a href='#bezorggebied'>Bezorggebied</a>.</p></section>";
+            return "<li><strong>" + cap(d.label) + "</strong><span class='muted'>" + d.times[0] + " – " + d.times[d.times.length - 1] + " · " + d.times.length + " tijden</span></li>";
+          }).join("") + "</ul>" : "<p class='muted small'>Er zijn de komende tijd geen afhaalmomenten. Klanten kunnen dan niet kiezen voor afhalen.</p>") +
+          "<p class='muted small'>De openingstijden op de website stel je in bij <a href='#openingstijden'>Openingstijden</a>.</p></section>";
         }
       });
     });
@@ -359,6 +362,6 @@
   }
 
   A.register("openingstijden", { render: renderHours });
-  A.register("bezorgtijden", { render: renderDelivery });
+  A.register("afhaaltijden", { render: renderPickup });
   A.register("bezorggebied", { render: renderArea });
 })();

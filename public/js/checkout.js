@@ -66,7 +66,7 @@ window.WWW.ready.then(loadShopInfo).then(function (info) {
     }
     form.querySelectorAll('[name="bezorging"]').forEach(function (input) {
       var d = CONFIG.delivery[input.value];
-      var blocked = (base.pickupOnly && !d.pickup) || (d.maxBottles && base.bottles > d.maxBottles) || (d.scheduled && !slots.length);
+      var blocked = (base.pickupOnly && !d.pickup) || (d.maxBottles && base.bottles > d.maxBottles);
       input.disabled = !!blocked;
       if (blocked) input.checked = false;
       input.closest(".option").classList.toggle("is-disabled", !!blocked);
@@ -75,7 +75,6 @@ window.WWW.ready.then(loadShopInfo).then(function (info) {
     var notes = [];
     if (base.pickupOnly) notes.push("Je bestelling bevat producten die alleen af te halen zijn.");
     var postnl = CONFIG.delivery.postnl;
-    if (region && !slots.length) notes.push("Bezorgen in Amsterdam en omstreken is op dit moment niet mogelijk: er zijn geen bezorgmomenten beschikbaar.");
     if (postnl && base.bottles > postnl.maxBottles) notes.push("PostNL is niet mogelijk boven " + postnl.maxBottles + " flessen (je hebt er " + base.bottles + ").");
     $("delivery-notice").hidden = !notes.length;
     $("delivery-notice").textContent = notes.join(" ");
@@ -95,13 +94,11 @@ window.WWW.ready.then(loadShopInfo).then(function (info) {
 
   function renderFields() {
     var d = CONFIG.delivery[value("bezorging")];
-    var ship = !!(d && !d.pickup), pick = !!(d && d.pickup), slot = !!(d && d.scheduled);
+    var ship = !!(d && !d.pickup), pick = !!(d && d.pickup);
     $("address-fields").hidden = !ship;
     $("pickup-fields").hidden = !pick;
-    $("slot-fields").hidden = !slot;
     form.querySelectorAll("[data-address]").forEach(function (i) { i.required = ship; });
     form.querySelectorAll("[data-pickup]").forEach(function (i) { i.required = pick; });
-    form.querySelectorAll("[data-slot]").forEach(function (i) { i.required = slot; });
     renderArea();
   }
 
@@ -127,26 +124,6 @@ window.WWW.ready.then(loadShopInfo).then(function (info) {
   function pickupMoment() {
     var day = days.find(function (d) { return d.date === value("afhaaldag"); });
     return day && value("afhaaltijd") ? ORDER.pickupLabel(day, value("afhaaltijd")) : "";
-  }
-
-  // ---- Bezorgen in de regio: dag en tijdvak kiezen ----
-  var slots = info ? info.deliveryDays : ORDER.deliveryDays(CONFIG);
-  function renderSlotDays() {
-    form.elements.bezorgdag.innerHTML = dayOptions(slots);
-    renderSlotTimes();
-  }
-  function renderSlotTimes() {
-    var day = slots.find(function (d) { return d.date === form.elements.bezorgdag.value; });
-    var sel = form.elements.bezorgtijd, cur = sel.value;
-    sel.innerHTML = day ? (day.windows.length > 1 ? '<option value="">Kies een tijdvak…</option>' : "") + day.windows.map(function (w) {
-      return '<option value="' + w + '">' + w.replace("-", " – ") + " uur</option>";
-    }).join("") : '<option value="">Kies eerst een dag</option>';
-    sel.disabled = !day;
-    if (day && day.windows.indexOf(cur) >= 0) sel.value = cur;
-  }
-  function deliveryMoment() {
-    var day = slots.find(function (d) { return d.date === value("bezorgdag"); });
-    return day && value("bezorgtijd") ? ORDER.deliveryLabel(day, value("bezorgtijd")) : "";
   }
 
   // ---- Bezorgen in de regio: postcode controleren ----
@@ -186,11 +163,16 @@ window.WWW.ready.then(loadShopInfo).then(function (info) {
   form.addEventListener("change", function (e) {
     if (e.target.name === "bezorging") { renderFields(); renderPayments(); renderSummary(); }
     if (e.target.name === "afhaaldag") renderPickupTimes();
-    if (e.target.name === "bezorgdag") renderSlotTimes();
   });
+  // Ingelogd via Mijn account: gegevens alvast invullen.
+  try {
+    var prof = JSON.parse(sessionStorage.getItem("wwwProfile") || "null");
+    if (prof) [["naam", "name"], ["email", "email"], ["telefoon", "phone"], ["adres", "address"], ["postcode", "postcode"], ["plaats", "city"]].forEach(function (f) {
+      if (form.elements[f[0]] && !form.elements[f[0]].value && prof[f[1]]) form.elements[f[0]].value = prof[f[1]];
+    });
+  } catch (err) {}
   form.elements.postcode.addEventListener("input", function () { renderArea(); });
   renderPickupDays();
-  renderSlotDays();
   document.addEventListener("cart:change", renderAll);
   renderAll();
 
@@ -214,7 +196,6 @@ window.WWW.ready.then(loadShopInfo).then(function (info) {
       "Totaal: " + W.euro(order.total), "",
       "Betaling: " + PAYMENTS[data.betaling].label,
       data.afhaalmoment ? "Afhalen: " + data.afhaalmoment : "",
-      data.bezorgmoment ? "Bezorgen: " + data.bezorgmoment : "",
       data.opmerkingen ? "Opmerkingen: " + data.opmerkingen : "", "",
       who.join("\n")
     ].filter(function (l, i, a) { return l !== "" || a[i - 1] !== ""; }).join("\n");
@@ -244,10 +225,9 @@ window.WWW.ready.then(loadShopInfo).then(function (info) {
     if (order.errors.length) return showError(order.errors.join(" "));
 
     var data = {};
-    ["naam", "email", "telefoon", "adres", "postcode", "plaats", "afhaaldag", "afhaaltijd", "bezorgdag", "bezorgtijd", "opmerkingen", "bezorging", "betaling"]
+    ["naam", "email", "telefoon", "adres", "postcode", "plaats", "afhaaldag", "afhaaltijd", "opmerkingen", "bezorging", "betaling"]
       .forEach(function (n) { data[n] = value(n); });
     data.afhaalmoment = order.delivery.pickup ? pickupMoment() : "";
-    data.bezorgmoment = order.delivery.scheduled ? deliveryMoment() : "";
     data.ordernummer = orderNumber();
     var text = summaryText(order, data);
     var saved = { number: data.ordernummer, order: order, data: data, text: text, payment: data.betaling };
@@ -274,8 +254,7 @@ window.WWW.ready.then(loadShopInfo).then(function (info) {
         notes: data.opmerkingen,
         pickupDate: data.afhaaldag,
         pickupTime: data.afhaaltijd,
-        deliveryDate: data.bezorgdag,
-        deliveryWindow: data.bezorgtijd,
+        newsletter: form.elements.nieuwsbrief.checked,
         customer: { name: data.naam, email: data.email, phone: data.telefoon, address: data.adres, postcode: data.postcode, city: data.plaats }
       })
     })

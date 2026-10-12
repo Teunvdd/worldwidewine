@@ -18,9 +18,8 @@
 
   <!-- Inloggen -->
   <div class="login" id="login" hidden>
-    <form class="login-box" id="login-form">
+    <form class="login-box" id="login-form" aria-label="Inloggen admin">
       <img src="/assets/logo.png" alt="worldwidewine.nl — dranken en culinaire projecten" width="986" height="135" class="login-logo">
-      <h1 class="sr-only">worldwidewine.nl</h1>
       <p class="muted">Admin &amp; kassa</p>
       <label class="field">Wachtwoord<input type="password" name="password" autocomplete="current-password" required autofocus></label>
       <p class="error" id="login-error" role="alert" hidden></p>
@@ -54,7 +53,7 @@
           <button class="menu-head" type="button" aria-expanded="false" aria-controls="menu-winkel-sub"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 4.6 4h14.8L21 9.5"/><path d="M3 9.5a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 12v8h14v-8M10 20v-5h4v5"/></svg></span><span>Winkel</span><span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button>
           <div class="menu-sub" id="menu-winkel-sub">
             <a href="#openingstijden" data-view="openingstijden"><span class="l">Openingstijden</span><span class="ml">Openingstijden</span></a>
-            <a href="#bezorgtijden" data-view="bezorgtijden"><span class="l">Bezorgtijden</span><span class="ml">Bezorgtijden</span></a>
+            <a href="#afhaaltijden" data-view="afhaaltijden"><span class="l">Afhaaltijden</span><span class="ml">Afhaaltijden</span></a>
             <a href="#bezorggebied" data-view="bezorggebied"><span class="l">Bezorggebied</span><span class="ml">Bezorggebied</span></a>
           </div>
         </div>

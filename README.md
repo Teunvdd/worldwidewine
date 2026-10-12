@@ -186,17 +186,33 @@ In de admin onder **Producten** staan de knoppen **Exporteren** en **Importeren*
 
 ### Afrekenen: afhalen en bezorgen
 Bij het afrekenen kiest de klant:
-- **Afhalen in de winkel** (Westzijde 358, Zaandam): de klant kiest meteen een **dag en tijd** binnen de openingstijden (om het halfuur, vandaag pas vanaf twee uur na nu, tot zes weken vooruit). Het afhaalmoment staat in de bestelling, de bevestigingsmail en de admin.
-- **Bezorgen in Amsterdam en omstreken**: zodra de klant zijn postcode invult zie je of we daar zelf bezorgen. Buiten het gebied kan de bestelling niet met deze optie worden geplaatst (ook de server controleert dit). De klant kiest een **bezorgdag en tijdvak**; dat bezorgmoment staat in de bestelling, de mails en de admin.
+- **Afhalen in de winkel** (Westzijde 358, Zaandam): de klant kiest meteen een **dag en tijd** binnen de afhaaltijden (standaard om het halfuur, vroegst twee uur na het bestellen, tot zes weken vooruit). Het afhaalmoment staat in de bestelling, de bevestigingsmail en de admin.
+- **Bezorgen in Amsterdam en omstreken**: zodra de klant zijn postcode invult zie je of we daar zelf bezorgen. Buiten het gebied kan de bestelling niet met deze optie worden geplaatst (ook de server controleert dit).
 - **Verzenden met PostNL** door heel Nederland, tot 18 flessen.
 
-### Winkel: openingstijden en bezorging
+Onderaan kan de klant aanvinken dat hij de **nieuwsbrief** wil ontvangen; dat komt bij de klant in de admin te staan.
+
+### Winkel: openingstijden, afhaaltijden en bezorggebied
 In de admin onder **Winkel**:
-- **Openingstijden:** een standaardweek, plus per week aan te passen (vakantie, feestdagen, een week met andere tijden). Blader met de pijltjes naar een week, pas de dagen aan en klik **Week opslaan**; alleen de dagen die afwijken van de standaardweek worden onthouden. Met **Kopieer naar volgende week** neem je een afwijkende week over, met **Terug naar standaardweek** maak je hem ongedaan. Per dag: *Open*, *Op afspraak* of *Dicht*. De website (homepage, contact) toont de tijden van de huidige week; afhalen kan op dagen die open zijn of op afspraak.
-- **Bezorgtijden:** per dag één of meer tijdvakken, ook per week aan te passen, en hoe snel na bestellen (bijv. vanaf de volgende dag) en hoe ver vooruit een klant kan kiezen.
+- **Openingstijden:** een standaardweek, plus per week aan te passen (vakantie, feestdagen, een week met andere tijden). Blader met de pijltjes naar een week, pas de dagen aan en klik **Week opslaan**; alleen de dagen die afwijken van de standaardweek worden onthouden. Met **Kopieer naar volgende week** neem je een afwijkende week over, met **Terug naar standaardweek** maak je hem ongedaan. Per dag: *Open*, *Op afspraak* of *Dicht*. De website (homepage, contact) toont de tijden van de huidige week.
+- **Afhaaltijden:** wanneer klanten bij het afrekenen een afhaalmoment (afspraak) kunnen kiezen, los van de openingstijden. Per dag één of meer tijdvakken, ook per week aan te passen (zelfde werkwijze als bij de openingstijden). Verder: om de hoeveel minuten een moment begint, hoe snel na het bestellen en hoe ver vooruit een klant kan kiezen.
 - **Bezorggebied:** de postcodegebieden (eerste vier cijfers, van – tot en met) waar we zelf bezorgen, de bezorgkosten en vanaf welk bedrag bezorgen gratis is. Met **Postcode controleren** test je direct een adres.
 
 Deze instellingen staan in de database (tabel `settings`, sleutel `shop`); er is geen extra databasewijziging nodig. Zolang er niets is opgeslagen gelden de standaardwaarden uit `public/data/config.js`.
+
+### Foto's proeverijen
+Op de pagina **Proeverijen** loopt een slideshow. De foto's staan in de map `public/assets/proeverijen/` en worden in `public/proeverijen.html` genoemd (`proeverij-1.jpg`, `proeverij-2.jpg`, `proeverij-3.jpg`). Foto toevoegen: zet het bestand in die map en kopieer in `proeverijen.html` een `<figure>`-regel met de nieuwe bestandsnaam (en eventueel een onderschrift). Een foto die er niet is wordt overgeslagen; zonder foto's toont de pagina alleen de tekst.
+
+### Mijn account (voor klanten)
+Klanten loggen in op **Mijn account** (`account.html`, het poppetje rechtsboven) met hun e-mailadres: ze krijgen een **code van zes cijfers per e-mail**, een wachtwoord is niet nodig. De code is 15 minuten geldig en werkt één keer; na 5 foute pogingen moet er een nieuwe code komen (maximaal 5 codes per uur). Ingelogd blijven ze 30 dagen.
+
+De klant ziet:
+- zijn **volgende afhaalmoment** (dag en tijd, adres, routelink) of dat de bestelling wordt bezorgd of met PostNL verzonden;
+- **al zijn bestellingen** (webshop en aankopen in de winkel die aan hem gekoppeld zijn) met status (ontvangen → klaar → afgehaald/onderweg → afgeleverd), betaling, producten en totaal, met **Opnieuw bestellen**;
+- zijn **gegevens** (naam, telefoon, adres) om aan te passen; die worden bij het afrekenen alvast ingevuld;
+- een schakelaar voor de **nieuwsbrief** (aan- en afmelden).
+
+Nodig: e-mail via Resend (`RESEND_API_KEY`, zie hierboven) en de tabel `customer_logins` (voer `supabase/migrations/20261020000000_klantaccount.sql` uit, of opnieuw `supabase/setup.sql`). Optioneel `CUSTOMER_SECRET` (een lange willekeurige tekst) om de inlogcookies te ondertekenen; zonder wordt een sleutel afgeleid van `SUPABASE_SERVICE_ROLE_KEY`. Lokaal (`WWW_LOCAL_DB=1 npm run dev`, zonder Resend) staat de code gewoon op het scherm.
 
 ### Nieuws
 Op de website staat een pagina **Nieuws** (`nieuws.html`, ook in het menu en de footer). Berichten plaats je in de admin onder **Nieuws**.
@@ -241,7 +257,7 @@ Gebruik voor het testen bij voorkeur een **apart Supabase-project**, niet de ech
 | `public/data/config.js` | Bezorgwijzen, contactgegevens en de standaardwaarden voor openingstijden, bezorgtijden en bezorggebied (aan te passen in de admin onder Winkel) |
 | `public/data/order.js` | Berekening van bestelling, korting, verzending en btw. Gedeeld door webshop, kassa en server |
 | `public/admin/` | Admin-omgeving en kassa |
-| `api/` | Vercel-serverfuncties: `products`, `orders`, `payment-status`, `mollie-webhook`, `news`, `shop-info`, `admin` |
+| `api/` | Vercel-serverfuncties: `products`, `orders`, `payment-status`, `mollie-webhook`, `news`, `shop-info`, `account`, `admin` |
 | `lib/` | Serverlogica: database (`db.js`), bedrijfslogica (`shop.js`), inloggen, Mollie, e-mail, foto's; `lib/handlers/` bevat de functies, `lib/vercel.js` koppelt ze aan Vercel |
 | `vercel.json` | Vercel-instellingen: publicatiemap, doorverwijzing `/api/admin/*`, beveiligingsheaders |
 | `supabase/setup.sql` | Complete database-installatie (alle migraties achter elkaar) |
