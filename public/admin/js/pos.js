@@ -10,6 +10,7 @@
   var ICON = {
     trash: svg("<path d='M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3'/>"),
     tag: svg("<path d='M3 12V4h8l10 10-8 8z'/><circle cx='7.5' cy='8.5' r='1.3'/>"),
+    keypad: svg("<path d='M5 5h2M11 5h2M17 5h2M5 11h2M11 11h2M17 11h2M5 17h2M11 17h2M17 17h2' stroke-width='3.4'/>"),
     user: svg("<circle cx='12' cy='8' r='4'/><path d='M4 21c1-4.5 4.5-6.5 8-6.5s7 2 8 6.5'/>")
   };
   var METHODS = [
@@ -529,25 +530,21 @@
     var t = totals();
     if (!t.lines.length || t.errors.length) return;
     S.screen = "payment"; S.pad.open = false;
-    S.pay = { lines: [], selected: -1, buffer: "" };
+    S.pay = { lines: [], selected: -1, buffer: "", pad: false };
     draw();
   }
 
   // Afrekenen: bovenin het bedrag, onderin links de betaalwijzen. De betaalregels (met toetsenblok)
   // verschijnen in het midden zodra er een betaalwijze gekozen is.
   function paymentScreen() {
-    var t = totals();
     return "<div class='pay3'>" +
       "<header class='pay-head'>" +
         "<button class='pay-nav' data-act='back'>« Terug</button>" +
         "<h1>Betaling</h1>" +
         "<button class='pay-nav pay-validate' data-act='validate' id='pay-validate'>Bevestig »</button>" +
       "</header>" +
-      "<section class='pay-card'>" +
-        "<strong class='pay-amount'>" + eu(t.total) + "</strong>" +
-        "<div class='pay-status' id='pay-status'></div>" +
-      "</section>" +
-      "<section class='pay-mid' id='pay-mid'></section>" +
+      "<section class='pay-card' id='pay-card'></section>" +
+      "<div class='pay-mid'></div>" +
       "<footer class='pay-foot'>" +
         "<div class='pay-methods'>" + methods().map(function (m) {
           return "<button class='pm-btn' data-method='" + m.key + "'>" + e(m.label) + "</button>";
@@ -584,34 +581,50 @@
       rounding: hasCash ? round(cashDue - cashPart) : 0, cashDue: cashDue };
   }
 
+  // Per betaalregel: wat er op dat moment nog openstond en wat er terug moet.
+  function payRows() {
+    var t = totals(), open = t.total;
+    return S.pay.lines.map(function (l) {
+      var due = Math.max(0, open);
+      if (l.method === "contant" && S.settings.roundCash) due = round(Math.round(due * 20) / 20);
+      var change = round((l.amount || 0) - due);
+      open = round(open - (l.amount || 0));
+      return { line: l, due: due, change: change > 0.004 ? change : 0 };
+    });
+  }
+
+  function num(v) { return Number(v || 0).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
   function drawPayment() {
     var st = payState();
     var quick = S.settings.methods && S.settings.methods.contant === false ? [] : (S.settings.quickCash || [10, 20, 50]);
     var key = function (k, label, cls) { return "<button class='nk" + (cls || "") + "' data-key='" + k + "'>" + label + "</button>"; };
-    root.querySelector("#pay-mid").innerHTML = S.pay.lines.length
-      ? "<div class='pay-lines'>" + S.pay.lines.map(function (l, i) {
-          return "<div class='pay-line" + (i === S.pay.selected ? " selected" : "") + "' data-pline='" + i + "'>" +
-            "<span>" + e(A.PAYMENT[l.method]) + "</span><strong>" + eu(l.amount || 0) + "</strong>" +
-            "<button class='pl-del' data-pdel='" + i + "' aria-label='Verwijderen'>×</button></div>";
-        }).join("") + "</div>" +
-        (S.pay.lines[S.pay.selected]
-          ? "<div class='pay-pad'>" +
-              "<div class='pay-quick'>" + key("exact", "Gepast", " nk-q") + quick.map(function (v) { return key("+" + v, "€ " + String(v).replace(".", ","), " nk-q"); }).join("") + "</div>" +
-              "<div class='nk-keys'>" +
-                key("1", "1") + key("2", "2") + key("3", "3") + key("back", "⌫", " nk-back") +
-                key("4", "4") + key("5", "5") + key("6", "6") + key(",", ",") +
-                key("7", "7") + key("8", "8") + key("9", "9") + key("C", "Wis", " nk-clr") +
-                key("00", "00") + key("0", "0", " nk-wide") +
-              "</div>" +
-            "</div>"
-          : "")
-      : "";
-    root.querySelector("#pay-status").innerHTML = !S.pay.lines.length
-      ? "<p>Selecteer een betaalmethode aub.</p>"
-      : (st.rounding ? "<p class='muted'>Afronding contant " + (st.rounding > 0 ? "+ " : "− ") + eu(Math.abs(st.rounding)) + "</p>" : "") +
+    var pad = "<div class='pay-numpad'>" +
+      "<div class='pay-quick'>" + key("exact", "Gepast", " nk-q") + quick.map(function (v) { return key("+" + v, "€ " + String(v).replace(".", ","), " nk-q"); }).join("") + "</div>" +
+      "<div class='nk-keys'>" +
+        key("1", "1") + key("2", "2") + key("3", "3") + key("back", "⌫", " nk-back") +
+        key("4", "4") + key("5", "5") + key("6", "6") + key(",", ",") +
+        key("7", "7") + key("8", "8") + key("9", "9") + "<button class='nk nk-ok' data-act='pay-pad-ok'>OK</button>" +
+        key("C", "Wis", " nk-clr") + key("0", "0") + key("00", "00") +
+      "</div></div>";
+    var card = root.querySelector("#pay-card");
+    card.classList.toggle("has-lines", S.pay.lines.length > 0);
+    card.innerHTML = !S.pay.lines.length
+      ? "<strong class='pay-amount'>" + eu(st.total) + "</strong><p class='pay-hint'>Selecteer een betaalmethode aub.</p>"
+      : "<div class='pt-head'><span>Te betalen</span><span>Ontvangen</span><span>Wisselgeld</span><span>Methode</span></div>" +
+        payRows().map(function (r, i) {
+          var sel = i === S.pay.selected;
+          return "<div class='pt-row" + (sel ? " selected" : "") + "' data-pline='" + i + "'>" +
+            "<span class='pt-due'>" + num(r.due) + "</span>" +
+            "<span class='pt-got'>" + num(r.line.amount) + "<i class='pt-pad-ic'>" + ICON.keypad + "</i>" + (sel && S.pay.pad ? pad : "") + "</span>" +
+            "<span class='pt-change'>" + (r.change ? num(r.change) : "") + "</span>" +
+            "<span class='pt-method'>" + e(A.PAYMENT[r.line.method]) + "</span>" +
+            "<button class='pt-del' data-pdel='" + i + "' aria-label='Verwijderen'>×</button>" +
+          "</div>";
+        }).join("") +
         (st.remaining > 0.004 ? "<p class='ps-remaining'>Nog te betalen " + eu(st.remaining) + "</p>"
-          : st.change > 0.004 ? "<p class='ps-change'>" + (st.tooMuchCard ? "Te veel (alleen contant kan wisselgeld) " : "Wisselgeld ") + eu(st.change) + "</p>"
-          : "<p class='ps-ok'>Betaald ✓</p>");
+          : st.tooMuchCard ? "<p class='ps-remaining'>Te veel betaald; alleen contant kan wisselgeld geven.</p>"
+          : st.rounding ? "<p class='muted'>Afronding contant " + (st.rounding > 0 ? "+ " : "− ") + eu(Math.abs(st.rounding)) + "</p>" : "");
     root.querySelector("#pay-validate").disabled = !st.ok;
     var c = S.ticket.customer;
     var btn = root.querySelector("#pay-customer");
@@ -754,6 +767,7 @@
   function onClick(ev) {
     // Tik buiten het toetsenblok: toetsenblok dicht.
     if (S.pad && S.pad.open && !ev.target.closest(".po-numpad, .po-line, .np-mode")) closePad();
+    if (S.screen === "payment" && S.pay.pad && !ev.target.closest(".pt-row")) { S.pay.pad = false; S.pay.buffer = ""; drawPayment(); }
     var t = ev.target.closest("[data-act],[data-key],[data-add],[data-line],[data-type],[data-method],[data-pline],[data-pdel]");
     if (!t) return;
     if (t.dataset.add) return addProduct(t.dataset.add);
@@ -765,8 +779,12 @@
       return drawGrid();
     }
     if (t.dataset.method) return addPayment(t.dataset.method);
-    if (t.dataset.pdel) { ev.stopPropagation(); S.pay.lines.splice(Number(t.dataset.pdel), 1); S.pay.selected = S.pay.lines.length - 1; S.pay.buffer = ""; return drawPayment(); }
-    if (t.dataset.pline) { S.pay.selected = Number(t.dataset.pline); S.pay.buffer = ""; return drawPayment(); }
+    if (t.dataset.pdel) { ev.stopPropagation(); S.pay.lines.splice(Number(t.dataset.pdel), 1); S.pay.selected = S.pay.lines.length - 1; S.pay.buffer = ""; S.pay.pad = false; return drawPayment(); }
+    if (t.dataset.pline) {
+      var i = Number(t.dataset.pline);
+      if (i !== S.pay.selected || !S.pay.pad) { S.pay.selected = i; S.pay.buffer = ""; S.pay.pad = true; drawPayment(); }
+      return;
+    }
     switch (t.dataset.act) {
       case "fullscreen": return A.isFullscreen() ? A.exitFullscreen() : A.enterFullscreen();
       case "exit":
@@ -785,6 +803,7 @@
         });
       case "open-session": return doOpenSession(t);
       case "pad-ok": return closePad();
+      case "pay-pad-ok": S.pay.pad = false; S.pay.buffer = ""; return drawPayment();
       case "pay": return goPay();
       case "back": S.screen = "products"; return draw();
       case "validate": return validate(t);
@@ -845,6 +864,7 @@
       ev.preventDefault();
       if (S.screen === "products" && S.pad.open) closePad();
       else if (S.screen === "products") goPay();
+      else if (S.screen === "payment" && S.pay.pad) { S.pay.pad = false; S.pay.buffer = ""; drawPayment(); }
       else if (S.screen === "payment") { var b = root.querySelector("#pay-validate"); if (b && !b.disabled) validate(b); }
       else if (S.screen === "receipt") { S.screen = "products"; draw(); }
       else if (S.screen === "open") { var o = root.querySelector("[data-act=open-session]"); if (o) doOpenSession(o); }
@@ -854,6 +874,7 @@
     if (ev.key === "," || ev.key === ".") { ev.preventDefault(); return padKey(","); }
     if (ev.key === "Delete") { ev.preventDefault(); return padKey("C"); }
     if (ev.key === "Escape" && S.pad.open) return closePad();
+    if (ev.key === "Escape" && S.screen === "payment" && S.pay.pad) { S.pay.pad = false; S.pay.buffer = ""; return drawPayment(); }
     if (ev.key === "Escape" && S.screen === "payment") { S.screen = "products"; return draw(); }
     if (ev.key === "ArrowUp" || ev.key === "ArrowDown") {
       if (S.screen !== "products" || !S.ticket.items.length) return;
