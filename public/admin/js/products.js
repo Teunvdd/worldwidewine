@@ -91,6 +91,11 @@
       "<form id='p-form' class='form-grid'>" +
         field("Wijnhuis / merk", "producer", p.producer, "required autofocus") +
         field("Naam", "name", p.name, "required") +
+        "<div class='field span-2'>Foto<div class='img-edit'><span class='thumb' id='p-thumb'>" + A.productArt(p) + "</span>" +
+          "<span class='img-edit-actions'><label class='btn btn-sm'>Foto kiezen…<input type='file' id='p-file' accept='image/jpeg,image/png,image/webp' hidden></label>" +
+          "<button type='button' class='btn btn-sm btn-ghost' id='p-img-remove'" + (p.image ? "" : " hidden") + ">Foto verwijderen</button>" +
+          "<span class='muted small'>Wordt gebruikt in de kassa en de webshop. Zonder foto tonen we een getekende fles.</span></span></div></div>" +
+        "<label class='field span-2'>Omschrijving<textarea name='description' rows='4'>" + e(p.description) + "</textarea></label>" +
         // Eigenschappen van het product. Ze staan in de webshop bij het product en worden daar
         // automatisch filters. Alles is vrij in te vullen; bestaande waarden worden voorgesteld.
         "<h3 class='span-2 form-sub'>Eigenschappen</h3>" +
@@ -117,11 +122,6 @@
         field("Barcode (EAN)", "ean", p.ean, "inputmode='numeric' placeholder='Scan of typ de barcode'") +
         (isNew ? field("Voorraad", "stock", "", "inputmode='numeric' placeholder='leeg = niet bijhouden'") : "<div class='field'>Voorraad<span class='static'>" + A.stockBadge(p) + " <a href='#voorraad'>wijzigen bij Voorraad</a></span></div>") +
         field("Melding bij voorraad ≤", "minStock", p.minStock, "inputmode='numeric'") +
-        "<div class='field span-2'>Foto<div class='img-edit'><span class='thumb' id='p-thumb'>" + A.productArt(p) + "</span>" +
-          "<span class='img-edit-actions'><label class='btn btn-sm'>Foto kiezen…<input type='file' id='p-file' accept='image/jpeg,image/png,image/webp' hidden></label>" +
-          "<button type='button' class='btn btn-sm btn-ghost' id='p-img-remove'" + (p.image ? "" : " hidden") + ">Foto verwijderen</button>" +
-          "<span class='muted small'>Wordt gebruikt in de kassa en de webshop. Zonder foto tonen we een getekende fles.</span></span></div></div>" +
-        "<label class='field span-2'>Omschrijving<textarea name='description' rows='4'>" + e(p.description) + "</textarea></label>" +
         "<label class='field span-2'>Interne notitie<textarea name='note' rows='2' placeholder='Alleen zichtbaar in de admin'>" + e(p.note) + "</textarea></label>" +
         // Per doos: zelfde product (voorraad in flessen), maar ook als doos te koop met eigen aantal en prijs.
         "<fieldset class='span-2 checks case-box' id='p-case'><legend>Per doos</legend>" +
