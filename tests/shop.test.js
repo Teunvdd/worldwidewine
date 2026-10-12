@@ -290,6 +290,58 @@ test("kassa: gesplitst betalen, regelkorting en aangepaste prijs", async () => {
   await assert.rejects(shop.createPosSale({ items: [{ id: "koremans-limoncello", qty: 1 }], payments: [{ method: "pin", amount: 500 }] }), /meer met pin/);
 });
 
+test("per doos: eigen aantal en prijs, voorraad in flessen, annuleren en kassa", async () => {
+  const id = "montemercurio-messaggero";
+  await assert.rejects(shop.saveProduct({ originalId: id, caseSize: 1 }), /2 tot 99/);
+  // Niet per doos te koop: doos bestellen wordt geweigerd.
+  await assert.rejects(
+    shop.createWebOrder({ orderNumber: nr(), items: [{ id, qty: 1, box: true }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer }),
+    /niet per doos/
+  );
+  const saved = await shop.saveProduct({ originalId: id, caseSize: 6, casePrice: 120 });
+  assert.strictEqual(saved.caseSize, 6);
+  assert.strictEqual(saved.casePrice, 120);
+  assert.strictEqual((await shop.publicProducts()).find((p) => p.id === id).caseSize, 6);
+  await shop.changeStock([{ id, set: 20 }], "Geteld");
+  const stock = async () => (await shop.getProducts()).find((p) => p.id === id).stock;
+
+  // Webshop: 1 doos + 2 losse flessen = 8 flessen van de voorraad.
+  const number = nr();
+  const order = await shop.createWebOrder({ orderNumber: number, items: [{ id, qty: 1, box: true }, { id, qty: 2 }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer });
+  const fles = order.lines.find((l) => !l.box);
+  const doos = order.lines.find((l) => l.box);
+  assert.strictEqual(doos.price, 120);
+  assert.strictEqual(doos.packSize, 6);
+  assert.strictEqual(doos.unit, "doos van 6");
+  assert.strictEqual(order.total, 120 + fles.price * 2);
+  assert.strictEqual(await stock(), 12);
+  const back = (await shop.getOrder(number)).lines.find((l) => l.box);
+  assert.strictEqual(back.packSize, 6);
+
+  // Meer dozen dan er flessen zijn: geweigerd.
+  await assert.rejects(
+    shop.createWebOrder({ orderNumber: nr(), items: [{ id, qty: 3, box: true }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer }),
+    /nog maar 12 flessen/
+  );
+  // Annuleren: alle 8 flessen terug.
+  await shop.setOrderStatus(number, "geannuleerd");
+  assert.strictEqual(await stock(), 20);
+
+  // Kassa: een doos boekt 6 flessen af.
+  const { order: sale } = await shop.createPosSale({ items: [{ id, qty: 1, box: true }], payments: [{ method: "pin", amount: 120 }] });
+  assert.strictEqual(sale.total, 120);
+  assert.strictEqual(await stock(), 14);
+
+  // Zonder doosprijs: flesprijs × aantal. Uitzetten wist ook de doosprijs.
+  const auto = await shop.saveProduct({ originalId: id, caseSize: 12, casePrice: null });
+  const { computeOrder } = require("../public/data/order.js");
+  const r = computeOrder([{ id, qty: 1, box: true }], null, [auto], require("../public/data/config.js"), { pos: true });
+  assert.strictEqual(r.lines[0].price, Math.round(auto.price * 12 * 100) / 100);
+  const off = await shop.saveProduct({ originalId: id, caseSize: null, casePrice: 50 });
+  assert.strictEqual(off.caseSize, undefined);
+  assert.strictEqual(off.casePrice, undefined);
+});
+
 test("kassa sluiten: verwacht kasgeld, telling en verschil", async () => {
   const { session } = await shop.currentSession();
   const expected = session.summary.expectedCash;

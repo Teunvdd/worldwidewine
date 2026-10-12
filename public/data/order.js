@@ -21,13 +21,24 @@
     return true;
   }
 
+  // Per doos: aantal flessen in een doos (null = niet per doos te koop) en de prijs van een doos.
+  function caseSize(p) { return p && p.caseSize >= 2 ? Math.floor(p.caseSize) : null; }
+  function casePrice(p) {
+    if (!caseSize(p)) return null;
+    if (p.casePrice != null) return p.casePrice;
+    return p.price == null ? null : round(p.price * caseSize(p));
+  }
+  // Sleutel van een regel: fles en doos van hetzelfde product zijn aparte regels.
+  function lineKey(item) { return item.id + (item.box ? "|doos" : ""); }
+
   function vatRate(p) {
     if (typeof p.vat === "number") return p.vat;
     return p.type === "delicatessen" || p.type === "water" ? 9 : 21;
   }
 
   /*
-   * items:    [{ id, qty }]  — in de kassa ook { price } (aangepaste prijs) en { discount } (korting % op de regel)
+   * items:    [{ id, qty, box }] — box: true = per doos. In de kassa ook { price } (aangepaste prijs)
+   *           en { discount } (korting % op de regel)
    * options:  { pos: true }          kassa: geen bezorging, ook producten die niet online staan,
    *                                  verkopen boven de geregistreerde voorraad is toegestaan
    *           { discount: { type: "percent" | "amount", value } }
@@ -47,47 +58,67 @@
     var merged = {};
     var extra = {};
 
+    var keys = [];
     (items || []).forEach(function (item) {
       var id = item && item.id;
       var qty = Math.floor(Number(item && item.qty));
       if (!byId[id] || !(qty > 0)) return;
-      merged[id] = (merged[id] || 0) + qty;
+      var key = lineKey({ id: id, box: !!item.box });
+      if (!merged[key]) { merged[key] = { id: id, box: !!item.box, qty: 0 }; keys.push(key); }
+      merged[key].qty += qty;
       if (pos) {
         // Aangepaste prijs of regelkorting (alleen in de kassa)
-        var e = extra[id] = extra[id] || {};
+        var e = extra[key] = extra[key] || {};
         if (item.price != null && item.price !== "" && Number(item.price) >= 0) e.price = round(Number(item.price));
         if (Number(item.discount) > 0) e.discount = Math.min(100, round(Number(item.discount)));
       }
     });
 
-    Object.keys(merged).forEach(function (id) {
-      var p = byId[id];
-      var qty = Math.min(merged[id], MAX_QTY);
-      var x = extra[id] || {};
+    // Voorraad telt in flessen: per product de flessen van losse flessen en dozen samen.
+    var need = {};
+    keys.forEach(function (key) {
+      var m = merged[key], p = byId[m.id];
+      need[m.id] = (need[m.id] || 0) + Math.min(m.qty, MAX_QTY) * (m.box ? caseSize(p) || 1 : 1);
+    });
+    var stockChecked = {};
+
+    keys.forEach(function (key) {
+      var m = merged[key];
+      var p = byId[m.id];
+      var qty = Math.min(m.qty, MAX_QTY);
+      var x = extra[key] || {};
+      var size = m.box ? caseSize(p) : 1;
+      var name = p.producer + " " + p.name;
       if (!isAvailable(p, pos)) {
-        errors.push(p.producer + " " + p.name + " is " + (hasStockCount(p) && p.stock <= 0 ? "uitverkocht." : "niet te bestellen."));
+        errors.push(name + " is " + (hasStockCount(p) && p.stock <= 0 ? "uitverkocht." : "niet te bestellen."));
         return;
       }
-      if (hasStockCount(p) && qty > p.stock) {
-        if (pos) warnings.push(p.producer + " " + p.name + ": volgens het systeem nog " + p.stock + " op voorraad.");
-        else {
-          errors.push("Van " + p.producer + " " + p.name + " zijn er nog maar " + p.stock + " op voorraad.");
+      if (m.box && !size) { errors.push(name + " is niet per doos te koop."); return; }
+      if (hasStockCount(p) && need[m.id] > p.stock) {
+        if (pos) {
+          if (!stockChecked[m.id]) warnings.push(name + ": volgens het systeem nog " + p.stock + " op voorraad.");
+        } else {
+          if (!stockChecked[m.id]) errors.push("Van " + name + " zijn er nog maar " + p.stock + (m.box || need[m.id] !== qty ? " flessen" : "") + " op voorraad.");
+          stockChecked[m.id] = true;
           return;
         }
+        stockChecked[m.id] = true;
       }
-      var price = x.price != null ? x.price : p.price;
-      if (price == null) { errors.push("Vul een prijs in voor " + p.producer + " " + p.name + "."); return; }
+      var base = m.box ? casePrice(p) : p.price;
+      var price = x.price != null ? x.price : base;
+      if (price == null) { errors.push("Vul een prijs in voor " + name + "."); return; }
       var lineDiscount = x.discount || 0;
       var lineTotal = round(price * qty * (1 - lineDiscount / 100));
       var line = {
-        id: p.id, name: p.producer + " — " + p.name, unit: p.unit,
+        id: p.id, key: key, name: p.producer + " — " + p.name, unit: m.box ? "doos van " + size : p.unit,
         qty: qty, price: price, total: lineTotal, vat: vatRate(p)
       };
+      if (m.box) { line.box = true; line.packSize = size; }
       if (lineDiscount) line.discount = lineDiscount;
-      if (price !== p.price) line.listPrice = p.price;
+      if (price !== base) line.listPrice = base;
       lines.push(line);
       subtotal += lineTotal;
-      bottles += (p.bottles || 0) * qty;
+      bottles += (p.bottles || 0) * qty * size;
       if (p.pickupOnly) pickupOnly = true;
     });
     subtotal = round(subtotal);
@@ -144,7 +175,8 @@
     };
   }
 
-  var api = { computeOrder: computeOrder, isAvailable: isAvailable, vatRate: vatRate, round: round };
+  var api = { computeOrder: computeOrder, isAvailable: isAvailable, vatRate: vatRate, round: round,
+    caseSize: caseSize, casePrice: casePrice, lineKey: lineKey };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.WWW_ORDER = api;
 })(this);
