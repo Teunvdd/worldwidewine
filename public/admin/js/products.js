@@ -15,7 +15,7 @@
       var products = res[0];
       el.innerHTML =
         "<header class='page-head'><div><h1>Producten</h1><p class='muted'>" + products.length + " producten · wijzigingen zijn direct zichtbaar in de webshop en de kassa</p></div>" +
-        "<div class='actions'><button class='btn' id='p-cats'>Categorieën</button><button class='btn btn-primary' id='p-new'>+ Nieuw product</button></div></header>" +
+        "<div class='actions'><button class='btn btn-primary' id='p-new'>+ Nieuw product</button></div></header>" +
         (cats === null ? "<p class='notice notice-warn'>Categorieën zijn nog niet beschikbaar: voer <strong>supabase/setup.sql</strong> opnieuw uit in Supabase → SQL Editor.</p>" : "") +
         "<div class='toolbar'>" +
           "<input type='search' id='p-q' placeholder='Zoek op naam, wijnhuis, barcode…' value='" + e(filters.q) + "'>" +
@@ -25,8 +25,12 @@
           "<select id='p-show'>" + [["", "Alle producten"], ["webshop", "Online te koop"], ["winkel", "Alleen in de winkel"], ["inactief", "Niet actief"], ["actie", "In de actie"]]
             .map(function (o) { return "<option value='" + o[0] + "'" + (filters.show === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>" +
         "</div>" +
-        "<div class='card card-flush'><table class='table table-hover'><thead><tr><th>Product</th><th>Soort / categorie</th><th class='num'>Prijs</th><th class='num'>Voorraad</th><th>Zichtbaar</th></tr></thead><tbody id='p-rows'></tbody></table></div>";
+        "<div class='bulk-bar' id='p-bulk' hidden><strong id='p-bulk-n'></strong>" +
+          "<button class='btn btn-sm' data-bulk='active'>Actief maken</button><button class='btn btn-sm' data-bulk='inactive'>Niet actief</button>" +
+          "<button class='btn btn-sm btn-danger-ghost' data-bulk='delete'>Verwijderen</button><button class='link' data-bulk='none'>Selectie wissen</button></div>" +
+        "<div class='card card-flush'><table class='table table-hover'><thead><tr><th class='sel-col'><input type='checkbox' id='p-all' aria-label='Alles selecteren'></th><th>Product</th><th>Soort / categorie</th><th class='num'>Prijs</th><th class='num'>Voorraad</th><th>Zichtbaar</th></tr></thead><tbody id='p-rows'></tbody></table></div>";
 
+      var selected = {}, shown = [];
       function draw() {
         var q = filters.q.toLowerCase();
         var list = products.filter(function (p) {
@@ -39,28 +43,71 @@
           if (filters.show === "actie" && !p.oldPrice) return false;
           return !q || [p.name, p.producer, p.ean, p.region, p.country, p.id].join(" ").toLowerCase().indexOf(q) >= 0;
         }).sort(function (a, b) { return (a.producer + a.name).localeCompare(b.producer + b.name, "nl"); });
+        shown = list;
         el.querySelector("#p-rows").innerHTML = list.map(function (p) {
           var vis = p.active === false ? "<span class='tag tag-off'>Niet actief</span>" : p.webshop === false ? "<span class='tag tag-winkel'>Alleen winkel</span>" : "<span class='tag tag-webshop'>Webshop + winkel</span>";
-          return "<tr class='clickable' data-id='" + e(p.id) + "'><td><div class='p-cell'><span class='thumb'>" + A.productArt(p) + "</span><span><span class='muted small'>" + e(p.producer) + "</span><br><strong>" + e(p.name) + "</strong>" + (p.vintage ? " <span class='muted'>" + p.vintage + "</span>" : "") + "</span></div></td>" +
+          return "<tr class='clickable" + (selected[p.id] ? " is-selected" : "") + "' data-id='" + e(p.id) + "'><td class='sel-col'><input type='checkbox' data-sel aria-label='Selecteren'" + (selected[p.id] ? " checked" : "") + "></td><td><div class='p-cell'><span class='thumb'>" + A.productArt(p) + "</span><span><span class='muted small'>" + e(p.producer) + "</span><br><strong>" + e(p.name) + "</strong>" + (p.vintage ? " <span class='muted'>" + p.vintage + "</span>" : "") + "</span></div></td>" +
             "<td>" + e(A.typeLabel(p.type)) + "<br>" + catTag(p) + "<span class='muted small'>" + e(p.unit) + (p.caseSize ? " · ook per doos van " + p.caseSize : "") + "</span></td>" +
             "<td class='num'>" + (p.price == null ? "<span class='muted'>op aanvraag</span>" : (p.oldPrice ? "<s class='muted small'>" + eu(p.oldPrice) + "</s> " : "") + eu(p.price)) + "</td>" +
             "<td class='num'>" + A.stockBadge(p) + "</td><td>" + vis + "</td></tr>";
-        }).join("") || "<tr><td colspan='5' class='empty-inline'>Geen producten gevonden.</td></tr>";
+        }).join("") || "<tr><td colspan='6' class='empty-inline'>Geen producten gevonden.</td></tr>";
+        drawBulk();
+      }
+      // Selectie: balk met acties zodra er iets aangevinkt is.
+      function drawBulk() {
+        var ids = Object.keys(selected);
+        el.querySelector("#p-bulk").hidden = !ids.length;
+        el.querySelector("#p-bulk-n").textContent = ids.length + (ids.length === 1 ? " product geselecteerd" : " producten geselecteerd");
+        var all = el.querySelector("#p-all"), n = shown.filter(function (p) { return selected[p.id]; }).length;
+        all.checked = shown.length > 0 && n === shown.length;
+        all.indeterminate = n > 0 && n < shown.length;
       }
       draw();
+      el.querySelector("#p-all").addEventListener("change", function () {
+        var on = this.checked;
+        shown.forEach(function (p) { if (on) selected[p.id] = true; else delete selected[p.id]; });
+        draw();
+      });
+      el.querySelector("#p-bulk").addEventListener("click", function (ev) {
+        var b = ev.target.closest("[data-bulk]");
+        if (!b) return;
+        var ids = Object.keys(selected), act = b.dataset.bulk;
+        if (act === "none") { selected = {}; return draw(); }
+        var go = function () {
+          A.busy(b, true, "Bezig…");
+          var calls = ids.map(function (id) {
+            return act === "delete" ? A.api("DELETE", "products/" + encodeURIComponent(id))
+              : A.api("POST", "products", { originalId: id, active: act === "active" });
+          });
+          Promise.allSettled(calls).then(function (res) {
+            var failed = res.filter(function (r) { return r.status === "rejected"; });
+            A.toast(failed.length ? failed.length + " van de " + ids.length + " lukte niet: " + failed[0].reason.message
+              : act === "delete" ? ids.length + " verwijderd" : ids.length + " bijgewerkt", failed.length ? "error" : undefined);
+            A.invalidate("products"); A.route();
+          });
+        };
+        if (act !== "delete") return go();
+        A.confirm(ids.length === 1 ? "Product verwijderen?" : ids.length + " producten verwijderen?",
+          "Dit kan niet ongedaan worden gemaakt. Tip: zet producten liever op ‘niet actief’, dan blijven ze in de geschiedenis bewaard.", "Verwijderen", true)
+          .then(function (ok) { if (ok) go(); });
+      });
 
       el.querySelector("#p-q").addEventListener("input", function () { filters.q = this.value; draw(); });
       el.querySelector("#p-type").addEventListener("change", function () { filters.type = this.value; draw(); });
       el.querySelector("#p-show").addEventListener("change", function () { filters.show = this.value; draw(); });
       var pc = el.querySelector("#p-cat");
       if (pc) pc.addEventListener("change", function () { filters.cat = this.value; draw(); });
-      el.querySelector("#p-cats").addEventListener("click", function () {
-        if (cats === null) return A.toast("Voer eerst supabase/setup.sql opnieuw uit in Supabase.", "error");
-        manageCategories();
-      });
       el.querySelector("#p-new").addEventListener("click", function () { edit(null); });
       el.querySelector("#p-rows").addEventListener("click", function (ev) {
         var tr = ev.target.closest("[data-id]");
+        if (ev.target.closest(".sel-col")) {
+          if (!tr) return;
+          var box = tr.querySelector("[data-sel]");
+          if (ev.target !== box) box.checked = !box.checked;
+          if (box.checked) selected[tr.dataset.id] = true; else delete selected[tr.dataset.id];
+          tr.classList.toggle("is-selected", box.checked);
+          return drawBulk();
+        }
         if (tr) edit(products.find(function (p) { return p.id === tr.dataset.id; }));
       });
     });
@@ -91,6 +138,12 @@
       "<form id='p-form' class='form-grid'>" +
         field("Wijnhuis / merk", "producer", p.producer, "required autofocus") +
         field("Naam", "name", p.name, "required") +
+        "<div class='field span-2'>Foto<div class='img-edit' id='p-drop'><span class='thumb' id='p-thumb'>" + A.productArt(p) + "</span>" +
+          "<span class='img-edit-actions'><label class='btn btn-sm'>Foto kiezen…<input type='file' id='p-file' accept='image/jpeg,image/png,image/webp' hidden></label>" +
+          "<button type='button' class='btn btn-sm btn-ghost' id='p-img-remove'" + (p.image ? "" : " hidden") + ">Foto verwijderen</button>" +
+          "<span class='muted small'>Sleep een foto hierheen of kies er een. Wordt gebruikt in de kassa en de webshop. Zonder foto tonen we een getekende fles.</span></span>" +
+          "<span class='drop-hint'>Laat los om de foto te gebruiken</span></div></div>" +
+        "<label class='field span-2'>Omschrijving<textarea name='description' rows='4'>" + e(p.description) + "</textarea></label>" +
         // Eigenschappen van het product. Ze staan in de webshop bij het product en worden daar
         // automatisch filters. Alles is vrij in te vullen; bestaande waarden worden voorgesteld.
         "<h3 class='span-2 form-sub'>Eigenschappen</h3>" +
@@ -117,11 +170,6 @@
         field("Barcode (EAN)", "ean", p.ean, "inputmode='numeric' placeholder='Scan of typ de barcode'") +
         (isNew ? field("Voorraad", "stock", "", "inputmode='numeric' placeholder='leeg = niet bijhouden'") : "<div class='field'>Voorraad<span class='static'>" + A.stockBadge(p) + " <a href='#voorraad'>wijzigen bij Voorraad</a></span></div>") +
         field("Melding bij voorraad ≤", "minStock", p.minStock, "inputmode='numeric'") +
-        "<div class='field span-2'>Foto<div class='img-edit'><span class='thumb' id='p-thumb'>" + A.productArt(p) + "</span>" +
-          "<span class='img-edit-actions'><label class='btn btn-sm'>Foto kiezen…<input type='file' id='p-file' accept='image/jpeg,image/png,image/webp' hidden></label>" +
-          "<button type='button' class='btn btn-sm btn-ghost' id='p-img-remove'" + (p.image ? "" : " hidden") + ">Foto verwijderen</button>" +
-          "<span class='muted small'>Wordt gebruikt in de kassa en de webshop. Zonder foto tonen we een getekende fles.</span></span></div></div>" +
-        "<label class='field span-2'>Omschrijving<textarea name='description' rows='4'>" + e(p.description) + "</textarea></label>" +
         "<label class='field span-2'>Interne notitie<textarea name='note' rows='2' placeholder='Alleen zichtbaar in de admin'>" + e(p.note) + "</textarea></label>" +
         // Per doos: zelfde product (voorraad in flessen), maar ook als doos te koop met eigen aantal en prijs.
         "<fieldset class='span-2 checks case-box' id='p-case'><legend>Per doos</legend>" +
@@ -160,14 +208,24 @@
     ["caseOn", "caseSize", "price"].forEach(function (n) { form[n].addEventListener("input", caseUi); form[n].addEventListener("change", caseUi); });
     caseUi();
     var pendingImage; // undefined = ongewijzigd, "" = verwijderen, anders data-URL
-    body.querySelector("#p-file").addEventListener("change", function () {
-      var file = this.files && this.files[0];
+    function useFile(file) {
       if (!file) return;
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return A.toast("Kies een JPG-, PNG- of WebP-foto.", "error");
       resizeImage(file, 900).then(function (dataUrl) {
         pendingImage = dataUrl;
         body.querySelector("#p-thumb").innerHTML = "<img class='p-img' src='" + dataUrl + "' alt=''>";
         body.querySelector("#p-img-remove").hidden = false;
       }).catch(function () { A.toast("Deze foto kan niet worden gelezen.", "error"); });
+    }
+    body.querySelector("#p-file").addEventListener("change", function () { useFile(this.files && this.files[0]); });
+    // Foto slepen en neerzetten op het fotovak.
+    var drop = body.querySelector("#p-drop"), depth = 0;
+    drop.addEventListener("dragenter", function (ev) { ev.preventDefault(); depth++; drop.classList.add("dragging"); });
+    drop.addEventListener("dragover", function (ev) { ev.preventDefault(); ev.dataTransfer.dropEffect = "copy"; });
+    drop.addEventListener("dragleave", function () { if (--depth <= 0) { depth = 0; drop.classList.remove("dragging"); } });
+    drop.addEventListener("drop", function (ev) {
+      ev.preventDefault(); depth = 0; drop.classList.remove("dragging");
+      useFile(ev.dataTransfer.files && ev.dataTransfer.files[0]);
     });
     body.querySelector("#p-img-remove").addEventListener("click", function () {
       pendingImage = "";
@@ -223,94 +281,98 @@
     return c ? "<span class='cat-tag'><i style='background:" + (c.color || "#cbbcb0") + "'></i>" + e(c.name) + "</span> " : "";
   }
 
-  // ---- Categorieën beheren (de knoppen boven de producten in de kassa) ----
-  function manageCategories() {
-    var body = A.modal("Categorieën",
-      "<p class='muted'>Categorieën verdelen de producten in de kassa over de knoppen boven het productoverzicht. " +
-        "Stel per product de categorie in bij het product zelf. De volgorde hier is de volgorde in de kassa.</p>" +
-      "<div class='cat-list' id='cat-list'></div>" +
-      "<form class='cat-add' id='cat-add'><input name='name' placeholder='Nieuwe categorie, bijv. Italiaanse wijn' maxlength='40' required autofocus>" +
-        "<button class='btn btn-primary'>+ Toevoegen</button></form>" +
-      "<div class='actions'><span class='spacer'></span><button class='btn' data-modal-close>Klaar</button></div>",
-      { wide: true, onClose: function () { A.invalidate("categories"); A.route(); } });
-    var list = body.querySelector("#cat-list");
-
-    function draw() {
-      list.innerHTML = cats.length ? cats.map(function (c, i) {
-        return "<div class='cat-row' data-cid='" + c.id + "'>" +
-          "<span class='cat-move'><button type='button' class='icon-btn' data-up='" + i + "'" + (i ? "" : " disabled") + " title='Omhoog'>▲</button>" +
-          "<button type='button' class='icon-btn' data-down='" + i + "'" + (i < cats.length - 1 ? "" : " disabled") + " title='Omlaag'>▼</button></span>" +
-          "<input class='cat-name' value='" + e(c.name) + "' maxlength='40' aria-label='Naam'>" +
-          "<span class='cat-colors'>" + COLORS.map(function (col) {
-            return "<button type='button' class='swatch" + (c.color === col ? " active" : "") + "' data-color='" + col + "' style='background:" + col + "' title='Kleur'></button>";
-          }).join("") + "<button type='button' class='swatch swatch-none" + (!c.color ? " active" : "") + "' data-color='' title='Geen kleur'></button></span>" +
-          "<span class='muted small cat-count'></span>" +
-          "<button type='button' class='btn btn-sm btn-danger-ghost' data-del='" + c.id + "'>Verwijderen</button></div>";
-      }).join("") : "<div class='empty-inline'>Nog geen categorieën." +
-        "<br><button type='button' class='btn btn-sm' id='cat-types'>Maak categorieën op basis van soort (Rood, Wit, …)</button></div>";
-      var counts = {};
-      (A.cacheOf("products") || []).forEach(function (p) { if (p.categoryId) counts[p.categoryId] = (counts[p.categoryId] || 0) + 1; });
-      list.querySelectorAll(".cat-row").forEach(function (row) {
-        var n = counts[row.dataset.cid] || 0;
-        row.querySelector(".cat-count").textContent = n + (n === 1 ? " product" : " producten");
-      });
-      var ft = list.querySelector("#cat-types");
-      if (ft) ft.addEventListener("click", function () {
-        A.busy(ft, true, "Bezig…");
-        A.api("POST", "categories/from-types", { labels: A.TYPES }).then(function (r) {
-          cats = r.categories; A.invalidate("products");
-          return A.load("products", true);
-        }).then(function () { draw(); A.toast("Categorieën aangemaakt en producten ingedeeld"); })
-          .catch(function (err) { A.busy(ft, false); A.toast(err.message, "error"); });
-      });
-    }
-    draw();
-
-    function save(c, changes) {
-      return A.api("POST", "categories", Object.assign({ id: c.id, name: c.name, color: c.color }, changes)).then(function (r) {
-        Object.assign(c, r.category); draw();
-      }).catch(function (err) { A.toast(err.message, "error"); draw(); });
-    }
-    function move(from, to) {
-      var c = cats.splice(from, 1)[0];
-      cats.splice(to, 0, c); draw();
-      A.api("POST", "categories/order", { ids: cats.map(function (x) { return x.id; }) })
-        .then(function (r) { cats = r.categories; draw(); })
-        .catch(function (err) { A.toast(err.message, "error"); });
-    }
-
-    list.addEventListener("click", function (ev) {
-      var b = ev.target.closest("button");
-      if (!b) return;
-      var row = b.closest(".cat-row");
-      var c = row && cats.find(function (x) { return String(x.id) === row.dataset.cid; });
-      if (b.dataset.up) return move(Number(b.dataset.up), Number(b.dataset.up) - 1);
-      if (b.dataset.down) return move(Number(b.dataset.down), Number(b.dataset.down) + 1);
-      if (b.dataset.color !== undefined && c) return save(c, { color: b.dataset.color || null });
-      if (b.dataset.del && c) {
-        if (!window.confirm("Categorie ‘" + c.name + "’ verwijderen? De producten blijven bestaan en krijgen geen categorie.")) return;
-        A.api("DELETE", "categories/" + c.id).then(function () {
-          cats = cats.filter(function (x) { return x !== c; });
-          (A.cacheOf("products") || []).forEach(function (p) { if (p.categoryId === c.id) p.categoryId = null; });
-          draw(); A.toast("Categorie verwijderd");
-        }).catch(function (err) { A.toast(err.message, "error"); });
+  // ---- Kassacategorieën (de knoppen boven de producten in de kassa): eigen pagina ----
+  function renderCategories(el) {
+    return Promise.all([A.load("products", true), loadCats(true)]).then(function () {
+      if (cats === null) {
+        el.innerHTML = "<header class='page-head'><div><h1>Kassacategorieën</h1></div></header>" +
+          "<p class='notice notice-warn'>Categorieën zijn nog niet beschikbaar: voer <strong>supabase/setup.sql</strong> opnieuw uit in Supabase → SQL Editor.</p>";
+        return;
       }
-    });
-    list.addEventListener("change", function (ev) {
-      if (!ev.target.classList.contains("cat-name")) return;
-      var row = ev.target.closest(".cat-row");
-      var c = cats.find(function (x) { return String(x.id) === row.dataset.cid; });
-      var name = ev.target.value.trim();
-      if (!name) { ev.target.value = c.name; return; }
-      if (name !== c.name) save(c, { name: name });
-    });
-    body.querySelector("#cat-add").addEventListener("submit", function (ev) {
-      ev.preventDefault();
-      var form = this, input = form.elements.namedItem("name"), name = input.value.trim();
-      if (!name) return;
-      A.api("POST", "categories", { name: name, color: COLORS[cats.length % COLORS.length] }).then(function (r) {
-        cats.push(r.category); form.reset(); draw(); input.focus();
-      }).catch(function (err) { A.toast(err.message, "error"); });
+      el.innerHTML =
+        "<header class='page-head'><div><h1>Kassacategorieën</h1><p class='muted'>De knoppen boven de producten in de kassa, in deze volgorde. " +
+          "De categorie van een product stel je in bij het product zelf.</p></div></header>" +
+        "<form class='card cat-add' id='cat-add'><input name='name' placeholder='Nieuwe categorie, bijv. Italiaanse wijn' maxlength='40' required>" +
+          "<button class='btn btn-primary'>+ Toevoegen</button></form>" +
+        "<div class='card card-flush'><table class='table cat-table'><thead><tr><th class='cat-move-col'>Volgorde</th><th>Naam</th><th>Kleur</th><th class='num'>Producten</th><th></th></tr></thead>" +
+          "<tbody id='cat-list'></tbody></table></div>";
+      var list = el.querySelector("#cat-list");
+
+      function draw() {
+        var counts = {};
+        (A.cacheOf("products") || []).forEach(function (p) { if (p.categoryId) counts[p.categoryId] = (counts[p.categoryId] || 0) + 1; });
+        list.innerHTML = cats.length ? cats.map(function (c, i) {
+          return "<tr class='cat-row' data-cid='" + c.id + "'>" +
+            "<td><span class='cat-move'><button type='button' class='icon-btn' data-up='" + i + "'" + (i ? "" : " disabled") + " title='Omhoog' aria-label='Omhoog'>▲</button>" +
+              "<button type='button' class='icon-btn' data-down='" + i + "'" + (i < cats.length - 1 ? "" : " disabled") + " title='Omlaag' aria-label='Omlaag'>▼</button></span></td>" +
+            "<td><input class='cat-name' value='" + e(c.name) + "' maxlength='40' aria-label='Naam'></td>" +
+            "<td><span class='cat-colors'>" + COLORS.map(function (col) {
+              return "<button type='button' class='swatch" + (c.color === col ? " active" : "") + "' data-color='" + col + "' style='background:" + col + "' title='Kleur'></button>";
+            }).join("") + "<button type='button' class='swatch swatch-none" + (!c.color ? " active" : "") + "' data-color='' title='Geen kleur'></button></span></td>" +
+            "<td class='num'>" + (counts[c.id] || 0) + "</td>" +
+            "<td class='num'><button type='button' class='btn btn-sm btn-danger-ghost' data-del='" + c.id + "'>Verwijderen</button></td></tr>";
+        }).join("") : "<tr><td colspan='5' class='empty-inline'>Nog geen categorieën." +
+          "<br><button type='button' class='btn btn-sm' id='cat-types'>Maak categorieën op basis van soort (Rood, Wit, …)</button></td></tr>";
+        var ft = list.querySelector("#cat-types");
+        if (ft) ft.addEventListener("click", function () {
+          A.busy(ft, true, "Bezig…");
+          A.api("POST", "categories/from-types", { labels: A.TYPES }).then(function (r) {
+            cats = r.categories; A.invalidate("products", "categories");
+            return A.load("products", true);
+          }).then(function () { draw(); A.toast("Categorieën aangemaakt en producten ingedeeld"); })
+            .catch(function (err) { A.busy(ft, false); A.toast(err.message, "error"); });
+        });
+      }
+      draw();
+
+      function save(c, changes) {
+        return A.api("POST", "categories", Object.assign({ id: c.id, name: c.name, color: c.color }, changes)).then(function (r) {
+          Object.assign(c, r.category); A.invalidate("categories"); draw();
+        }).catch(function (err) { A.toast(err.message, "error"); draw(); });
+      }
+      function move(from, to) {
+        var c = cats.splice(from, 1)[0];
+        cats.splice(to, 0, c); draw();
+        A.api("POST", "categories/order", { ids: cats.map(function (x) { return x.id; }) })
+          .then(function (r) { cats = r.categories; A.invalidate("categories"); draw(); })
+          .catch(function (err) { A.toast(err.message, "error"); });
+      }
+
+      list.addEventListener("click", function (ev) {
+        var b = ev.target.closest("button");
+        if (!b) return;
+        var row = b.closest(".cat-row");
+        var c = row && cats.find(function (x) { return String(x.id) === row.dataset.cid; });
+        if (b.dataset.up) return move(Number(b.dataset.up), Number(b.dataset.up) - 1);
+        if (b.dataset.down) return move(Number(b.dataset.down), Number(b.dataset.down) + 1);
+        if (b.dataset.color !== undefined && c) return save(c, { color: b.dataset.color || null });
+        if (b.dataset.del && c) {
+          A.confirm("Categorie verwijderen?", "‘" + c.name + "’ wordt verwijderd. De producten blijven bestaan en krijgen geen categorie.", "Verwijderen", true).then(function (ok) {
+            if (!ok) return;
+            A.api("DELETE", "categories/" + c.id).then(function () {
+              cats = cats.filter(function (x) { return x !== c; });
+              (A.cacheOf("products") || []).forEach(function (p) { if (p.categoryId === c.id) p.categoryId = null; });
+              A.invalidate("categories"); draw(); A.toast("Categorie verwijderd");
+            }).catch(function (err) { A.toast(err.message, "error"); });
+          });
+        }
+      });
+      list.addEventListener("change", function (ev) {
+        if (!ev.target.classList.contains("cat-name")) return;
+        var row = ev.target.closest(".cat-row");
+        var c = cats.find(function (x) { return String(x.id) === row.dataset.cid; });
+        var name = ev.target.value.trim();
+        if (!name) { ev.target.value = c.name; return; }
+        if (name !== c.name) save(c, { name: name });
+      });
+      el.querySelector("#cat-add").addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        var form = this, input = form.elements.namedItem("name"), name = input.value.trim();
+        if (!name) return;
+        A.api("POST", "categories", { name: name, color: COLORS[cats.length % COLORS.length] }).then(function (r) {
+          cats.push(r.category); A.invalidate("categories"); form.reset(); draw(); input.focus();
+        }).catch(function (err) { A.toast(err.message, "error"); });
+      });
     });
   }
 
@@ -335,4 +397,5 @@
   }
 
   A.register("producten", { render: render });
+  A.register("kassa-categorieen", { render: renderCategories });
 })();
