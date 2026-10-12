@@ -117,7 +117,7 @@ window.WWW.ready.then(function () {
         '<p class="pm-price">' + W.priceHtml(p) + ' <small>' + W.esc(p.unit) + "</small></p>" +
         "<p>" + W.esc(p.description) + "</p>" +
         '<dl class="specs">' + rows.map(function (r) { return "<dt>" + r[0] + "</dt><dd>" + W.esc(r[1]) + "</dd>"; }).join("") + "</dl>" +
-        '<div class="pm-actions">' + W.buyButton(p) + W.caseButton(p, true) + "</div>" +
+        '<div class="pm-actions">' + W.buyButton(p) + "</div>" +
         (p.pickupOnly ? '<p class="muted">Dit product is alleen af te halen in Zaandam of Weesp.</p>' : "") +
         (p.price != null && !p.pickupOnly ? '<p class="muted">Gratis afhalen · bezorging in de regio · PostNL door heel Nederland</p>' : "") +
       "</div>";
