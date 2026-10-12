@@ -69,6 +69,14 @@ test("annuleren zet de voorraad terug", async () => {
   await assert.rejects(shop.setOrderStatus(number, "afgerond"), /geannuleerd/);
 });
 
+test("kassa: verkopen kan pas na openen van de kassa", async () => {
+  await assert.rejects(shop.createPosSale({ items: [{ id: "koremans-limoncello", qty: 1 }], payment: "pin" }), /Open eerst de kassa/);
+  const s = await shop.startSession({ openingCash: 150 });
+  assert.strictEqual(s.status, "open");
+  assert.strictEqual(s.openingCash, 150);
+  await assert.rejects(shop.startSession({ openingCash: 0 }), /al een kassadienst open/);
+});
+
 test("kassaverkoop met korting, contant en btw", async () => {
   const { order } = await shop.createPosSale({
     items: [{ id: "wiston-estate-brut", qty: 1 }, { id: "iberico-pata-negra-bellota", qty: 1 }],
@@ -181,7 +189,7 @@ test("online betalen via Mollie: betaling starten en webhook verwerken", async (
 test("publieke sleutel (anon) kan niets lezen of wijzigen", async () => {
   const { createClient } = require("@supabase/supabase-js");
   const anon = createClient(stack.url, stack.anonKey, { auth: { persistSession: false } });
-  for (const table of ["products", "customers", "orders", "order_lines", "stock_movements"]) {
+  for (const table of ["products", "customers", "orders", "order_lines", "stock_movements", "pos_sessions"]) {
     const { data, error } = await anon.from(table).select("*").limit(1);
     assert.ok(error || (data && data.length === 0), table + " is leesbaar met de anon-sleutel");
     assert.ok(error, table + " zou een permissiefout moeten geven");
@@ -224,4 +232,54 @@ test("product bewerken: velden leegmaken werkt", async () => {
   assert.strictEqual(p.oldPrice, undefined);
   assert.deepStrictEqual(p.tags, []);
   assert.strictEqual(p.price, 11.9);
+});
+
+test("kassa: gesplitst betalen, regelkorting en aangepaste prijs", async () => {
+  const { order } = await shop.createPosSale({
+    items: [{ id: "montemercurio-messaggero", qty: 2, discount: 10 }, { id: "koremans-limoncello", qty: 1, price: 20 }],
+    payments: [{ method: "pin", amount: 30 }, { method: "contant", amount: 50 }]
+  });
+  // 2 × 21,50 (Messaggero, prijs in eerdere test aangepast? nee: 23) − 10% + 20
+  const messaggero = order.lines.find((l) => l.id === "montemercurio-messaggero");
+  assert.strictEqual(messaggero.discount, 10);
+  assert.strictEqual(messaggero.total, Math.round(messaggero.price * 2 * 0.9 * 100) / 100);
+  const lim = order.lines.find((l) => l.id === "koremans-limoncello");
+  assert.strictEqual(lim.price, 20);
+  assert.strictEqual(lim.listPrice, 22);
+  assert.strictEqual(order.paymentMethod, "gemengd");
+  const cash = order.payments.find((p) => p.method === "contant");
+  assert.strictEqual(cash.amount, Math.round((order.total - 30) * 100) / 100);
+  assert.strictEqual(order.cash.change, Math.round((50 - cash.amount) * 100) / 100);
+  const saved = await shop.getOrder(order.number);
+  assert.deepStrictEqual(saved.payments, order.payments);
+  assert.strictEqual(saved.lines.find((l) => l.id === "koremans-limoncello").listPrice, 22);
+  await assert.rejects(shop.createPosSale({ items: [{ id: "koremans-limoncello", qty: 1 }], payments: [{ method: "pin", amount: 5 }] }), /lager dan het totaal/);
+  await assert.rejects(shop.createPosSale({ items: [{ id: "koremans-limoncello", qty: 1 }], payments: [{ method: "pin", amount: 500 }] }), /meer met pin/);
+});
+
+test("kassa sluiten: verwacht kasgeld, telling en verschil", async () => {
+  const { session } = await shop.currentSession();
+  const expected = session.summary.expectedCash;
+  assert.strictEqual(expected, Math.round((150 + (session.summary.byMethod.contant || 0)) * 100) / 100);
+  assert.ok(session.summary.count >= 3);
+  const closed = await shop.closeSession({ countedCash: expected - 2.5, note: "2,50 te weinig" });
+  assert.strictEqual(closed.status, "gesloten");
+  assert.strictEqual(closed.difference, -2.5);
+  assert.strictEqual((await shop.currentSession()).session, null);
+  assert.strictEqual((await shop.currentSession()).lastClosingCash, expected - 2.5);
+  await assert.rejects(shop.createPosSale({ items: [{ id: "koremans-limoncello", qty: 1 }], payment: "pin" }), /Open eerst de kassa/);
+  assert.strictEqual((await shop.listSessions())[0].id, closed.id);
+});
+
+test("productfoto uploaden", async () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  process.env.WWW_LOCAL_UPLOADS = fs.mkdtempSync(path.join(os.tmpdir(), "www-img-"));
+  const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+  const p = await shop.setProductImage("wiston-estate-brut", png);
+  assert.match(p.image, /^\/uploads\/wiston-estate-brut-.*\.png$/);
+  assert.ok(fs.existsSync(path.join(process.env.WWW_LOCAL_UPLOADS, path.basename(p.image))));
+  await assert.rejects(shop.setProductImage("wiston-estate-brut", "data:text/html;base64,PGgxPg=="), /JPG/);
+  const cleared = await shop.setProductImage("wiston-estate-brut", null);
+  assert.strictEqual(cleared.image, undefined);
+  delete process.env.WWW_LOCAL_UPLOADS;
 });

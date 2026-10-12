@@ -1,106 +1,233 @@
-/* Kassa voor de winkel: producten zoeken of scannen, afrekenen, bon afdrukken. */
+/* Kassa (POS) voor de winkel, in de stijl van Odoo:
+ *   #kassa  beheer in de admin: kassa openen, sluiten, overzicht van diensten
+ *   #pos    de kassa zelf, op volledig scherm: productkaarten, bon met numpad, betaalscherm, bonscherm
+ */
 (function () {
   var e = A.esc, eu = A.euro;
-  var ticket = { items: [], discount: null, customer: null };
-  var products = [];
-  var filterType = "";
-  var root;
+  var round = function (n) { return Math.round(n * 100) / 100; };
+  var METHODS = [
+    { key: "pin", label: "Pin", icon: "▭" },
+    { key: "contant", label: "Contant", icon: "€" },
+    { key: "tikkie", label: "Tikkie", icon: "↗" }
+  ];
 
-  function save() { try { localStorage.setItem("wwwPosTicket", JSON.stringify(ticket)); } catch (x) {} }
-  function restore() {
-    try { var t = JSON.parse(localStorage.getItem("wwwPosTicket") || "null"); if (t && Array.isArray(t.items)) ticket = t; } catch (x) {}
-  }
+  // ================================================================ Kassabeheer (#kassa)
 
-  function byId(id) { return products.find(function (p) { return p.id === id; }); }
-  function sellable(p) { return p.active !== false && p.price != null; }
-
-  function totals() {
-    return A.computeOrder(ticket.items, null, products, A.CONFIG, { pos: true, discount: ticket.discount });
-  }
-
-  function add(id, qty) {
-    var p = byId(id);
-    if (!p || !sellable(p)) return;
-    var line = ticket.items.find(function (i) { return i.id === id; });
-    if (line) line.qty += qty || 1; else ticket.items.push({ id: id, qty: qty || 1 });
-    save(); drawTicket();
-    flash(id);
-  }
-  function setQty(id, qty) {
-    ticket.items = ticket.items.map(function (i) { return i.id === id ? { id: id, qty: qty } : i; }).filter(function (i) { return i.qty > 0; });
-    save(); drawTicket();
-  }
-  function clearTicket() { ticket = { items: [], discount: null, customer: null }; save(); drawTicket(); }
-
-  function flash(id) {
-    var tile = root.querySelector("[data-pos-add='" + CSS.escape(id) + "']");
-    if (tile) { tile.classList.remove("flash"); void tile.offsetWidth; tile.classList.add("flash"); }
-  }
-
-  function render(el) {
-    root = el;
-    restore();
-    return A.load("products", true).then(function (list) {
-      products = list;
+  function renderManage(el) {
+    return Promise.all([A.api("GET", "pos/session"), A.api("GET", "pos/sessions")]).then(function (res) {
+      var cur = res[0].session, sessions = res[1].sessions;
       el.innerHTML =
-        "<div class='pos'>" +
-          "<section class='pos-catalog'>" +
-            "<div class='pos-search'>" +
-              "<input type='search' id='pos-q' placeholder='Zoek product of scan barcode…' autocomplete='off' autofocus>" +
-            "</div>" +
-            "<div class='chips' id='pos-types'>" +
-              "<button class='chip active' data-type=''>Alles</button>" +
-              Object.keys(A.TYPES).filter(function (t) { return products.some(function (p) { return p.type === t && sellable(p); }); })
-                .map(function (t) { return "<button class='chip' data-type='" + t + "'>" + A.TYPES[t] + "</button>"; }).join("") +
-            "</div>" +
-            "<div class='pos-grid' id='pos-grid'></div>" +
-          "</section>" +
-          "<section class='pos-ticket'>" +
-            "<header class='pos-ticket-head'><h2>Bon</h2><button class='link' id='pos-clear'>Leegmaken</button></header>" +
-            "<div class='pos-customer' id='pos-customer'></div>" +
-            "<div class='pos-lines' id='pos-lines'></div>" +
-            "<div class='pos-summary' id='pos-summary'></div>" +
-            "<div class='pos-pay'>" +
-              "<button class='pay pay-pin' data-pay='pin'>Pin</button>" +
-              "<button class='pay pay-cash' data-pay='contant'>Contant</button>" +
-              "<button class='pay pay-other' data-pay='tikkie'>Tikkie</button>" +
-            "</div>" +
-          "</section>" +
-        "</div>";
+        "<header class='page-head'><div><h1>Kassa</h1><p class='muted'>Open de kassa aan het begin van de dag en sluit hem af met een kastelling.</p></div></header>" +
+        "<section class='card kassa-status " + (cur ? "is-open" : "is-closed") + "'>" +
+          (cur
+            ? "<div><span class='dot'></span><strong>De kassa is open</strong> sinds " + A.date(cur.openedAt, true) + "<br><span class='muted'>" +
+                cur.summary.count + " bonnen · omzet " + eu(cur.summary.total) + " · in de la verwacht " + eu(cur.summary.expectedCash) + "</span></div>" +
+              "<div class='actions'><button class='btn' id='k-close'>Kassa sluiten</button><button class='btn btn-primary btn-lg' id='k-open'>Naar de kassa</button></div>"
+            : "<div><span class='dot'></span><strong>De kassa is gesloten</strong><br><span class='muted'>Laatst geteld in de la: " + eu(res[0].lastClosingCash) + "</span></div>" +
+              "<div class='actions'><button class='btn btn-primary btn-lg' id='k-open'>Kassa openen</button></div>") +
+        "</section>" +
+        "<p class='muted small'>Tip: zet de kassacomputer in kioskmodus, dan opent de kassa direct op volledig scherm (zie README).</p>" +
+        "<section class='card card-flush'><table class='table table-hover'><thead><tr><th>Dienst</th><th>Geopend</th><th>Gesloten</th><th class='num'>Bonnen</th><th class='num'>Omzet</th><th class='num'>Pin</th><th class='num'>Contant</th><th class='num'>Verschil kas</th></tr></thead><tbody>" +
+        (sessions.length ? sessions.map(function (s) {
+          var sm = s.summary || {}, bm = sm.byMethod || {};
+          var diff = s.difference == null ? "—" : "<span class='" + (Math.abs(s.difference) < 0.005 ? "num-up" : "num-down") + "'>" + (s.difference > 0 ? "+" : "") + eu(s.difference) + "</span>";
+          return "<tr class='clickable' data-session='" + s.id + "'><td>#" + s.id + (s.status === "open" ? " <span class='status status-nieuw'>Open</span>" : "") + "</td><td>" + A.date(s.openedAt, true) + "</td><td>" + (s.closedAt ? A.date(s.closedAt, true) : "—") + "</td>" +
+            "<td class='num'>" + (sm.count == null ? "—" : sm.count) + "</td><td class='num'>" + (sm.total == null ? "—" : eu(sm.total)) + "</td><td class='num'>" + (bm.pin ? eu(bm.pin) : "—") + "</td><td class='num'>" + (bm.contant ? eu(bm.contant) : "—") + "</td><td class='num'>" + diff + "</td></tr>";
+        }).join("") : "<tr><td colspan='8' class='empty-inline'>Nog geen kassadiensten.</td></tr>") +
+        "</tbody></table></section>";
 
-      drawGrid();
-      drawTicket();
-
-      var q = el.querySelector("#pos-q");
-      q.addEventListener("input", drawGrid);
-      q.addEventListener("keydown", function (ev) {
-        if (ev.key !== "Enter") return;
-        ev.preventDefault();
-        var v = q.value.trim();
-        if (!v) return;
-        // Barcodescanners typen de code en sturen een Enter.
-        var hit = products.find(function (p) { return p.ean && p.ean === v; });
-        var matches = visible();
-        if (!hit && matches.length === 1) hit = matches[0];
-        if (hit) { add(hit.id); q.value = ""; drawGrid(); }
-        else A.toast(/^\d{8,14}$/.test(v) ? "Barcode " + v + " is niet gekoppeld aan een product." : "Kies een product uit de lijst.", "error");
+      el.querySelector("#k-open").addEventListener("click", function () { A.openPos(); });
+      var c = el.querySelector("#k-close");
+      if (c) c.addEventListener("click", function () { closeDialog(function () { A.route(); }); });
+      el.querySelectorAll("[data-session]").forEach(function (tr) {
+        tr.addEventListener("click", function () {
+          var s = sessions.find(function (x) { return String(x.id) === tr.dataset.session; });
+          if (s.status === "open") return A.openPos();
+          showZReport(s);
+        });
       });
-      el.querySelector("#pos-types").addEventListener("click", function (ev) {
-        var b = ev.target.closest("[data-type]");
-        if (!b) return;
-        filterType = b.dataset.type;
-        el.querySelectorAll(".chip").forEach(function (c) { c.classList.toggle("active", c === b); });
-        drawGrid();
-      });
-      el.querySelector(".pos").addEventListener("click", onClick);
     });
   }
 
+  function showZReport(s) {
+    var body = A.modal("Kassarapport dienst #" + s.id, "<div class='receipt-preview'>" + A.zReportHtml(s) + "</div>" +
+      "<div class='actions'><button class='btn' id='z-print'>Afdrukken</button><button class='btn btn-primary' data-modal-close>Sluiten</button></div>", { narrow: true });
+    body.querySelector("#z-print").addEventListener("click", function () { A.printHtml(A.zReportHtml(s)); });
+  }
+
+  // Kassa sluiten met kastelling. done() wordt aangeroepen na het sluiten.
+  function closeDialog(done) {
+    A.api("GET", "pos/session").then(function (res) {
+      var s = res.session;
+      if (!s) { A.toast("De kassa is al gesloten."); return done && done(); }
+      var sm = s.summary;
+      var body = A.modal("Kassa sluiten",
+        "<dl class='close-sum'>" +
+          "<dt>Geopend</dt><dd>" + A.date(s.openedAt, true) + "</dd>" +
+          "<dt>Aantal bonnen</dt><dd>" + sm.count + "</dd>" +
+          "<dt>Omzet</dt><dd><strong>" + eu(sm.total) + "</strong></dd>" +
+          Object.keys(sm.byMethod).map(function (m) { return "<dt>— " + e(A.PAYMENT[m] || m) + "</dt><dd>" + eu(sm.byMethod[m]) + "</dd>"; }).join("") +
+          "<dt>Beginsaldo kas</dt><dd>" + eu(s.openingCash) + "</dd>" +
+          "<dt>Verwacht in de la</dt><dd><strong>" + eu(sm.expectedCash) + "</strong></dd>" +
+        "</dl>" +
+        "<label class='field'>Geteld in de kassalade (€)<input id='cl-count' inputmode='decimal' autofocus placeholder='0,00'></label>" +
+        "<p class='change' id='cl-diff'></p>" +
+        "<label class='field'><span>Notitie <span class='muted'>(optioneel)</span></span><input id='cl-note' placeholder='Bijv. 20 euro afgeroomd'></label>" +
+        "<div class='actions'><button class='btn' data-modal-close>Annuleren</button><button class='btn btn-primary btn-lg' id='cl-ok' disabled>Kassa sluiten</button></div>",
+        { narrow: true });
+      var input = body.querySelector("#cl-count");
+      function upd() {
+        var v = A.parseNum(input.value);
+        var ok = v != null && v >= 0;
+        body.querySelector("#cl-ok").disabled = !ok;
+        if (!ok) { body.querySelector("#cl-diff").textContent = ""; return; }
+        var d = round(v - sm.expectedCash);
+        body.querySelector("#cl-diff").innerHTML = Math.abs(d) < 0.005 ? "<span class='num-up'>Kas klopt ✓</span>" :
+          "Verschil: <strong class='num-down'>" + (d > 0 ? "+" : "") + eu(d) + "</strong>";
+      }
+      input.addEventListener("input", upd);
+      body.querySelector("#cl-ok").addEventListener("click", function () {
+        var btn = this;
+        A.busy(btn, true);
+        A.api("POST", "pos/session/close", { countedCash: A.parseNum(input.value), note: body.querySelector("#cl-note").value })
+          .then(function (r) { A.closeModal(); showZReport(r.session); A.toast("Kassa gesloten"); if (done) done(); })
+          .catch(function (err) { A.busy(btn, false); A.toast(err.message, "error"); });
+      });
+    }).catch(function (err) { A.toast(err.message, "error"); });
+  }
+
+  A.register("kassa", { render: renderManage });
+
+  // ================================================================ De kassa (#pos)
+
+  var S, root, keyHandler, fsHandler;
+
+  function freshTicket() { return { items: [], selected: null, discount: null, customer: null }; }
+  function save() { try { localStorage.setItem("wwwPosTicket2", JSON.stringify(S.ticket)); } catch (x) {} }
+  function restore() {
+    try { var t = JSON.parse(localStorage.getItem("wwwPosTicket2") || "null"); if (t && Array.isArray(t.items)) return t; } catch (x) {}
+    return freshTicket();
+  }
+  function byId(id) { return S.products.find(function (p) { return p.id === id; }); }
+  function sellable(p) { return p.active !== false; }
+  function totals() { return A.computeOrder(S.ticket.items, null, S.products, A.CONFIG, { pos: true, discount: S.ticket.discount }); }
+  function line(id) { return S.ticket.items.find(function (i) { return i.id === id; }); }
+
+  function renderPos(el) {
+    document.body.classList.add("pos-mode");
+    S = { screen: "products", products: [], session: null, lastClosingCash: 0, type: "", q: "",
+      ticket: restore(), pad: { mode: "qty", buffer: "" }, pay: { lines: [], selected: -1, buffer: "" }, lastOrder: null, scan: "", scanAt: 0, scanTimer: null };
+    return Promise.all([A.api("GET", "pos/session"), A.load("products", true)]).then(function (res) {
+      S.session = res[0].session; S.lastClosingCash = res[0].lastClosingCash || 0; S.products = res[1];
+      S.screen = S.session ? "products" : "open";
+      el.innerHTML =
+        "<div class='pos2'>" +
+          "<header class='pos-top'>" +
+            "<img src='/assets/logo-light.png' alt='worldwidewine.nl' class='pos-logo'>" +
+            "<div class='pos-search'><input type='search' id='pos-q' placeholder='Zoek product of scan barcode…' autocomplete='off'></div>" +
+            "<div class='pos-session' id='pos-session'></div>" +
+            "<div class='pos-top-actions'>" +
+              "<button class='top-btn' data-act='fullscreen' title='Volledig scherm (F11)'>⛶</button>" +
+              "<button class='top-btn' data-act='close-session'>Kassa sluiten</button>" +
+              "<button class='top-btn' data-act='exit'>← Admin</button>" +
+            "</div>" +
+          "</header>" +
+          "<div class='pos-screen' id='pos-screen'></div>" +
+        "</div>";
+      root = el.querySelector(".pos2");
+      root.addEventListener("click", onClick);
+      root.querySelector("#pos-q").addEventListener("input", function () { S.q = this.value; drawGrid(); });
+      root.querySelector("#pos-q").addEventListener("keydown", onSearchKey);
+      keyHandler = onKey;
+      document.addEventListener("keydown", keyHandler);
+      fsHandler = function () { var b = root.querySelector("[data-act=fullscreen]"); if (b) b.classList.toggle("active", A.isFullscreen()); };
+      document.addEventListener("fullscreenchange", fsHandler);
+      fsHandler();
+      draw();
+    });
+  }
+
+  function leavePos() {
+    document.body.classList.remove("pos-mode");
+    if (keyHandler) document.removeEventListener("keydown", keyHandler);
+    if (fsHandler) document.removeEventListener("fullscreenchange", fsHandler);
+    keyHandler = fsHandler = null;
+  }
+
+  function draw() {
+    root.classList.toggle("no-session", !S.session);
+    root.querySelector(".pos-search").style.visibility = S.screen === "products" ? "visible" : "hidden";
+    root.querySelector("[data-act=close-session]").hidden = !S.session;
+    root.querySelector("#pos-session").innerHTML = S.session
+      ? "<span class='dot'></span>Dienst #" + S.session.id + " · sinds " + new Date(S.session.openedAt).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })
+      : "<span class='dot off'></span>Kassa gesloten";
+    var scr = root.querySelector("#pos-screen");
+    if (S.screen === "open") scr.innerHTML = openScreen();
+    else if (S.screen === "products") { scr.innerHTML = productScreen(); drawGrid(); drawTicket(); }
+    else if (S.screen === "payment") { scr.innerHTML = paymentScreen(); drawPayment(); }
+    else if (S.screen === "receipt") scr.innerHTML = receiptScreen();
+    var f = scr.querySelector("[autofocus]");
+    if (f) f.focus();
+  }
+
+  // ---------------------------------------------------------------- Kassa openen
+
+  function openScreen() {
+    return "<div class='pos-open'><div class='pos-open-card'>" +
+      "<img src='/assets/logo.png' alt='worldwidewine.nl' class='pos-open-logo'>" +
+      "<h1>Kassa openen</h1>" +
+      "<p class='muted'>Tel het wisselgeld in de kassalade en vul het beginsaldo in.</p>" +
+      "<label class='field'>Beginsaldo kassalade (€)<input id='open-cash' inputmode='decimal' value='" + String(S.lastClosingCash.toFixed(2)).replace(".", ",") + "' autofocus></label>" +
+      "<button class='btn btn-primary btn-lg btn-block' data-act='open-session'>Kassa openen</button>" +
+      "<button class='link' data-act='exit'>Terug naar de admin</button>" +
+    "</div></div>";
+  }
+
+  function doOpenSession(btn) {
+    var v = A.parseNum(root.querySelector("#open-cash").value) || 0;
+    A.busy(btn, true);
+    A.api("POST", "pos/session/open", { openingCash: v }).then(function (r) {
+      S.session = r.session; S.screen = "products"; A.enterFullscreen(); draw(); A.toast("Kassa geopend");
+    }).catch(function (err) { A.busy(btn, false); A.toast(err.message, "error"); });
+  }
+
+  // ---------------------------------------------------------------- Productscherm
+
+  function productScreen() {
+    var types = Object.keys(A.TYPES).filter(function (t) { return S.products.some(function (p) { return p.type === t && sellable(p); }); });
+    var pad = [["1", "2", "3", "qty"], ["4", "5", "6", "disc"], ["7", "8", "9", "price"], ["C", "0", ",", "back"]];
+    var labels = { qty: "Aantal", disc: "% Korting", price: "Prijs", back: "⌫", C: "Wis regel" };
+    return "<div class='pos-main'>" +
+      "<section class='pos-order'>" +
+        "<div class='po-lines' id='po-lines'></div>" +
+        "<div class='po-totals' id='po-totals'></div>" +
+        "<div class='po-actions'>" +
+          "<button class='po-btn' data-act='customer' id='po-customer'>👤 Klant</button>" +
+          "<button class='po-btn' data-act='ticket-discount' id='po-tdisc'>Bonkorting</button>" +
+          "<button class='po-btn' data-act='clear'>Nieuwe bon</button>" +
+        "</div>" +
+        "<div class='numpad'>" + pad.map(function (row) {
+          return row.map(function (k) {
+            var isMode = k === "qty" || k === "disc" || k === "price";
+            return "<button class='np-key" + (isMode ? " np-mode" : "") + (k === "back" ? " np-back" : "") + (k === "C" ? " np-clear" : "") + "' data-key='" + k + "'>" + (labels[k] || k) + "</button>";
+          }).join("");
+        }).join("") + "</div>" +
+        "<button class='po-pay' data-act='pay' id='po-pay'><span>Betalen</span><strong id='po-pay-total'></strong></button>" +
+      "</section>" +
+      "<section class='pos-products'>" +
+        "<div class='chips' id='pos-types'><button class='chip" + (!S.type ? " active" : "") + "' data-type=''>Alles</button>" +
+          types.map(function (t) { return "<button class='chip" + (S.type === t ? " active" : "") + "' data-type='" + t + "'>" + A.TYPES[t] + "</button>"; }).join("") +
+        "</div>" +
+        "<div class='pp-grid' id='pp-grid'></div>" +
+      "</section>" +
+    "</div>";
+  }
+
   function visible() {
-    var q = (root.querySelector("#pos-q").value || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-    return products.filter(function (p) {
+    var q = S.q.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+    return S.products.filter(function (p) {
       if (!sellable(p)) return false;
-      if (filterType && p.type !== filterType) return false;
+      if (S.type && p.type !== S.type) return false;
       if (!q) return true;
       var hay = [p.name, p.producer, p.region, p.country, p.grape, p.ean, p.vintage].join(" ").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
       return q.split(/\s+/).every(function (w) { return hay.indexOf(w) >= 0; });
@@ -108,179 +235,429 @@
   }
 
   function drawGrid() {
+    var grid = root && root.querySelector("#pp-grid");
+    if (!grid) return;
     var list = visible();
-    root.querySelector("#pos-grid").innerHTML = list.length ? list.map(function (p) {
-      return "<button class='tile tile-" + e(p.type) + "' data-pos-add='" + e(p.id) + "'>" +
-        "<span class='tile-producer'>" + e(p.producer) + "</span>" +
-        "<span class='tile-name'>" + e(p.name) + "</span>" +
-        "<span class='tile-foot'><strong>" + eu(p.price) + "</strong>" + A.stockBadge(p) + "</span></button>";
+    grid.innerHTML = list.length ? list.map(function (p) {
+      var stock = typeof p.stock === "number" ? "<span class='pp-stock " + (p.stock <= 0 ? "out" : p.stock <= (p.minStock == null ? 6 : p.minStock) ? "low" : "") + "'>" + p.stock + "</span>" : "";
+      return "<button class='pp-card' data-add='" + e(p.id) + "'>" +
+        "<span class='pp-img'>" + A.productArt(p) + "<span class='pp-price'>" + (p.price == null ? "prijs?" : eu(p.price)) + "</span>" + stock + "</span>" +
+        "<span class='pp-name'><small>" + e(p.producer) + "</small><span class='pp-title'>" + e(p.name) + "</span></span></button>";
     }).join("") : "<p class='empty-inline'>Geen producten gevonden.</p>";
   }
 
   function drawTicket() {
-    if (!root || !root.querySelector("#pos-lines")) return;
+    var box = root.querySelector("#po-lines");
+    if (!box) return;
     var t = totals();
-    root.querySelector("#pos-customer").innerHTML = ticket.customer
-      ? "<span>👤 " + e(ticket.customer.name || ticket.customer.email) + "</span><button class='link' data-pos-customer-clear>Verwijder</button>"
-      : "<button class='link' data-pos-customer>+ Klant koppelen</button>";
-    root.querySelector("#pos-lines").innerHTML = t.lines.length ? t.lines.map(function (l) {
-      var p = byId(l.id);
-      return "<div class='pos-line'>" +
-        "<div class='pos-line-name'><span>" + e(p.producer) + "</span>" + e(p.name) + "<small>" + eu(l.price) + (p.unit !== "fles" ? " · " + e(p.unit) : "") + "</small></div>" +
-        "<div class='qty'><button data-pos-qty='" + e(l.id) + "' data-d='-1' aria-label='Eén minder'>−</button><span>" + l.qty + "</span><button data-pos-qty='" + e(l.id) + "' data-d='1' aria-label='Eén meer'>+</button></div>" +
-        "<strong class='num'>" + eu(l.total) + "</strong></div>";
-    }).join("") : "<p class='pos-empty'>Tik op een product of scan een barcode.</p>";
+    if (S.ticket.selected && !line(S.ticket.selected)) S.ticket.selected = S.ticket.items.length ? S.ticket.items[S.ticket.items.length - 1].id : null;
+    var byLine = {};
+    t.lines.forEach(function (l) { byLine[l.id] = l; });
+    box.innerHTML = S.ticket.items.length ? S.ticket.items.map(function (it) {
+      var p = byId(it.id), l = byLine[it.id];
+      if (!p) return "";
+      var sel = it.id === S.ticket.selected;
+      var detail = it.qty + " × " + (l ? eu(l.price) : "<em>prijs invoeren</em>") +
+        (l && l.listPrice != null ? " <s>" + eu(l.listPrice) + "</s>" : "") +
+        (it.discount ? " · <span class='po-disc'>−" + String(it.discount).replace(".", ",") + "%</span>" : "");
+      return "<div class='po-line" + (sel ? " selected" : "") + "' data-line='" + e(it.id) + "'>" +
+        "<div class='po-line-main'><span class='po-name'>" + e(A.productName(p)) + "</span><strong>" + (l ? eu(l.total) : "—") + "</strong></div>" +
+        "<div class='po-line-sub'>" + detail + "</div></div>";
+    }).join("") : "<div class='po-empty'><span>🛒</span>Tik op een product of scan een barcode</div>";
+    var sel = box.querySelector(".selected");
+    if (sel) sel.scrollIntoView({ block: "nearest" });
 
-    root.querySelector("#pos-summary").innerHTML =
-      (t.warnings.length ? "<p class='warn small'>⚠ " + t.warnings.map(e).join("<br>⚠ ") + "</p>" : "") +
-      "<div class='row'><span>Subtotaal</span><span>" + eu(t.subtotal) + "</span></div>" +
-      "<div class='row'><button class='link' data-pos-discount>" + (t.discount ? "Korting" + (ticket.discount.type === "percent" ? " " + ticket.discount.value + "%" : "") + " (wijzig)" : "+ Korting") + "</button><span>" + (t.discount ? "− " + eu(t.discount) : "") + "</span></div>" +
-      "<div class='row row-total'><span>Totaal</span><span>" + eu(t.total) + "</span></div>";
-    root.querySelectorAll("[data-pay]").forEach(function (b) { b.disabled = !t.lines.length; });
+    var vat = t.vat.reduce(function (s, v) { return s + v.vat; }, 0);
+    root.querySelector("#po-totals").innerHTML =
+      (t.errors.length && S.ticket.items.length ? "<p class='po-warn'>" + t.errors.map(e).join("<br>") + "</p>" : "") +
+      (t.warnings.length ? "<p class='po-warn'>⚠ " + t.warnings.map(e).join("<br>⚠ ") + "</p>" : "") +
+      (t.discount ? "<div class='row'><span>Bonkorting" + (S.ticket.discount.type === "percent" ? " " + S.ticket.discount.value + "%" : "") + "</span><span>− " + eu(t.discount) + "</span></div>" : "") +
+      "<div class='row row-total'><span>Totaal</span><span>" + eu(t.total) + "</span></div>" +
+      "<div class='row small muted'><span>waarvan btw</span><span>" + eu(vat) + "</span></div>";
+    root.querySelector("#po-pay-total").textContent = eu(t.total);
+    root.querySelector("#po-pay").disabled = !t.lines.length || t.errors.length > 0;
+    root.querySelector("#po-customer").innerHTML = S.ticket.customer ? "👤 " + e(S.ticket.customer.name || S.ticket.customer.email) : "👤 Klant";
+    root.querySelector("#po-customer").classList.toggle("active", !!S.ticket.customer);
+    root.querySelector("#po-tdisc").classList.toggle("active", !!S.ticket.discount);
+    root.querySelectorAll(".np-mode").forEach(function (b) { b.classList.toggle("active", b.dataset.key === S.pad.mode); });
   }
 
-  function onClick(ev) {
-    var t = ev.target.closest("[data-pos-add],[data-pos-qty],[data-pay],[data-pos-discount],[data-pos-customer],[data-pos-customer-clear],#pos-clear");
-    if (!t) return;
-    if (t.dataset.posAdd) add(t.dataset.posAdd);
-    else if (t.dataset.posQty) {
-      var line = ticket.items.find(function (i) { return i.id === t.dataset.posQty; });
-      if (line) setQty(line.id, line.qty + Number(t.dataset.d));
+  function addProduct(id) {
+    var p = byId(id);
+    if (!p || !sellable(p)) return;
+    var it = line(id);
+    if (it) it.qty += 1; else S.ticket.items.push(it = { id: id, qty: 1 });
+    S.ticket.selected = id;
+    S.pad.buffer = "";
+    S.pad.mode = p.price == null && it.price == null ? "price" : "qty";
+    if (S.pad.mode === "price") A.toast("Voer de prijs in met het toetsenblok.");
+    save(); drawTicket();
+    var card = root.querySelector("[data-add='" + CSS.escape(id) + "']");
+    if (card) { card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash"); }
+  }
+
+  function applyBuffer() {
+    var it = line(S.ticket.selected);
+    if (!it) return;
+    var b = S.pad.buffer;
+    var v = b === "" ? null : Number(b.replace(",", "."));
+    if (S.pad.mode === "qty") {
+      if (v === null || v < 1) { S.ticket.items = S.ticket.items.filter(function (x) { return x !== it; }); S.ticket.selected = null; S.pad.buffer = ""; }
+      else it.qty = Math.min(999, Math.floor(v));
+    } else if (S.pad.mode === "disc") {
+      if (v === null || !v) delete it.discount; else it.discount = Math.min(100, v);
+    } else if (S.pad.mode === "price") {
+      if (v === null) delete it.price; else it.price = v;
     }
-    else if (t.dataset.pay) pay(t.dataset.pay);
-    else if (t.hasAttribute("data-pos-discount")) discountDialog();
-    else if (t.hasAttribute("data-pos-customer")) customerDialog();
-    else if (t.hasAttribute("data-pos-customer-clear")) { ticket.customer = null; save(); drawTicket(); }
-    else if (t.id === "pos-clear" && ticket.items.length) A.confirm("Bon leegmaken?", "Alle producten worden van de bon gehaald.", "Leegmaken", true).then(function (ok) { if (ok) clearTicket(); });
+    save(); drawTicket();
   }
 
-  function discountDialog() {
-    var d = ticket.discount || { type: "percent", value: "" };
-    var body = A.modal("Korting", "<form id='disc-form'>" +
-      "<div class='seg'><label><input type='radio' name='type' value='percent'" + (d.type === "percent" ? " checked" : "") + "> Percentage</label>" +
-      "<label><input type='radio' name='type' value='amount'" + (d.type === "amount" ? " checked" : "") + "> Bedrag (€)</label></div>" +
-      "<label class='field'>Korting<input name='value' inputmode='decimal' value='" + e(d.value) + "' autofocus></label>" +
-      "<div class='quick'>" + [5, 10, 15, 20].map(function (n) { return "<button type='button' class='btn' data-pct='" + n + "'>" + n + "%</button>"; }).join("") + "</div>" +
-      "<div class='actions'><button type='button' class='btn' id='disc-remove'>Geen korting</button><button class='btn btn-primary'>Toepassen</button></div></form>", { narrow: true });
-    var form = body.querySelector("form");
-    body.querySelectorAll("[data-pct]").forEach(function (b) {
-      b.addEventListener("click", function () { form.type.value = "percent"; form.value.value = b.dataset.pct; });
-    });
-    body.querySelector("#disc-remove").addEventListener("click", function () { ticket.discount = null; save(); drawTicket(); A.closeModal(); });
-    form.addEventListener("submit", function (ev) {
-      ev.preventDefault();
-      var v = A.parseNum(form.value.value);
-      ticket.discount = v > 0 ? { type: form.type.value, value: v } : null;
-      save(); drawTicket(); A.closeModal();
-    });
+  function padKey(k) {
+    if (S.screen === "payment") return payKey(k);
+    if (S.screen !== "products") return;
+    if (k === "qty" || k === "disc" || k === "price") { S.pad.mode = k; S.pad.buffer = ""; drawTicket(); return; }
+    if (!line(S.ticket.selected)) return;
+    if (k === "C") { S.ticket.items = S.ticket.items.filter(function (x) { return x.id !== S.ticket.selected; }); S.ticket.selected = null; S.pad.buffer = ""; save(); drawTicket(); return; }
+    if (k === "back") {
+      if (!S.pad.buffer) { // lege invoer: terug naar standaard / regel weg
+        S.pad.buffer = "";
+      } else S.pad.buffer = S.pad.buffer.slice(0, -1);
+      return applyBuffer();
+    }
+    if (k === ",") { if (S.pad.mode === "qty" || S.pad.buffer.indexOf(",") >= 0) return; S.pad.buffer = (S.pad.buffer || "0") + ","; return applyBuffer(); }
+    if (/^\d$/.test(k)) {
+      if (S.pad.buffer.length >= 7) return;
+      var dec = S.pad.buffer.split(",")[1];
+      if (dec && dec.length >= 2) return;
+      S.pad.buffer += k;
+      applyBuffer();
+    }
   }
+
+  // ---------------------------------------------------------------- Betaalscherm
+
+  function goPay() {
+    var t = totals();
+    if (!t.lines.length || t.errors.length) return;
+    S.screen = "payment";
+    S.pay = { lines: [], selected: -1, buffer: "" };
+    draw();
+  }
+
+  function paymentScreen() {
+    var t = totals();
+    return "<div class='pay2'>" +
+      "<section class='pay-methods'>" +
+        "<h2>Betaalwijze</h2>" +
+        METHODS.map(function (m) { return "<button class='pm-btn pm-" + m.key + "' data-method='" + m.key + "'><span>" + m.icon + "</span>" + m.label + "</button>"; }).join("") +
+        "<div class='pay-lines' id='pay-lines'></div>" +
+      "</section>" +
+      "<section class='pay-center'>" +
+        "<div class='pay-due'><span>Te betalen</span><strong>" + eu(t.total) + "</strong></div>" +
+        "<div class='pay-status' id='pay-status'></div>" +
+        "<div class='numpad numpad-pay'>" +
+          ["1", "2", "3", "+10", "4", "5", "6", "+20", "7", "8", "9", "+50", "C", "0", ",", "back"].map(function (k) {
+            return "<button class='np-key" + (k.charAt(0) === "+" ? " np-mode" : "") + (k === "back" ? " np-back" : "") + "' data-key='" + k + "'>" + (k === "back" ? "⌫" : k === "C" ? "Wis" : k) + "</button>";
+          }).join("") +
+        "</div>" +
+        "<div class='pay-actions'>" +
+          "<button class='btn btn-lg' data-act='back'>← Terug</button>" +
+          "<button class='btn btn-primary btn-lg pay-validate' data-act='validate' id='pay-validate'>Valideren</button>" +
+        "</div>" +
+        "<p class='muted small center'>" + (S.ticket.customer ? "Klant: " + e(S.ticket.customer.name || S.ticket.customer.email) : "Geen klant gekoppeld") + "</p>" +
+      "</section>" +
+    "</div>";
+  }
+
+  function payState() {
+    var t = totals();
+    var paid = round(S.pay.lines.reduce(function (s, l) { return s + (l.amount || 0); }, 0));
+    var nonCash = round(S.pay.lines.filter(function (l) { return l.method !== "contant"; }).reduce(function (s, l) { return s + (l.amount || 0); }, 0));
+    var remaining = round(t.total - paid);
+    var change = remaining < 0 ? -remaining : 0;
+    var hasCash = S.pay.lines.some(function (l) { return l.method === "contant"; });
+    var ok = S.pay.lines.length > 0 && paid >= t.total - 0.001 && nonCash <= t.total + 0.001 && (change < 0.005 || hasCash);
+    return { total: t.total, paid: paid, remaining: remaining, change: change, ok: ok, tooMuchCard: nonCash > t.total + 0.001 || (change > 0.005 && !hasCash) };
+  }
+
+  function drawPayment() {
+    var st = payState();
+    root.querySelector("#pay-lines").innerHTML = S.pay.lines.map(function (l, i) {
+      return "<div class='pay-line" + (i === S.pay.selected ? " selected" : "") + "' data-pline='" + i + "'>" +
+        "<span>" + e(A.PAYMENT[l.method]) + "</span><strong>" + eu(l.amount || 0) + "</strong>" +
+        "<button class='pl-del' data-pdel='" + i + "' aria-label='Verwijderen'>×</button></div>";
+    }).join("") || "<p class='muted small'>Kies hierboven hoe de klant betaalt. Gesplitst betalen kan ook.</p>";
+    root.querySelector("#pay-status").innerHTML =
+      "<div class='ps-row'><span>Betaald</span><strong>" + eu(st.paid) + "</strong></div>" +
+      (st.remaining > 0.004 ? "<div class='ps-row ps-remaining'><span>Nog te betalen</span><strong>" + eu(st.remaining) + "</strong></div>" : "") +
+      (st.change > 0.004 ? "<div class='ps-row ps-change'><span>" + (st.tooMuchCard ? "Te veel (alleen contant kan wisselgeld)" : "Wisselgeld") + "</span><strong>" + eu(st.change) + "</strong></div>" : "");
+    root.querySelector("#pay-validate").disabled = !st.ok;
+  }
+
+  function addPayment(method) {
+    var st = payState();
+    var amount = st.remaining > 0 ? st.remaining : 0;
+    var existing = S.pay.lines.findIndex(function (l) { return l.method === method; });
+    if (existing >= 0) { S.pay.selected = existing; }
+    else { S.pay.lines.push({ method: method, amount: amount }); S.pay.selected = S.pay.lines.length - 1; }
+    S.pay.buffer = "";
+    drawPayment();
+  }
+
+  function payKey(k) {
+    var l = S.pay.lines[S.pay.selected];
+    if (!l) { if (/^\d$/.test(k)) { addPayment("contant"); l = S.pay.lines[S.pay.selected]; } else return; }
+    // +10/+20/+50: eerste druk = "klant geeft een briefje van …", daarna optellen
+    if (k.charAt(0) === "+") { l.amount = round((S.pay.buffer ? l.amount : 0) + Number(k.slice(1))); S.pay.buffer = String(l.amount).replace(".", ","); return drawPayment(); }
+    if (k === "C") { S.pay.buffer = ""; l.amount = 0; return drawPayment(); }
+    if (k === "back") S.pay.buffer = S.pay.buffer.slice(0, -1);
+    else if (k === ",") { if (S.pay.buffer.indexOf(",") >= 0) return; S.pay.buffer = (S.pay.buffer || "0") + ","; }
+    else if (/^\d$/.test(k)) {
+      var dec = S.pay.buffer.split(",")[1];
+      if ((dec && dec.length >= 2) || S.pay.buffer.length >= 8) return;
+      S.pay.buffer += k;
+    }
+    l.amount = S.pay.buffer ? round(Number(S.pay.buffer.replace(",", "."))) : 0;
+    drawPayment();
+  }
+
+  function validate(btn) {
+    var st = payState();
+    if (!st.ok) return;
+    A.busy(btn, true, "Bezig…");
+    A.api("POST", "pos", {
+      items: S.ticket.items, discount: S.ticket.discount, customerId: S.ticket.customer && S.ticket.customer.id,
+      payments: S.pay.lines.map(function (l) { return { method: l.method, amount: l.amount }; })
+    }).then(function (res) {
+      S.lastOrder = res.order;
+      S.ticket = freshTicket(); save();
+      S.screen = "receipt"; draw();
+      A.invalidate("products", "orders", "customers");
+      A.load("products", true).then(function (list) { S.products = list; });
+    }).catch(function (err) { A.busy(btn, false); A.toast(err.message, "error"); });
+  }
+
+  // ---------------------------------------------------------------- Bonscherm
+
+  function receiptScreen() {
+    var o = S.lastOrder;
+    return "<div class='rc2'>" +
+      "<div class='rc-left'>" +
+        "<div class='rc-done'>✓</div><h1>Betaald</h1><p class='rc-total'>" + eu(o.total) + "</p>" +
+        (o.cash && o.cash.change > 0 ? "<p class='rc-change'>Wisselgeld <strong>" + eu(o.cash.change) + "</strong></p>" : "") +
+        "<div class='rc-actions'>" +
+          "<button class='btn btn-lg' data-act='print'>🖨 Bon afdrukken</button>" +
+          "<button class='btn btn-primary btn-lg' data-act='new' autofocus>Nieuwe bestelling →</button>" +
+        "</div>" +
+      "</div>" +
+      "<div class='rc-right'><div class='receipt-preview'>" + A.receiptHtml(o) + "</div></div>" +
+    "</div>";
+  }
+
+  // ---------------------------------------------------------------- Klant en bonkorting
 
   function customerDialog() {
     A.load("customers").then(function (list) {
       var body = A.modal("Klant koppelen", "<input type='search' id='cust-q' placeholder='Zoek op naam, e-mail of telefoon' autofocus>" +
-        "<div class='pick-list' id='cust-list'></div><p class='muted small'>Nieuwe klant? Voeg die toe onder Klanten.</p>", { narrow: true });
+        "<div class='pick-list' id='cust-list'></div>" +
+        (S.ticket.customer ? "<button class='btn btn-block' id='cust-none'>Geen klant</button>" : "") +
+        "<p class='muted small'>Nieuwe klant? Voeg die toe onder Klanten in de admin.</p>", { narrow: true });
       var q = body.querySelector("#cust-q");
-      function draw() {
+      function drawList() {
         var v = q.value.toLowerCase();
         var hits = list.filter(function (c) { return !v || [c.name, c.email, c.phone, c.company].join(" ").toLowerCase().indexOf(v) >= 0; }).slice(0, 30);
         body.querySelector("#cust-list").innerHTML = hits.map(function (c) {
           return "<button class='pick' data-id='" + e(c.id) + "'><strong>" + e(c.name || c.email) + "</strong><span class='muted small'>" + e([c.email, c.phone].filter(Boolean).join(" · ")) + "</span></button>";
         }).join("") || "<p class='empty-inline'>Geen klanten gevonden.</p>";
       }
-      q.addEventListener("input", draw); draw();
+      q.addEventListener("input", drawList); drawList();
       body.addEventListener("click", function (ev) {
+        if (ev.target.closest("#cust-none")) { S.ticket.customer = null; save(); drawTicket(); return A.closeModal(); }
         var b = ev.target.closest(".pick");
         if (!b) return;
         var c = list.find(function (x) { return x.id === b.dataset.id; });
-        ticket.customer = { id: c.id, name: c.name, email: c.email };
+        S.ticket.customer = { id: c.id, name: c.name, email: c.email };
         save(); drawTicket(); A.closeModal();
       });
     });
   }
 
-  function pay(method) {
-    var t = totals();
-    if (!t.lines.length) return;
-    if (method === "contant") return cashDialog(t);
-    var label = method === "pin" ? "Pinbetaling" : "Tikkie / betaalverzoek";
-    var body = A.modal(label, "<p class='pay-amount'>" + eu(t.total) + "</p>" +
-      "<p class='muted center'>" + (method === "pin" ? "Laat de klant pinnen op de pinautomaat. Bevestig hieronder als de betaling is gelukt." : "Stuur het betaalverzoek en bevestig zodra het is betaald.") + "</p>" +
-      "<div class='actions'><button class='btn' data-modal-close>Annuleren</button><button class='btn btn-primary btn-lg' id='pay-ok'>Betaald</button></div>", { narrow: true });
-    body.querySelector("#pay-ok").addEventListener("click", function () { complete(method, null, this); });
+  function ticketDiscountDialog() {
+    var d = S.ticket.discount || { type: "percent", value: "" };
+    var body = A.modal("Korting op de hele bon", "<form id='disc-form'>" +
+      "<div class='seg'><label><input type='radio' name='type' value='percent'" + (d.type === "percent" ? " checked" : "") + "> Percentage</label>" +
+      "<label><input type='radio' name='type' value='amount'" + (d.type === "amount" ? " checked" : "") + "> Bedrag (€)</label></div>" +
+      "<label class='field'>Korting<input name='value' inputmode='decimal' value='" + e(d.value) + "' autofocus></label>" +
+      "<div class='quick'>" + [5, 10, 15, 20].map(function (n) { return "<button type='button' class='btn' data-pct='" + n + "'>" + n + "%</button>"; }).join("") + "</div>" +
+      "<div class='actions'><button type='button' class='btn' id='disc-remove'>Geen korting</button><button class='btn btn-primary'>Toepassen</button></div></form>", { narrow: true });
+    var form = body.querySelector("form");
+    body.querySelectorAll("[data-pct]").forEach(function (b) { b.addEventListener("click", function () { form.type.value = "percent"; form.value.value = b.dataset.pct; }); });
+    body.querySelector("#disc-remove").addEventListener("click", function () { S.ticket.discount = null; save(); drawTicket(); A.closeModal(); });
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var v = A.parseNum(form.value.value);
+      S.ticket.discount = v > 0 ? { type: form.type.value, value: v } : null;
+      save(); drawTicket(); A.closeModal();
+    });
   }
 
-  function cashDialog(t) {
-    var body = A.modal("Contant", "<p class='pay-amount'>" + eu(t.total) + "</p>" +
-      "<label class='field'>Ontvangen<input id='cash-in' inputmode='decimal' placeholder='0,00' autofocus></label>" +
-      "<div class='quick'>" + [t.total, 10, 20, 50, 100].filter(function (v, i, a) { return v >= t.total && a.indexOf(v) === i; }).slice(0, 4)
-        .map(function (v) { return "<button type='button' class='btn' data-cash='" + v + "'>" + (v === t.total ? "Gepast" : eu(v)) + "</button>"; }).join("") + "</div>" +
-      "<p class='change' id='cash-change'></p>" +
-      "<div class='actions'><button class='btn' data-modal-close>Annuleren</button><button class='btn btn-primary btn-lg' id='cash-ok' disabled>Afrekenen</button></div>", { narrow: true });
-    var input = body.querySelector("#cash-in");
-    function update() {
-      var v = A.parseNum(input.value);
-      var ok = v != null && v >= t.total - 0.001;
-      body.querySelector("#cash-ok").disabled = !ok;
-      body.querySelector("#cash-change").innerHTML = ok ? "Wisselgeld: <strong>" + eu(Math.round((v - t.total) * 100) / 100) + "</strong>" : v ? "Nog " + eu(t.total - v) + " te ontvangen" : "";
+  // ---------------------------------------------------------------- Invoer
+
+  function onClick(ev) {
+    var t = ev.target.closest("[data-act],[data-key],[data-add],[data-line],[data-type],[data-method],[data-pline],[data-pdel]");
+    if (!t) return;
+    if (t.dataset.add) return addProduct(t.dataset.add);
+    if (t.dataset.key) return padKey(t.dataset.key);
+    if (t.dataset.line) { S.ticket.selected = t.dataset.line; S.pad.buffer = ""; S.pad.mode = "qty"; return drawTicket(); }
+    if (t.dataset.type !== undefined && t.classList.contains("chip")) {
+      S.type = t.dataset.type;
+      root.querySelectorAll("#pos-types .chip").forEach(function (c) { c.classList.toggle("active", c === t); });
+      return drawGrid();
     }
-    input.addEventListener("input", update);
-    body.querySelectorAll("[data-cash]").forEach(function (b) { b.addEventListener("click", function () { input.value = String(b.dataset.cash).replace(".", ","); update(); }); });
-    body.querySelector("#cash-ok").addEventListener("click", function () { complete("contant", A.parseNum(input.value), this); });
-    input.addEventListener("keydown", function (ev) { if (ev.key === "Enter" && !body.querySelector("#cash-ok").disabled) body.querySelector("#cash-ok").click(); });
+    if (t.dataset.method) return addPayment(t.dataset.method);
+    if (t.dataset.pdel) { ev.stopPropagation(); S.pay.lines.splice(Number(t.dataset.pdel), 1); S.pay.selected = S.pay.lines.length - 1; S.pay.buffer = ""; return drawPayment(); }
+    if (t.dataset.pline) { S.pay.selected = Number(t.dataset.pline); S.pay.buffer = ""; return drawPayment(); }
+    switch (t.dataset.act) {
+      case "fullscreen": return A.isFullscreen() ? A.exitFullscreen() : A.enterFullscreen();
+      case "exit": A.exitFullscreen(); location.hash = "#kassa"; return;
+      case "close-session":
+        if (S.ticket.items.length) return A.toast("Reken eerst de open bon af of maak hem leeg.", "error");
+        return closeDialog(function () { S.session = null; S.screen = "open"; A.api("GET", "pos/session").then(function (r) { S.lastClosingCash = r.lastClosingCash || 0; draw(); }); });
+      case "open-session": return doOpenSession(t);
+      case "pay": return goPay();
+      case "back": S.screen = "products"; return draw();
+      case "validate": return validate(t);
+      case "print": return A.printReceipt(S.lastOrder);
+      case "new": S.screen = "products"; S.q = ""; root.querySelector("#pos-q").value = ""; return draw();
+      case "customer": return customerDialog();
+      case "ticket-discount": return ticketDiscountDialog();
+      case "clear":
+        if (!S.ticket.items.length) return;
+        return A.confirm("Nieuwe bon?", "De huidige bon wordt leeggemaakt.", "Leegmaken", true).then(function (ok) {
+          if (ok) { S.ticket = freshTicket(); save(); drawTicket(); }
+        });
+    }
   }
 
-  function complete(method, cashReceived, btn) {
-    A.busy(btn, true);
-    A.api("POST", "pos", {
-      items: ticket.items, payment: method, discount: ticket.discount,
-      cashReceived: cashReceived, customerId: ticket.customer && ticket.customer.id
-    }).then(function (res) {
-      clearTicket();
-      A.invalidate("products", "orders", "customers");
-      A.load("products", true).then(function (list) { products = list; drawGrid(); });
-      receiptDialog(res.order);
-      A.refreshBadges();
-    }).catch(function (err) { A.busy(btn, false); A.toast(err.message, "error"); });
+  function findByCode(code) {
+    return S.products.find(function (p) { return p.ean && p.ean === code && sellable(p); });
   }
 
-  function receiptDialog(order) {
-    var body = A.modal("Verkoop afgerond", "<div class='receipt-preview'>" + A.receiptHtml(order) + "</div>" +
-      (order.cash ? "<p class='change'>Wisselgeld: <strong>" + eu(order.cash.change) + "</strong></p>" : "") +
-      "<div class='actions'><button class='btn' id='rc-print'>Bon afdrukken</button><button class='btn btn-primary btn-lg' data-modal-close autofocus>Nieuwe verkoop</button></div>",
-      { narrow: true, onClose: function () { var q = document.getElementById("pos-q"); if (q) q.focus(); } });
-    body.querySelector("#rc-print").addEventListener("click", function () { A.printReceipt(order); });
+  function onSearchKey(ev) {
+    if (ev.key !== "Enter") return;
+    ev.preventDefault();
+    var v = this.value.trim();
+    if (!v) return;
+    var hit = findByCode(v);
+    var list = visible();
+    if (!hit && list.length === 1) hit = list[0];
+    if (hit) { addProduct(hit.id); this.value = ""; S.q = ""; drawGrid(); }
+    else A.toast(/^\d{6,14}$/.test(v) ? "Barcode " + v + " is niet gekoppeld aan een product." : "Kies een product uit de lijst.", "error");
   }
 
-  A.register("kassa", { render: render });
+  // Toetsenbord: cijfers gaan naar het toetsenblok. Een barcodescanner typt heel snel
+  // een reeks cijfers gevolgd door Enter; die wordt als barcode herkend.
+  function onKey(ev) {
+    if (!document.getElementById("modal").hidden) return;
+    var tag = (ev.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select") return;
+    if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    var now = Date.now();
+    if (/^[0-9]$/.test(ev.key)) {
+      ev.preventDefault();
+      clearTimeout(S.scanTimer);
+      if (now - S.scanAt > 60 && S.scan) { var prev = S.scan; S.scan = ""; prev.split("").forEach(function (k) { padKey(k); }); }
+      S.scan += ev.key; S.scanAt = now;
+      var buffered = S.scan;
+      S.scanTimer = setTimeout(function () {
+        // Geen Enter binnen korte tijd: het was gewoon typen.
+        buffered.split("").forEach(function (k) { padKey(k); });
+        S.scan = "";
+      }, 70);
+      return;
+    }
+    if (ev.key === "Enter") {
+      if (S.scan.length >= 6 && now - S.scanAt < 100) {
+        ev.preventDefault();
+        clearTimeout(S.scanTimer);
+        var code = S.scan; S.scan = "";
+        if (S.screen !== "products") return;
+        var p = findByCode(code);
+        if (p) addProduct(p.id); else A.toast("Barcode " + code + " is niet gekoppeld aan een product.", "error");
+        return;
+      }
+      ev.preventDefault();
+      if (S.screen === "products") goPay();
+      else if (S.screen === "payment") { var b = root.querySelector("#pay-validate"); if (b && !b.disabled) validate(b); }
+      else if (S.screen === "receipt") { S.screen = "products"; draw(); }
+      else if (S.screen === "open") { var o = root.querySelector("[data-act=open-session]"); if (o) doOpenSession(o); }
+      return;
+    }
+    if (ev.key === "Backspace") { ev.preventDefault(); return padKey("back"); }
+    if (ev.key === "," || ev.key === ".") { ev.preventDefault(); return padKey(","); }
+    if (ev.key === "Delete") { ev.preventDefault(); return padKey("C"); }
+    if (ev.key === "Escape" && S.screen === "payment") { S.screen = "products"; return draw(); }
+    if (ev.key === "ArrowUp" || ev.key === "ArrowDown") {
+      if (S.screen !== "products" || !S.ticket.items.length) return;
+      ev.preventDefault();
+      var i = S.ticket.items.findIndex(function (x) { return x.id === S.ticket.selected; });
+      i = Math.max(0, Math.min(S.ticket.items.length - 1, i + (ev.key === "ArrowUp" ? -1 : 1)));
+      S.ticket.selected = S.ticket.items[i].id; S.pad.buffer = ""; S.pad.mode = "qty"; drawTicket();
+    }
+  }
+
+  A.register("pos", { render: renderPos, leave: leavePos });
 })();
 
-/* Kassabon (gedeeld met Bestellingen). */
+/* ---------------------------------------------------------------- Kassabon en kassarapport (gedeeld) */
+
+A.receiptHead = function () {
+  return "<p class='r-center r-shop'>worldwidewine.nl</p><p class='r-center r-tag'>DRANKEN EN CULINAIRE PROJECTEN</p>" +
+    "<p class='r-center'>Westzijde 358, 1506 GK Zaandam<br>06 83 17 27 04 · info@worldwidewine.nl<br>KvK 32134785</p>";
+};
+
 A.receiptHtml = function (o) {
   var e = A.esc, eu = A.euro;
-  return "<div class='receipt'>" +
-    "<p class='r-center r-shop'>worldwidewine.nl</p><p class='r-center r-tag'>DRANKEN EN CULINAIRE PROJECTEN</p>" +
-    "<p class='r-center'>Westzijde 358, 1506 GK Zaandam<br>06 83 17 27 04 · info@worldwidewine.nl<br>KvK 32134785</p>" +
+  var payments = o.payments && o.payments.length ? o.payments : [{ method: o.paymentMethod, amount: o.total }];
+  return "<div class='receipt'>" + A.receiptHead() +
     "<p class='r-center'>" + A.date(o.createdAt, true) + "<br>Bon " + e(o.number) + "</p><hr>" +
     o.lines.map(function (l) {
-      return "<div class='r-line'><span>" + l.qty + " × " + e(l.name) + "</span><span>" + eu(l.total) + "</span></div>" +
-        (l.qty > 1 ? "<div class='r-sub'>à " + eu(l.price) + "</div>" : "");
+      var gross = Math.round(l.price * l.qty * 100) / 100;
+      return "<div class='r-line'><span>" + l.qty + " × " + e(l.name) + "</span><span>" + eu(l.discount ? gross : l.total) + "</span></div>" +
+        (l.qty > 1 || l.listPrice != null ? "<div class='r-sub'>à " + eu(l.price) + (l.listPrice != null ? " (normaal " + eu(l.listPrice) + ")" : "") + "</div>" : "") +
+        (l.discount ? "<div class='r-line r-sub'><span>korting " + String(l.discount).replace(".", ",") + "%</span><span>− " + eu(gross - l.total) + "</span></div>" : "");
     }).join("") + "<hr>" +
-    (o.discount ? "<div class='r-line'><span>Subtotaal</span><span>" + eu(o.subtotal) + "</span></div><div class='r-line'><span>Korting</span><span>− " + eu(o.discount) + "</span></div>" : "") +
+    (o.discount ? "<div class='r-line'><span>Subtotaal</span><span>" + eu(o.subtotal) + "</span></div><div class='r-line'><span>Korting op bon</span><span>− " + eu(o.discount) + "</span></div>" : "") +
     (o.shipping ? "<div class='r-line'><span>Verzending</span><span>" + eu(o.shipping) + "</span></div>" : "") +
     "<div class='r-line r-total'><span>TOTAAL</span><span>" + eu(o.total) + "</span></div>" +
-    "<div class='r-line'><span>" + e(A.PAYMENT[o.paymentMethod] || o.paymentMethod) + "</span><span>" + eu(o.cash ? o.cash.received : o.total) + "</span></div>" +
-    (o.cash ? "<div class='r-line'><span>Wisselgeld</span><span>" + eu(o.cash.change) + "</span></div>" : "") + "<hr>" +
+    payments.map(function (pm) {
+      var shown = pm.method === "contant" && o.cash ? o.cash.received : pm.amount;
+      return "<div class='r-line'><span>" + e(A.PAYMENT[pm.method] || pm.method) + "</span><span>" + eu(shown) + "</span></div>";
+    }).join("") +
+    (o.cash && o.cash.change ? "<div class='r-line'><span>Wisselgeld</span><span>" + eu(o.cash.change) + "</span></div>" : "") + "<hr>" +
     "<div class='r-line r-small'><span>Btw</span><span>over</span><span>btw</span></div>" +
     (o.vat || []).map(function (v) { return "<div class='r-line r-small'><span>" + v.rate + "%</span><span>" + eu(v.gross - v.vat) + "</span><span>" + eu(v.vat) + "</span></div>"; }).join("") +
+    (o.customer && o.customer.name ? "<hr><p class='r-center'>Klant: " + e(o.customer.name) + "</p>" : "") +
     "<hr><p class='r-center'>Bedankt en proost!<br>Geen 18, geen alcohol.</p></div>";
 };
 
-A.printReceipt = function (o) {
-  var el = document.getElementById("receipt-print");
-  el.innerHTML = A.receiptHtml(o);
-  document.body.classList.add("printing-receipt");
-  setTimeout(function () {
-    window.print();
-    document.body.classList.remove("printing-receipt");
-  }, 50);
+A.zReportHtml = function (s) {
+  var e = A.esc, eu = A.euro, sm = s.summary || {};
+  var row = function (a, b, cls) { return "<div class='r-line" + (cls ? " " + cls : "") + "'><span>" + a + "</span><span>" + b + "</span></div>"; };
+  return "<div class='receipt'>" + A.receiptHead() +
+    "<p class='r-center r-shop'>KASSARAPPORT (Z)</p><p class='r-center'>Dienst #" + s.id + "</p><hr>" +
+    row("Geopend", A.date(s.openedAt, true)) + row("Gesloten", s.closedAt ? A.date(s.closedAt, true) : "nog open") + "<hr>" +
+    row("Aantal bonnen", sm.count || 0) +
+    row("Omzet", eu(sm.total || 0), "r-total") +
+    Object.keys(sm.byMethod || {}).map(function (m) { return row("  " + e(A.PAYMENT[m] || m), eu(sm.byMethod[m])); }).join("") +
+    (sm.discount ? row("Gegeven korting", eu(sm.discount)) : "") + "<hr>" +
+    "<div class='r-line r-small'><span>Btw</span><span>over</span><span>btw</span></div>" +
+    (sm.vat || []).map(function (v) { return "<div class='r-line r-small'><span>" + v.rate + "%</span><span>" + eu(v.gross - v.vat) + "</span><span>" + eu(v.vat) + "</span></div>"; }).join("") + "<hr>" +
+    row("Beginsaldo kas", eu(s.openingCash)) +
+    row("Contante verkopen", eu((sm.byMethod && sm.byMethod.contant) || 0)) +
+    row("Verwacht in de la", eu(s.expectedCash != null ? s.expectedCash : sm.expectedCash || 0)) +
+    (s.countedCash != null ? row("Geteld", eu(s.countedCash)) + row("Verschil", (s.difference > 0 ? "+" : "") + eu(s.difference), "r-total") : "") +
+    (s.note ? "<hr><p>" + e(s.note) + "</p>" : "") + "</div>";
 };
+
+A.printReceipt = function (o) { A.printHtml(A.receiptHtml(o)); };

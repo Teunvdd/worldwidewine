@@ -47,6 +47,7 @@ async function handle(event) {
 
     case "products":
       if (method === "GET") return json(200, { products: await shop.getProducts(), types: shop.TYPES });
+      if (method === "POST" && id && action === "image") return json(200, { product: await shop.setProductImage(id, body.image) });
       if (method === "POST") return json(200, { product: await shop.saveProduct(body) });
       if (method === "DELETE" && id) { await shop.deleteProduct(id); return json(200, { ok: true }); }
       break;
@@ -93,7 +94,11 @@ async function handle(event) {
       break;
 
     case "pos":
-      if (method === "POST") return json(200, await shop.createPosSale(body));
+      if (method === "GET" && id === "session") return json(200, await shop.currentSession());
+      if (method === "GET" && id === "sessions") return json(200, { sessions: await shop.listSessions() });
+      if (method === "POST" && id === "session" && action === "open") return json(200, { session: await shop.startSession(body) });
+      if (method === "POST" && id === "session" && action === "close") return json(200, { session: await shop.closeSession(body) });
+      if (method === "POST" && !id) return json(200, await shop.createPosSale(body));
       break;
 
     case "export":

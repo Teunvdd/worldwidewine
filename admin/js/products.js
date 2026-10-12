@@ -28,7 +28,7 @@
         }).sort(function (a, b) { return (a.producer + a.name).localeCompare(b.producer + b.name, "nl"); });
         el.querySelector("#p-rows").innerHTML = list.map(function (p) {
           var vis = p.active === false ? "<span class='tag tag-off'>Niet actief</span>" : p.webshop === false ? "<span class='tag tag-winkel'>Alleen winkel</span>" : "<span class='tag tag-webshop'>Webshop + winkel</span>";
-          return "<tr class='clickable' data-id='" + e(p.id) + "'><td><span class='muted small'>" + e(p.producer) + "</span><br><strong>" + e(p.name) + "</strong>" + (p.vintage ? " <span class='muted'>" + p.vintage + "</span>" : "") + "</td>" +
+          return "<tr class='clickable' data-id='" + e(p.id) + "'><td><div class='p-cell'><span class='thumb'>" + A.productArt(p) + "</span><span><span class='muted small'>" + e(p.producer) + "</span><br><strong>" + e(p.name) + "</strong>" + (p.vintage ? " <span class='muted'>" + p.vintage + "</span>" : "") + "</span></div></td>" +
             "<td>" + e(A.TYPES[p.type] || p.type) + "<br><span class='muted small'>" + e(p.unit) + "</span></td>" +
             "<td class='num'>" + (p.price == null ? "<span class='muted'>op aanvraag</span>" : (p.oldPrice ? "<s class='muted small'>" + eu(p.oldPrice) + "</s> " : "") + eu(p.price)) + "</td>" +
             "<td class='num'>" + A.stockBadge(p) + "</td><td>" + vis + "</td></tr>";
@@ -74,7 +74,10 @@
         field("Barcode (EAN)", "ean", p.ean, "inputmode='numeric' placeholder='Scan of typ de barcode'") +
         (isNew ? field("Voorraad", "stock", "", "inputmode='numeric' placeholder='leeg = niet bijhouden'") : "<div class='field'>Voorraad<span class='static'>" + A.stockBadge(p) + " <a href='#voorraad'>wijzigen bij Voorraad</a></span></div>") +
         field("Melding bij voorraad ≤", "minStock", p.minStock, "inputmode='numeric'") +
-        field("Foto (pad of URL)", "image", p.image, "placeholder='assets/producten/naam.jpg'", "span-2") +
+        "<div class='field span-2'>Foto<div class='img-edit'><span class='thumb' id='p-thumb'>" + A.productArt(p) + "</span>" +
+          "<span class='img-edit-actions'><label class='btn btn-sm'>Foto kiezen…<input type='file' id='p-file' accept='image/jpeg,image/png,image/webp' hidden></label>" +
+          "<button type='button' class='btn btn-sm btn-ghost' id='p-img-remove'" + (p.image ? "" : " hidden") + ">Foto verwijderen</button>" +
+          "<span class='muted small'>Wordt gebruikt in de kassa en de webshop. Zonder foto tonen we een getekende fles.</span></span></div></div>" +
         "<label class='field span-2'>Omschrijving<textarea name='description' rows='4'>" + e(p.description) + "</textarea></label>" +
         "<label class='field span-2'>Interne notitie<textarea name='note' rows='2' placeholder='Alleen zichtbaar in de admin'>" + e(p.note) + "</textarea></label>" +
         "<fieldset class='span-2 checks'><legend>Instellingen</legend>" +
@@ -91,6 +94,21 @@
       "</form>", { wide: true });
 
     var form = body.querySelector("form");
+    var pendingImage; // undefined = ongewijzigd, "" = verwijderen, anders data-URL
+    body.querySelector("#p-file").addEventListener("change", function () {
+      var file = this.files && this.files[0];
+      if (!file) return;
+      resizeImage(file, 900).then(function (dataUrl) {
+        pendingImage = dataUrl;
+        body.querySelector("#p-thumb").innerHTML = "<img class='p-img' src='" + dataUrl + "' alt=''>";
+        body.querySelector("#p-img-remove").hidden = false;
+      }).catch(function () { A.toast("Deze foto kan niet worden gelezen.", "error"); });
+    });
+    body.querySelector("#p-img-remove").addEventListener("click", function () {
+      pendingImage = "";
+      body.querySelector("#p-thumb").innerHTML = A.productArt(Object.assign({}, p, { image: null }));
+      this.hidden = true;
+    });
     form.addEventListener("submit", function (ev) {
       ev.preventDefault();
       var d = A.formData(form);
@@ -99,14 +117,18 @@
         producer: d.producer, name: d.name, type: d.type, unit: d.unit,
         price: A.parseNum(d.price), oldPrice: A.parseNum(d.oldPrice), cost: A.parseNum(d.cost), vat: d.vat,
         country: d.country, region: d.region, grape: d.grape, vintage: d.vintage, size: d.size, bottles: d.bottles,
-        ean: d.ean, minStock: d.minStock, image: d.image, description: d.description, note: d.note,
+        ean: d.ean, minStock: d.minStock, description: d.description, note: d.note,
         active: d.active, webshop: d.webshop, pickupOnly: d.pickupOnly,
         tags: ["uitgelicht", "actie", "nieuw", "bio"].filter(function (t) { return d["tag_" + t]; })
       };
       if (isNew) input.stock = d.stock;
       var btn = form.querySelector(".btn-primary");
       A.busy(btn, true, "Opslaan…");
-      A.api("POST", "products", input).then(function () {
+      A.api("POST", "products", input).then(function (res) {
+        if (pendingImage === undefined) return;
+        A.busy(btn, true, "Foto uploaden…");
+        return A.api("POST", "products/" + encodeURIComponent(res.product.id) + "/image", { image: pendingImage || null });
+      }).then(function () {
         A.toast("Product opgeslagen");
         A.invalidate("products");
         A.closeModal();
@@ -121,6 +143,26 @@
           A.toast("Product verwijderd"); A.invalidate("products"); A.route();
         }).catch(function (err) { A.toast(err.message, "error"); });
       });
+    });
+  }
+
+  // Verkleint een foto in de browser (max. 900 px, JPEG), zodat uploaden snel gaat.
+  function resizeImage(file, max) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        var scale = Math.min(1, max / Math.max(img.width, img.height));
+        var c = document.createElement("canvas");
+        c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+        var ctx = c.getContext("2d");
+        ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("foto")); };
+      img.src = url;
     });
   }
 

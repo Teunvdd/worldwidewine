@@ -12,7 +12,8 @@
 
   // Is een product online (of in de kassa) te koop?
   function isAvailable(p, pos) {
-    if (!p || p.price == null) return false;
+    if (!p) return false;
+    if (p.price == null && !pos) return false; // prijs op aanvraag: alleen in de kassa, met ingevoerde prijs
     if (p.active === false) return false;
     if (!pos && p.webshop === false) return false;
     if (p.stock === false) return false;
@@ -26,7 +27,7 @@
   }
 
   /*
-   * items:    [{ id, qty }]
+   * items:    [{ id, qty }]  — in de kassa ook { price } (aangepaste prijs) en { discount } (korting % op de regel)
    * options:  { pos: true }          kassa: geen bezorging, ook producten die niet online staan,
    *                                  verkopen boven de geregistreerde voorraad is toegestaan
    *           { discount: { type: "percent" | "amount", value } }
@@ -44,17 +45,25 @@
     var bottles = 0;
     var pickupOnly = false;
     var merged = {};
+    var extra = {};
 
     (items || []).forEach(function (item) {
       var id = item && item.id;
       var qty = Math.floor(Number(item && item.qty));
       if (!byId[id] || !(qty > 0)) return;
       merged[id] = (merged[id] || 0) + qty;
+      if (pos) {
+        // Aangepaste prijs of regelkorting (alleen in de kassa)
+        var e = extra[id] = extra[id] || {};
+        if (item.price != null && item.price !== "" && Number(item.price) >= 0) e.price = round(Number(item.price));
+        if (Number(item.discount) > 0) e.discount = Math.min(100, round(Number(item.discount)));
+      }
     });
 
     Object.keys(merged).forEach(function (id) {
       var p = byId[id];
       var qty = Math.min(merged[id], MAX_QTY);
+      var x = extra[id] || {};
       if (!isAvailable(p, pos)) {
         errors.push(p.producer + " " + p.name + " is " + (hasStockCount(p) && p.stock <= 0 ? "uitverkocht." : "niet te bestellen."));
         return;
@@ -66,11 +75,17 @@
           return;
         }
       }
-      var lineTotal = round(p.price * qty);
-      lines.push({
+      var price = x.price != null ? x.price : p.price;
+      if (price == null) { errors.push("Vul een prijs in voor " + p.producer + " " + p.name + "."); return; }
+      var lineDiscount = x.discount || 0;
+      var lineTotal = round(price * qty * (1 - lineDiscount / 100));
+      var line = {
         id: p.id, name: p.producer + " — " + p.name, unit: p.unit,
-        qty: qty, price: p.price, total: lineTotal, vat: vatRate(p)
-      });
+        qty: qty, price: price, total: lineTotal, vat: vatRate(p)
+      };
+      if (lineDiscount) line.discount = lineDiscount;
+      if (price !== p.price) line.listPrice = p.price;
+      lines.push(line);
       subtotal += lineTotal;
       bottles += (p.bottles || 0) * qty;
       if (p.pickupOnly) pickupOnly = true;

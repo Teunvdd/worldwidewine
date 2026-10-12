@@ -19,13 +19,7 @@ De website en de serverfuncties draaien op **Netlify**. De gegevens staan in een
 ### Admin-omgeving (`/admin/`)
 
 - **Overzicht:** omzet van vandaag, deze week en deze maand (webshop en winkel apart), het kassatotaal van vandaag per betaalwijze (handig bij de dagafsluiting), te verwerken bestellingen, voorraadmeldingen en de best verkochte producten.
-- **Kassa (POS):** voor de winkel, werkt op een computer en op een tablet.
-  - Producten zoeken, op soort filteren of een **barcode scannen**. Een USB- of Bluetooth-barcodescanner werkt direct, want die "typt" de code.
-  - Aantallen aanpassen, korting geven (procent of bedrag) en een klant aan de verkoop koppelen.
-  - Afrekenen met **pin**, **contant** (met wisselgeldberekening) of **Tikkie**.
-  - Een **kassabon** met btw-specificatie, af te drukken op een bonprinter van 80 mm of een gewone printer.
-  - Een bon die nog niet is afgerekend blijft bewaard als de pagina per ongeluk sluit.
-  - Producten die je uitzet voor de webshop (bijv. huiswijn van het vat) staan wel in de kassa.
+- **Kassa (POS):** een volledig-schermkassa in de stijl van Odoo, bedoeld voor een vaste desktop in de winkel. Je opent hem via **Kassa openen** in de admin. Zie "Kassa" hieronder.
 - **Bestellingen:** webshop en winkel samen, met zoeken en filters.
   - Status wijzigen: nieuw → betaald → klaar → verzonden → afgerond, of geannuleerd. **Bij annuleren gaat de voorraad automatisch terug.**
   - Een pakbon of bon afdrukken, en de klant mailen.
@@ -60,7 +54,9 @@ Alle onderdelen werken met één Supabase-database. Die heeft tabellen voor `pro
 ### 1. Database (Supabase)
 
 1. Maak een gratis account op [supabase.com](https://supabase.com) en een nieuw project. Kies als regio **EU (Frankfurt of Amsterdam)**, in verband met de AVG.
-2. Ga naar **SQL Editor**, plak de inhoud van `supabase/migrations/20261012000000_init.sql` en klik **Run**. Dat maakt de tabellen, functies en rechten aan.
+2. Ga naar **SQL Editor** en voer de bestanden in `supabase/migrations/` **op volgorde** uit (plakken en **Run**):
+   - eerst `20261012000000_init.sql` (tabellen, functies en rechten);
+   - daarna `20261013000000_kassa.sql` (kassadiensten, gesplitst betalen en de opslagmap voor productfoto's).
 3. Noteer bij **Project Settings → API (Data API / API Keys)**:
    - de **Project URL**, bijvoorbeeld `https://abcdefgh.supabase.co`;
    - de **secret key** (`sb_secret_…`) of de oude **service_role**-sleutel. Deel deze sleutel nooit en zet hem niet in de website zelf.
@@ -84,13 +80,44 @@ Bij het eerste bezoek wordt de database automatisch gevuld met het startassortim
    - Betalingen worden via de webhook automatisch op "betaald" gezet.
 5. **Domein koppelen:** voeg `worldwidewine.nl` toe bij *Domain management*. Zeg daarna het Wix-abonnement op.
 
-### In de winkel
+## Kassa
 
-- Open `https://www.worldwidewine.nl/admin/#kassa` op de kassacomputer of tablet en zet hem als bladwijzer of beginscherm.
-- **Barcodescanner:** sluit hem aan en scan in het zoekveld. Koppel de barcode eerst aan het product: Producten → product → Barcode (je kunt daar ook in scannen).
-- **Pinapparaat:** het pinapparaat werkt los van de kassa. Laat de klant pinnen en tik dan op "Betaald".
-- **Bonprinter:** elke bonprinter van 80 mm die als printer in Windows of macOS is geïnstalleerd werkt. Kies bij het afdrukken die printer en zet de marges op "geen".
-- Voor de kassa is internet nodig. Valt internet uit, gebruik dan tijdelijk de hotspot van je telefoon.
+### Dagelijks gebruik
+1. **Openen:** in de admin klik je op **Kassa openen** (op het overzicht of onder *Kassa*). Tel het wisselgeld in de la en vul het beginsaldo in. De kassa gaat daarna op volledig scherm.
+2. **Verkopen:**
+   - Producten toevoeg je door op een productkaart te tikken, de barcode te scannen of te zoeken.
+   - Met het **toetsenblok** pas je de geselecteerde regel aan: **Aantal**, **% Korting** of **Prijs**. ⌫ wist een cijfer; "Wis regel" haalt de regel weg.
+   - **Bonkorting** geeft korting op de hele bon, **Klant** koppelt een klant aan de verkoop.
+3. **Betalen:** op het betaalscherm kies je **Pin**, **Contant** of **Tikkie**.
+   - Gesplitst betalen kan ook, bijvoorbeeld € 50 pin en de rest contant.
+   - Bij contant typ je het ontvangen bedrag, of tik je op +10, +20 of +50 voor een briefje. Het wisselgeld wordt meteen getoond.
+   - **Valideren** rondt de verkoop af. Daarna kun je de bon afdrukken of direct een nieuwe bestelling beginnen.
+4. **Sluiten (dagafsluiting):** klik op **Kassa sluiten**. Je ziet de omzet per betaalwijze en wat er in de la hoort te zitten. Vul in wat je telt; het verschil wordt bewaard. Het **kassarapport (Z)** kun je afdrukken. Alle diensten staan in de admin onder *Kassa*.
+
+**Sneltoetsen:**
+- Cijfers, ⌫, komma en Delete werken als het toetsenblok.
+- Pijltjes ↑/↓ kiezen een andere regel.
+- Enter gaat naar betalen of valideert de betaling.
+- Esc gaat terug van het betaalscherm.
+- Een barcodescanner wordt automatisch herkend, ook zonder op het zoekveld te klikken.
+
+### De kassacomputer instellen
+- **Kioskmodus (aanbevolen):** maak een snelkoppeling naar Google Chrome met
+  `chrome --kiosk https://www.worldwidewine.nl/admin/#pos`.
+  - De kassa start dan altijd op volledig scherm, zonder adresbalk of tabbladen.
+  - Afsluiten doe je met Alt+F4 (Windows) of Cmd+Q (Mac).
+  - Log één keer in; daarna blijf je 12 uur ingelogd.
+- Zonder kioskmodus schakel je volledig scherm aan of uit met de knop ⛶ rechtsboven, of met F11.
+- **Barcodescanner:** een USB- of Bluetooth-scanner werkt direct. Koppel de barcode eerst aan het product: *Producten → product → Barcode*. Je kunt daar ook in scannen.
+- **Pinapparaat:** het pinapparaat werkt los van de kassa. Laat de klant pinnen en klik dan op Valideren.
+- **Bonprinter:** elke bonprinter van 80 mm die als printer in Windows of macOS is geïnstalleerd werkt. Kies bij het afdrukken die printer en zet de marges op "geen". In kioskmodus kun je Chrome starten met `--kiosk-printing`; dan wordt de bon zonder printvenster op de standaardprinter afgedrukt.
+- Voor de kassa is internet nodig. Valt het internet uit, gebruik dan tijdelijk de hotspot van je telefoon.
+
+### Productfoto's
+- Foto's voeg je toe in de admin: *Producten → product → Foto kiezen…*.
+- De foto wordt automatisch verkleind en opgeslagen in Supabase Storage (map `product-images`).
+- Je ziet hem in de kassa én in de webshop.
+- Producten zonder foto krijgen een getekende fles in de kleur van de wijnsoort.
 
 ## Lokaal draaien en testen
 

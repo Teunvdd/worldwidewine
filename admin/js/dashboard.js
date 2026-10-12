@@ -6,7 +6,7 @@ A.register("dashboard", {
       var methods = Object.keys(d.today.byMethod);
       el.innerHTML =
         "<header class='page-head'><div><h1>Overzicht</h1><p class='muted'>" + e(new Date().toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" })) + "</p></div>" +
-        "<a class='btn btn-primary btn-lg' href='#kassa'>Kassa openen</a></header>" +
+        "<button class='btn btn-primary btn-lg' id='d-pos'>Kassa openen</button></header>" +
 
         "<section class='kpis'>" +
           kpi("Vandaag", eu(d.today.total), d.today.count + (d.today.count === 1 ? " verkoop" : " verkopen")) +
@@ -37,6 +37,7 @@ A.register("dashboard", {
           "</tbody></table>" : "<p class='empty-inline'>Nog geen verkopen deze maand.</p>") +
         "</section>";
 
+      el.querySelector("#d-pos").addEventListener("click", function () { A.openPos(); });
       el.querySelectorAll("[data-order]").forEach(function (tr) {
         tr.addEventListener("click", function () { A.showOrder(tr.dataset.order); });
       });

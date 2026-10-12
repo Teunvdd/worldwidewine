@@ -11,7 +11,7 @@ var A = (function () {
   };
   var PAYMENT = {
     online: "Online (Mollie)", "bij-afhalen": "Bij afhalen", betaalverzoek: "Betaalverzoek",
-    pin: "Pin", contant: "Contant", tikkie: "Tikkie", overig: "Anders"
+    pin: "Pin", contant: "Contant", tikkie: "Tikkie", overig: "Anders", gemengd: "Gemengd"
   };
 
   function esc(s) {
@@ -130,7 +130,29 @@ var A = (function () {
     Promise.resolve(views[name].render(el)).catch(function (e) {
       el.innerHTML = "<div class='empty'><p>" + esc(e.message) + "</p><button class='btn' onclick='location.reload()'>Opnieuw proberen</button></div>";
     });
-    refreshBadges();
+    if (name !== "pos") refreshBadges();
+  }
+
+  // ---- Volledig scherm (kassa) ----
+  function enterFullscreen() {
+    var el = document.documentElement;
+    var fn = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (fn && !isFullscreen()) { try { var r = fn.call(el); if (r && r.catch) r.catch(function () {}); } catch (e) {} }
+  }
+  function exitFullscreen() {
+    var fn = document.exitFullscreen || document.webkitExitFullscreen;
+    if (fn && isFullscreen()) { try { var r = fn.call(document); if (r && r.catch) r.catch(function () {}); } catch (e) {} }
+  }
+  function isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  // Kassa openen: moet direct vanuit een klik worden aangeroepen (anders weigert de browser volledig scherm).
+  function openPos() { enterFullscreen(); location.hash = "#pos"; }
+
+  // Afdrukken van een bon of rapport
+  function printHtml(html) {
+    var el = document.getElementById("receipt-print");
+    el.innerHTML = html;
+    document.body.classList.add("printing-receipt");
+    setTimeout(function () { window.print(); document.body.classList.remove("printing-receipt"); }, 50);
   }
 
   function refreshBadges() {
@@ -188,11 +210,43 @@ var A = (function () {
   }
   function productName(p) { return p.producer + " — " + p.name; }
 
+  // Foto van het product, of anders een getekende fles in de kleur van de soort.
+  var ART = {
+    rood: ["#4a1219", "#7a1f2b"], wit: ["#6b7a2e", "#9aab52"], rose: ["#d98a8f", "#f0b9b5"],
+    mousserend: ["#1f3324", "#3d5c43"], likeur: ["#d8c22a", "#f2e46a"], delicatessen: ["#9c3b35", "#d77a72"], water: ["#6aa3c0", "#cfe6ef"]
+  };
+  function productArt(p, cls) {
+    if (p.image) return "<img class='p-img " + (cls || "") + "' src='" + esc(p.image) + "' alt='' loading='lazy'>";
+    var c = ART[p.type] || ART.rood;
+    var id = "g" + Math.random().toString(36).slice(2, 8);
+    var initials = (p.producer || "").replace(/^(Domaine|Château|Champagne|Weingut)\s+/i, "").split(/\s+/).slice(0, 2)
+      .map(function (w) { return w.charAt(0); }).join("").toUpperCase();
+    var grad = "<defs><linearGradient id='" + id + "' x1='0' x2='1'><stop offset='0' stop-color='" + c[0] + "'/><stop offset='.55' stop-color='" + c[1] + "'/><stop offset='1' stop-color='" + c[0] + "'/></linearGradient></defs>";
+    var shape;
+    if (p.type === "delicatessen") {
+      shape = "<ellipse cx='60' cy='86' rx='38' ry='30' fill='url(#" + id + ")'/><ellipse cx='60' cy='86' rx='16' ry='12' fill='#f6e6d6'/>";
+    } else if (p.type === "likeur") {
+      shape = "<rect x='44' y='24' width='32' height='12' rx='3' fill='#2a1a1c'/><rect x='38' y='36' width='44' height='92' rx='8' fill='url(#" + id + ")'/>" +
+        "<rect x='42' y='66' width='36' height='34' rx='3' fill='#fbf7f3'/><text x='60' y='89' text-anchor='middle' font-family='Georgia,serif' font-weight='700' font-size='14' fill='#a9441f'>" + esc(initials) + "</text>";
+    } else {
+      var wide = p.type === "mousserend" || p.type === "water";
+      var w = wide ? 16 : 12;
+      var cap = p.type === "mousserend" ? "#d9c27a" : p.type === "water" ? "#2b5d77" : "#ce542b";
+      shape = "<rect x='53' y='12' width='14' height='12' rx='2' fill='" + cap + "'/>" +
+        "<path d='M54 24h12v22c0 6 " + w + " 10 " + w + " 22v66a6 6 0 0 1-6 6H" + (60 - w) + "a6 6 0 0 1-6-6V68c0-12 " + w + "-16 " + w + "-22Z' fill='url(#" + id + ")'/>" +
+        "<rect x='44' y='76' width='32' height='30' rx='3' fill='#fbf7f3'/><rect x='44' y='76' width='32' height='3' fill='#e08a62'/>" +
+        "<text x='60' y='97' text-anchor='middle' font-family='Georgia,serif' font-weight='700' font-size='12' fill='#a9441f'>" + esc(initials) + "</text>";
+    }
+    var cases = p.unit === "doos van 6" ? "<rect x='78' y='112' width='30' height='16' rx='3' fill='#a9441f'/><text x='93' y='124' text-anchor='middle' font-family='Arial,sans-serif' font-weight='700' font-size='10' fill='#fff'>6×</text>" : "";
+    return "<svg class='p-img p-art " + (cls || "") + "' viewBox='0 0 120 140' role='img' aria-hidden='true'>" + grad + shape + cases + "</svg>";
+  }
+
   return {
     $: $, $$: $$, esc: esc, euro: euro, date: date, parseNum: parseNum,
     api: api, load: load, invalidate: invalidate, toast: toast, modal: modal, closeModal: closeModal,
     confirm: confirmBox, formData: formData, busy: busy, register: register, route: route, start: start,
-    refreshBadges: refreshBadges, statusBadge: statusBadge, stockBadge: stockBadge, productName: productName,
+    enterFullscreen: enterFullscreen, exitFullscreen: exitFullscreen, isFullscreen: isFullscreen, openPos: openPos, printHtml: printHtml,
+    refreshBadges: refreshBadges, statusBadge: statusBadge, stockBadge: stockBadge, productName: productName, productArt: productArt,
     TYPES: TYPES, STATUS: STATUS, PAYMENT: PAYMENT,
     computeOrder: window.WWW_ORDER.computeOrder, CONFIG: window.WWW_CONFIG
   };

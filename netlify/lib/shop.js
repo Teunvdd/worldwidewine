@@ -4,13 +4,15 @@ const { HttpError, str } = require("./http");
 const SEED = require("../../data/products.js");
 const CONFIG = require("../../data/config.js");
 const { computeOrder, round } = require("../../data/order.js");
+const images = require("./images");
 
 const TYPES = ["rood", "wit", "rose", "mousserend", "likeur", "delicatessen", "water"];
 const STATUSES = ["nieuw", "betaald", "klaar", "verzonden", "afgerond", "geannuleerd"];
 const PAYMENT_LABELS = {
   online: "Online (Mollie)", "bij-afhalen": "Bij afhalen", betaalverzoek: "Betaalverzoek",
-  pin: "Pin", contant: "Contant", tikkie: "Tikkie / betaalverzoek", overig: "Anders"
+  pin: "Pin", contant: "Contant", tikkie: "Tikkie / betaalverzoek", overig: "Anders", gemengd: "Gemengd"
 };
+const POS_METHODS = ["pin", "contant", "tikkie", "overig"];
 
 const now = () => new Date().toISOString();
 // Datum in Nederlandse tijd (de server draait op UTC), als "2026-10-12".
@@ -62,7 +64,8 @@ const ORDER_FIELDS = {
   paymentMethod: "payment_method", paymentStatus: "payment_status", molliePaymentId: "mollie_payment_id",
   subtotal: "subtotal", discount: "discount", discountInfo: "discount_info", shipping: "shipping", total: "total",
   vat: "vat", delivery: "delivery", deliveryLabel: "delivery_label", customerId: "customer_id",
-  customer: "customer", notes: "notes", pickupMoment: "pickup_moment", cash: "cash", history: "history"
+  customer: "customer", notes: "notes", pickupMoment: "pickup_moment", cash: "cash", history: "history",
+  posSessionId: "pos_session_id", payments: "payments"
 };
 
 function toOrderRow(o) {
@@ -76,9 +79,13 @@ function fromOrderRow(r) {
   Object.keys(ORDER_FIELDS).forEach((k) => { o[k] = r[ORDER_FIELDS[k]]; });
   ["subtotal", "discount", "shipping", "total"].forEach((k) => { o[k] = num(o[k]) || 0; });
   o.createdAt = new Date(o.createdAt).toISOString();
-  o.lines = (r.order_lines || []).sort((a, b) => a.line_no - b.line_no).map((l) => ({
-    id: l.product_id, name: l.name, unit: l.unit, qty: l.qty, price: num(l.price), total: num(l.total), vat: l.vat
-  }));
+  o.lines = (r.order_lines || []).sort((a, b) => a.line_no - b.line_no).map((l) => {
+    const line = { id: l.product_id, name: l.name, unit: l.unit, qty: l.qty, price: num(l.price), total: num(l.total), vat: l.vat };
+    if (num(l.discount)) line.discount = num(l.discount);
+    if (l.list_price != null) line.listPrice = num(l.list_price);
+    return line;
+  });
+  if (!o.payments) o.payments = o.paymentMethod && o.paymentMethod !== "gemengd" ? [{ method: o.paymentMethod, amount: o.total }] : [];
   o.history = o.history || [];
   o.vat = o.vat || [];
   return o;
@@ -263,7 +270,12 @@ async function getOrder(number) {
 }
 
 function orderLines(result) {
-  return result.lines.map((l) => ({ id: l.id, name: l.name, unit: l.unit, qty: l.qty, price: l.price, total: l.total, vat: l.vat }));
+  return result.lines.map((l) => {
+    const line = { id: l.id, name: l.name, unit: l.unit, qty: l.qty, price: l.price, total: l.total, vat: l.vat };
+    if (l.discount) line.discount = l.discount;
+    if (l.listPrice != null) line.listPrice = l.listPrice;
+    return line;
+  });
 }
 
 async function saveNewOrder(order, strict, reason) {
@@ -320,10 +332,83 @@ async function nextReceiptNumber() {
   return "K-" + day + "-" + String(n).padStart(3, "0");
 }
 
-// Kassaverkoop in de winkel.
+// ---------------- Kassadiensten ----------------
+
+function fromSessionRow(r) {
+  return {
+    id: r.id, status: r.status, openedAt: new Date(r.opened_at).toISOString(),
+    closedAt: r.closed_at ? new Date(r.closed_at).toISOString() : null,
+    openingCash: num(r.opening_cash) || 0, expectedCash: num(r.expected_cash), countedCash: num(r.counted_cash),
+    difference: num(r.difference), summary: r.summary, note: r.note
+  };
+}
+
+async function openSession() {
+  const rows = await run(db().from("pos_sessions").select("*").eq("status", "open"));
+  return rows.length ? fromSessionRow(rows[0]) : null;
+}
+
+// Omzet en kas van een dienst, berekend uit de kassaverkopen.
+async function sessionSummary(session) {
+  const rows = await all(() => db().from("orders").select("*, order_lines(*)").eq("pos_session_id", session.id).order("created_at"));
+  const orders = rows.map(fromOrderRow).filter((o) => o.status !== "geannuleerd");
+  const byMethod = {};
+  orders.forEach((o) => o.payments.forEach((pm) => { byMethod[pm.method] = round((byMethod[pm.method] || 0) + pm.amount); }));
+  const vat = {};
+  orders.forEach((o) => (o.vat || []).forEach((v) => { vat[v.rate] = vat[v.rate] || { rate: v.rate, gross: 0, vat: 0 }; vat[v.rate].gross = round(vat[v.rate].gross + v.gross); vat[v.rate].vat = round(vat[v.rate].vat + v.vat); }));
+  return {
+    count: orders.length,
+    total: round(orders.reduce((t, o) => t + o.total, 0)),
+    discount: round(orders.reduce((t, o) => t + (o.discount || 0), 0) + orders.reduce((t, o) => t + o.lines.reduce((u, l) => u + (l.discount ? round(l.price * l.qty) - l.total : 0), 0), 0)),
+    byMethod,
+    vat: Object.values(vat).sort((a, b) => a.rate - b.rate),
+    expectedCash: round(session.openingCash + (byMethod.contant || 0))
+  };
+}
+
+async function currentSession() {
+  const session = await openSession();
+  if (!session) return { session: null, lastClosingCash: await lastClosingCash() };
+  return { session: Object.assign(session, { summary: await sessionSummary(session) }) };
+}
+
+async function lastClosingCash() {
+  const rows = await run(db().from("pos_sessions").select("counted_cash").eq("status", "gesloten").order("closed_at", { ascending: false }).limit(1));
+  return rows.length ? num(rows[0].counted_cash) : 0;
+}
+
+async function startSession(input) {
+  const opening = round(Number(input.openingCash) || 0);
+  if (opening < 0) throw new HttpError(400, "Beginsaldo kan niet negatief zijn.");
+  const rows = await run(db().from("pos_sessions").insert({ opening_cash: opening, note: str(input.note, 300) || null }).select(),
+    { pos_sessions_one_open: "Er is al een kassadienst open." });
+  return fromSessionRow(rows[0]);
+}
+
+async function closeSession(input) {
+  const session = await openSession();
+  if (!session) throw new HttpError(409, "Er is geen kassadienst open.");
+  const counted = input.countedCash === "" || input.countedCash == null ? null : round(Number(input.countedCash));
+  if (counted == null || !(counted >= 0)) throw new HttpError(400, "Vul het getelde bedrag in de kassalade in.");
+  const summary = await sessionSummary(session);
+  const rows = await run(db().from("pos_sessions").update({
+    status: "gesloten", closed_at: now(), expected_cash: summary.expectedCash, counted_cash: counted,
+    difference: round(counted - summary.expectedCash), summary, note: str(input.note, 500) || session.note
+  }).eq("id", session.id).eq("status", "open").select());
+  if (!rows.length) throw new HttpError(409, "Deze kassadienst is al gesloten.");
+  return fromSessionRow(rows[0]);
+}
+
+async function listSessions() {
+  const rows = await run(db().from("pos_sessions").select("*").order("opened_at", { ascending: false }).limit(60));
+  return rows.map(fromSessionRow);
+}
+
+// Kassaverkoop in de winkel. Betalen kan gesplitst: payments = [{ method, amount }].
+// Bij contant mag het bedrag hoger zijn dan nodig; het verschil is wisselgeld.
 async function createPosSale(input) {
-  const method = ["pin", "contant", "tikkie", "overig"].indexOf(input.payment) >= 0 ? input.payment : null;
-  if (!method) throw new HttpError(400, "Kies een betaalwijze.");
+  const session = await openSession();
+  if (!session) throw new HttpError(409, "Open eerst de kassa.");
   const discount = input.discount && Number(input.discount.value) > 0
     ? { type: input.discount.type === "percent" ? "percent" : "amount", value: Number(input.discount.value) } : null;
 
@@ -331,12 +416,29 @@ async function createPosSale(input) {
   const result = computeOrder((input.items || []).slice(0, 200), null, products, CONFIG, { pos: true, discount });
   if (result.errors.length) throw new HttpError(400, result.errors.join(" "));
 
-  let cash = null;
-  if (method === "contant" && input.cashReceived != null && input.cashReceived !== "") {
-    const received = round(Number(input.cashReceived));
-    if (!(received >= result.total)) throw new HttpError(400, "Ontvangen bedrag is lager dan het totaal.");
-    cash = { received, change: round(received - result.total) };
+  // Betalingen (oude aanroep met één betaalwijze blijft werken)
+  let given = Array.isArray(input.payments) ? input.payments
+    : [{ method: input.payment, amount: input.payment === "contant" && input.cashReceived != null && input.cashReceived !== "" ? input.cashReceived : result.total }];
+  given = given.slice(0, 10).map((pm) => ({ method: pm && pm.method, amount: round(Number(pm && pm.amount)) }))
+    .filter((pm) => pm.amount > 0 || result.total === 0);
+  if (!given.length || given.some((pm) => POS_METHODS.indexOf(pm.method) < 0 || !Number.isFinite(pm.amount))) {
+    throw new HttpError(400, "Kies een betaalwijze.");
   }
+  const nonCash = round(given.filter((pm) => pm.method !== "contant").reduce((t, pm) => t + pm.amount, 0));
+  const cashGiven = round(given.filter((pm) => pm.method === "contant").reduce((t, pm) => t + pm.amount, 0));
+  if (nonCash > result.total + 0.001) throw new HttpError(400, "Er is meer met pin/Tikkie betaald dan het totaal.");
+  if (round(nonCash + cashGiven) < result.total - 0.001) throw new HttpError(400, "Het betaalde bedrag is lager dan het totaal.");
+  const cashPart = round(result.total - nonCash);
+  const payments = [];
+  given.forEach((pm) => {
+    const amount = pm.method === "contant" ? 0 : pm.amount;
+    const same = payments.find((x) => x.method === pm.method);
+    if (pm.method !== "contant") { if (same) same.amount = round(same.amount + amount); else payments.push({ method: pm.method, amount }); }
+  });
+  if (cashGiven > 0 && cashPart > 0) payments.push({ method: "contant", amount: cashPart });
+  if (!payments.length) payments.push({ method: given[0].method, amount: result.total });
+  const cash = cashGiven > 0 ? { received: cashGiven, change: round(cashGiven - cashPart) } : null;
+  const method = payments.length > 1 ? "gemengd" : payments[0].method;
 
   let customer = null, customerId = null;
   if (input.customerId) {
@@ -348,14 +450,31 @@ async function createPosSale(input) {
   const createdAt = now();
   const order = {
     number, channel: "winkel", createdAt, status: "afgerond",
-    paymentMethod: method, paymentStatus: "betaald",
+    paymentMethod: method, paymentStatus: "betaald", payments, posSessionId: session.id,
     lines: orderLines(result), subtotal: result.subtotal, discount: result.discount, discountInfo: discount,
     shipping: 0, total: result.total, vat: result.vat, cash, customerId, customer,
     notes: str(input.notes, 500), delivery: null, deliveryLabel: null, pickupMoment: null, molliePaymentId: null,
-    history: [{ at: createdAt, status: "afgerond", note: "Kassaverkoop (" + PAYMENT_LABELS[method] + ")" }]
+    history: [{ at: createdAt, status: "afgerond", note: "Kassaverkoop (" + payments.map((pm) => PAYMENT_LABELS[pm.method]).join(" + ") + ")" }]
   };
   await saveNewOrder(order, false, "Verkoop winkel");
   return { order, warnings: result.warnings };
+}
+
+// ---------------- Productfoto's ----------------
+
+async function setProductImage(id, dataUrl) {
+  const found = await run(db().from("products").select("id").eq("id", id));
+  if (!found.length) throw new HttpError(404, "Product niet gevonden.");
+  let url = null;
+  if (dataUrl) {
+    const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl));
+    if (!m) throw new HttpError(400, "Gebruik een foto in JPG-, PNG- of WebP-formaat.");
+    const buffer = Buffer.from(m[2], "base64");
+    if (buffer.length > 3 * 1024 * 1024) throw new HttpError(400, "De foto is te groot (maximaal 3 MB).");
+    url = await images.save(id, buffer, m[1]);
+  }
+  const rows = await run(db().from("products").update({ image: url, updated_at: now() }).eq("id", id).select());
+  return fromProductRow(rows[0]);
 }
 
 async function setOrderStatus(number, status, note) {
@@ -380,7 +499,7 @@ async function dashboard() {
   const todays = valid.filter((o) => localDay(o.createdAt) === today);
   const posToday = todays.filter((o) => o.channel === "winkel");
   const byMethod = {};
-  posToday.forEach((o) => { byMethod[o.paymentMethod] = round((byMethod[o.paymentMethod] || 0) + o.total); });
+  posToday.forEach((o) => o.payments.forEach((pm) => { byMethod[pm.method] = round((byMethod[pm.method] || 0) + pm.amount); }));
   const month = valid.filter((o) => localDay(o.createdAt).slice(0, 7) === today.slice(0, 7));
 
   // Best verkocht deze maand
@@ -408,5 +527,6 @@ module.exports = {
   changeStock, stockLog,
   getCustomers, saveCustomer, deleteCustomer,
   listOrders, getOrder, createWebOrder, createPosSale, setOrderStatus, setPaymentStatus,
+  currentSession, startSession, closeSession, listSessions, setProductImage,
   dashboard
 };

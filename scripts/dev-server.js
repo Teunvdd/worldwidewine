@@ -55,6 +55,14 @@ const server = http.createServer((req, res) => {
       console.log("Formulier ontvangen:", forms[forms.length - 1]["form-name"]);
       res.writeHead(200); return res.end("ok");
     }
+    if (url.pathname.startsWith("/uploads/") && process.env.WWW_LOCAL_UPLOADS) {
+      const name = path.basename(decodeURIComponent(url.pathname));
+      return fs.readFile(path.join(process.env.WWW_LOCAL_UPLOADS, name), (err, data) => {
+        if (err) { res.writeHead(404); return res.end(); }
+        res.writeHead(200, { "Content-Type": TYPES[path.extname(name)] || "application/octet-stream" });
+        res.end(data);
+      });
+    }
     let file = path.join(ROOT, decodeURIComponent(url.pathname));
     if (!file.startsWith(ROOT) || /[\\/]\.(data|git|env)|node_modules|netlify[\\/]|supabase[\\/]|tests[\\/]/.test(file)) { res.writeHead(404); return res.end(); }
     if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, "index.html");
@@ -74,6 +82,7 @@ const server = http.createServer((req, res) => {
     const stack = await local.start();
     process.env.SUPABASE_URL = stack.url;
     process.env.SUPABASE_SERVICE_ROLE_KEY = stack.serviceKey;
+    process.env.WWW_LOCAL_UPLOADS = process.env.WWW_LOCAL_UPLOADS || path.join(ROOT, ".data", "uploads");
     console.log("Tijdelijke lokale database gestart.");
     const stop = () => stack.stop().then(() => process.exit(0));
     process.on("SIGINT", stop); process.on("SIGTERM", stop);
