@@ -32,17 +32,31 @@ var A = (function () {
   function parseNum(v) { return v === "" || v == null ? null : Number(String(v).replace(",", ".")); }
 
   // ---- API ----
+  // Laad-rondje rechtsboven zolang er iets van de server komt (pas na een korte pauze, zodat snelle verzoeken niet knipperen).
+  var pending = 0, spinTimer;
+  function netBusy(on) {
+    pending = Math.max(0, pending + (on ? 1 : -1));
+    clearTimeout(spinTimer);
+    var el = document.getElementById("net-spin");
+    if (!el) return;
+    // Niet tonen als de pagina zelf al een laad-rondje laat zien.
+    if (pending) spinTimer = setTimeout(function () { el.hidden = !!document.querySelector("#view > .loading, .boot:not([hidden])"); }, 250);
+    else el.hidden = true;
+  }
+
   function api(method, path, body) {
     var opts = { method: method, headers: { Accept: "application/json" }, credentials: "same-origin" };
     if (method !== "GET") opts.headers["X-WWW-Admin"] = "1";
     if (body !== undefined) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+    netBusy(true);
     return fetch("/api/admin/" + path, opts).then(function (r) {
+      netBusy(false);
       return r.json().catch(function () { return {}; }).then(function (j) {
         if (r.status === 401 && path !== "login") { showLogin(); }
         if (!r.ok) { var e = new Error(j.error || "Er ging iets mis (" + r.status + ")."); e.status = r.status; throw e; }
         return j;
       });
-    }, function () { throw new Error("Geen verbinding met de server. Controleer de internetverbinding."); });
+    }, function () { netBusy(false); throw new Error("Geen verbinding met de server. Controleer de internetverbinding."); });
   }
 
   // Gedeelde gegevens, met eenvoudige cache per sessie.
@@ -112,7 +126,7 @@ var A = (function () {
 
   function busy(btn, on, label) {
     if (!btn) return;
-    if (on) { btn.dataset.label = btn.textContent; btn.textContent = label || "Bezig…"; btn.disabled = true; }
+    if (on) { btn.dataset.label = btn.textContent; btn.innerHTML = "<span class='spinner spinner-sm'></span>" + esc(label || "Bezig…"); btn.disabled = true; }
     else { btn.textContent = btn.dataset.label || btn.textContent; btn.disabled = false; }
   }
 
@@ -128,7 +142,7 @@ var A = (function () {
     $$("#menu a").forEach(function (a) { a.classList.toggle("active", a.dataset.view === name); });
     document.body.dataset.view = name;
     var el = $("#view");
-    el.innerHTML = "<div class='loading'>Laden…</div>";
+    el.innerHTML = "<div class='loading'><span class='spinner'></span>Laden…</div>";
     Promise.resolve(views[name].render(el)).catch(function (e) {
       el.innerHTML = "<div class='empty'><p>" + esc(e.message) + "</p><button class='btn' onclick='location.reload()'>Opnieuw proberen</button></div>";
     });
@@ -167,12 +181,14 @@ var A = (function () {
 
   // ---- Inloggen ----
   function showLogin(message) {
+    $("#boot").hidden = true;
     $("#app").hidden = true;
     $("#login").hidden = false;
     if (message) { $("#login-error").textContent = message; $("#login-error").hidden = false; }
     $("#login-form [name=password]").focus();
   }
   function showApp() {
+    $("#boot").hidden = true;
     $("#login").hidden = true;
     $("#app").hidden = false;
     route();

@@ -244,3 +244,9 @@
 .legal ul { padding-left: 1.2rem; }
 .legal li { margin-bottom: .4rem; }
 .badge-low { background: #fcefe6; color: #8a5a00; border-color: #e8c96b; }
+
+/* Laad-rondje */
+.loading { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; gap: .8rem; padding: 3rem 1rem; color: var(--muted, #6e625c); text-align: center; }
+.spinner { display: inline-block; width: 36px; height: 36px; border: 4px solid rgba(206, 84, 43, .2); border-top-color: var(--brand, #ce542b); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }

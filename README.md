@@ -105,7 +105,7 @@ Bij het eerste bezoek wordt de database automatisch gevuld met het startassortim
    - Gesplitst betalen kan ook, bijvoorbeeld € 50 pin en de rest contant.
    - Bij contant typ je het ontvangen bedrag, of tik je op +10, +20 of +50 voor een briefje. Het wisselgeld wordt meteen getoond.
    - **Valideren** rondt de verkoop af. Daarna kun je de bon afdrukken of direct een nieuwe bestelling beginnen.
-4. **Sluiten (dagafsluiting):** klik op **Kassa sluiten**. Je ziet de omzet per betaalwijze en wat er in de la hoort te zitten. Vul in wat je telt; het verschil wordt bewaard. Het **kassarapport (Z)** kun je afdrukken. Alle diensten staan in de admin onder *Kassa*.
+4. **Sluiten (dagafsluiting):** klik op het tandwiel linksboven in de kassa en kies **Kassa sluiten**. Je ziet de omzet per betaalwijze en wat er in de la hoort te zitten. Vul in wat je telt; het verschil wordt bewaard. Het **kassarapport (Z)** kun je afdrukken. Alle diensten staan in de admin onder *Kassa*.
 
 **Sneltoetsen:**
 - Cijfers, ⌫, komma en Delete werken als het toetsenblok.
@@ -141,7 +141,7 @@ De pincode wordt versleuteld opgeslagen en is bedoeld om handelingen van medewer
   - De kassa start dan altijd op volledig scherm, zonder adresbalk of tabbladen.
   - Afsluiten doe je met Alt+F4 (Windows) of Cmd+Q (Mac).
   - Log één keer in; daarna blijf je 12 uur ingelogd.
-- Zonder kioskmodus schakel je volledig scherm aan of uit met de knop ⛶ rechtsboven, of met F11.
+- Zonder kioskmodus schakel je volledig scherm aan of uit via het tandwiel linksboven (**Volledig scherm**), of met F11.
 - **Barcodescanner:** een USB- of Bluetooth-scanner werkt direct. Koppel de barcode eerst aan het product: *Producten → product → Barcode*. Je kunt daar ook in scannen.
 - **Pinapparaat:** het pinapparaat werkt los van de kassa. Laat de klant pinnen en klik dan op Valideren.
 - **Bonprinter:** elke bonprinter van 80 mm die als printer in Windows of macOS is geïnstalleerd werkt. Kies bij het afdrukken die printer en zet de marges op "geen". In kioskmodus kun je Chrome starten met `--kiosk-printing`; dan wordt de bon zonder printvenster op de standaardprinter afgedrukt.

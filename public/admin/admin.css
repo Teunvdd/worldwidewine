@@ -123,6 +123,18 @@ textarea { resize: vertical; }
 .toolbar { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
 .toolbar input[type=search] { flex: 1 1 260px; }
 .loading, .empty { padding: 4rem 1rem; text-align: center; color: var(--muted); }
+.loading { display: flex; flex-direction: column; align-items: center; gap: .9rem; }
+
+/* Laad-rondje */
+.spinner { display: inline-block; width: 36px; height: 36px; border: 4px solid rgba(206, 84, 43, .2); border-top-color: var(--brand); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: middle; flex: none; }
+.spinner-sm { width: 1em; height: 1em; border-width: 2px; margin-right: .45em; border-color: currentColor; border-top-color: transparent; opacity: .85; }
+.spinner-lg { width: 52px; height: 52px; border-width: 5px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.boot { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); z-index: 50; }
+.boot[hidden] { display: none; }
+.net-spin { position: fixed; top: 12px; right: 14px; z-index: 300; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: #fff; color: var(--brand); box-shadow: 0 2px 10px rgba(0,0,0,.18); pointer-events: none; }
+.net-spin[hidden] { display: none; }
+.net-spin .spinner-sm { margin: 0; width: 18px; height: 18px; }
 .empty-inline { color: var(--muted); padding: 1rem 0; margin: 0; }
 
 /* Kaarten en tabellen */
@@ -228,7 +240,15 @@ body.pos-mode .main { padding: 0 !important; height: 100vh; }
 .pos-search { flex: 1; max-width: 560px; }
 .pos-search input { width: 100%; min-height: 44px; border-radius: 10px; border: 0; padding: .6rem 1rem; font-size: 1rem; background: #fff; }
 .pos-session { font-size: .88rem; white-space: nowrap; margin-left: auto; display: flex; align-items: center; }
-.pos-top-actions { display: flex; gap: .4rem; }
+.pos-menu { position: relative; flex: none; }
+.pos-gear { width: 44px; padding: 0; display: grid; place-items: center; }
+.pos-gear svg { width: 22px; height: 22px; }
+.pos-menu-list { position: absolute; top: calc(100% + 8px); left: 0; z-index: 40; min-width: 240px; background: #fff; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.28); padding: 6px; display: grid; }
+.pos-menu-list[hidden] { display: none; }
+.pos-menu-list button { display: flex; align-items: center; gap: .7rem; border: 0; background: none; border-radius: 7px; padding: .8rem .9rem; font: inherit; font-size: 1rem; font-weight: 500; color: var(--ink); text-align: left; cursor: pointer; min-height: 48px; }
+.pos-menu-list button[hidden] { display: none; }
+.pos-menu-list button:hover { background: var(--line-2); }
+.pos-menu-list svg { font-size: 1.15rem; color: var(--brand); flex: none; }
 .top-btn { background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.15); border-radius: 9px; padding: .55rem .9rem; font: inherit; font-weight: 600; cursor: pointer; min-height: 44px; }
 .top-btn:hover, .top-btn.active { background: rgba(255,255,255,.18); }
 .pos-screen { flex: 1; min-height: 0; }
