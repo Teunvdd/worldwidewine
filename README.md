@@ -115,7 +115,7 @@ Bij het eerste bezoek wordt de database automatisch gevuld met het startassortim
 - Een barcodescanner wordt automatisch herkend, ook zonder op het zoekveld te klikken.
 
 ### Categorieën
-In de admin onder **Producten → Categorieën** maak je categorieën aan, bijvoorbeeld *Rood*, *Italië* of *Cadeaus*. Je kunt ze hernoemen, een kleur geven, verwijderen en de volgorde bepalen. Die volgorde zie je terug in de kassa.
+In de admin onder **Kassa → Categorieën** (links in het menu) maak je categorieën aan, bijvoorbeeld *Rood*, *Italië* of *Cadeaus*. Je kunt ze hernoemen, een kleur geven, verwijderen en de volgorde bepalen. Die volgorde zie je terug in de kassa.
 - Per product kies je de categorie bij het product zelf (veld **Categorie (kassa)**).
 - Nog geen categorieën? Met één klik maak je ze aan op basis van soort (Rood, Wit, Rosé, …); alle producten worden dan meteen ingedeeld.
 - Producten zonder categorie staan in de kassa onder **Overig**. Zolang er geen categorieën zijn, deelt de kassa in op soort.
@@ -164,8 +164,11 @@ Per product vul je in de admin onder **Producten** bij **Eigenschappen** in: **S
 - **Prijs** en **Alcohol volume** filter je met een schuifje met twee handvatten.
 - Bij een bestaande database: voer na deze update **`supabase/setup.sql`** nog één keer uit (of alleen `supabase/migrations/20261017000000_alcohol.sql` en `20261018000000_soort_vrij.sql`).
 
+### Producten in één keer aanpassen
+In de productlijst zet je vinkjes voor de producten (of met het vinkje bovenaan alle producten die je nu ziet). Er verschijnt een balk waarmee je ze in één keer **actief** of **niet actief** maakt of **verwijdert**.
+
 ### Productfoto's
-- Foto's voeg je toe in de admin: *Producten → product → Foto kiezen…*.
+- Foto's voeg je toe in de admin: *Producten → product*. Sleep een foto op het fotovak of klik op *Foto kiezen…*.
 - De foto wordt automatisch verkleind en opgeslagen in Supabase Storage (map `product-images`).
 - Je ziet hem in de kassa én in de webshop.
 - Producten zonder foto krijgen een getekende fles in de kleur van de wijnsoort.

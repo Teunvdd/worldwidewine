@@ -101,14 +101,29 @@ textarea { resize: vertical; }
 .logo-full { display: block; width: 100%; height: auto; }
 .logo-mark { display: none; width: 30px; height: 30px; }
 .menu { display: grid; gap: .2rem; }
-.menu a { display: flex; align-items: center; gap: .7rem; padding: .7rem .8rem; border-radius: 9px; color: #e9dcd3; text-decoration: none; font-weight: 500; }
-.menu a:hover { background: rgba(255,255,255,.06); }
+.menu a, .menu-head { display: flex; align-items: center; gap: .75rem; width: 100%; padding: .7rem .8rem; border: 0; border-radius: 9px; background: none; color: #e9dcd3; text-decoration: none; font: inherit; font-weight: 500; text-align: left; cursor: pointer; }
+.menu a:hover, .menu-head:hover { background: rgba(255,255,255,.06); }
 .menu a.active { background: var(--brand); color: #fff; }
-.menu .ic { width: 20px; text-align: center; opacity: .8; }
+.menu .ic { width: 20px; height: 20px; flex: none; display: grid; place-items: center; opacity: .85; }
+.menu .ic svg, .sidebar-foot .ic svg { width: 19px; height: 19px; }
+.menu a.active .ic { opacity: 1; }
+/* Uitklapmenu (Kassa) */
+.chev { margin-left: auto; display: grid; place-items: center; opacity: .7; transition: transform .2s; }
+.chev svg { width: 16px; height: 16px; }
+.menu-group.open .chev { transform: rotate(180deg); }
+.menu-group:has(a.active) > .menu-head { color: #fff; }
+.menu-sub { display: none; margin: .15rem 0 .3rem 1.55rem; padding-left: .7rem; border-left: 1px solid rgba(255,255,255,.12); gap: .1rem; }
+.menu-group.open .menu-sub { display: grid; }
+.menu-sub a { padding: .5rem .7rem; font-size: .92rem; }
+.menu-sub .ml { display: none; }
 .pill { margin-left: auto; background: var(--peach); color: var(--ink); font-size: .72rem; border-radius: 10px; padding: .05rem .45rem; }
 .pill-warn { background: #f3b6a0; color: #6b1c10; }
-.sidebar-foot { margin-top: auto; display: grid; gap: .6rem; padding: .8rem; font-size: .85rem; }
-.sidebar-foot a, .sidebar-foot .link { color: #cdbdb4; text-align: left; }
+.sidebar-foot { margin-top: auto; display: grid; gap: .5rem; padding: .8rem .2rem 0; font-size: .88rem; border-top: 1px solid rgba(255,255,255,.08); }
+.foot-link { display: flex; align-items: center; gap: .75rem; padding: .55rem .6rem; border-radius: 9px; color: #cdbdb4; text-decoration: none; }
+.foot-link:hover { background: rgba(255,255,255,.06); color: #fff; }
+.btn-logout { display: flex; align-items: center; justify-content: center; gap: .55rem; width: 100%; background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.14); color: #f2e7e0; font-weight: 600; }
+.btn-logout:hover { background: rgba(255,255,255,.14); }
+.sidebar-foot .ic { width: 20px; height: 20px; display: grid; place-items: center; }
 .main { padding: 1.8rem 2rem 4rem; min-width: 0; outline: none; }
 @media (max-width: 900px) {
   .app { grid-template-columns: 1fr; }
@@ -117,8 +132,14 @@ textarea { resize: vertical; }
   .logo { padding: 0 .4rem; }
   .logo-mark { display: block; }
   .menu { display: flex; gap: .1rem; }
-  .menu a { padding: .55rem .7rem; white-space: nowrap; font-size: .88rem; }
+  .menu a { padding: .55rem .7rem; white-space: nowrap; font-size: .88rem; width: auto; }
   .menu .ic { display: none; }
+  /* Op smalle schermen: Kassa-onderdelen gewoon naast de andere knoppen */
+  .menu-group { display: contents; }
+  .menu-head { display: none; }
+  .menu-sub, .menu-group.open .menu-sub { display: contents; }
+  .menu-sub .l { display: none; }
+  .menu-sub .ml { display: inline; }
   .main { padding: 1.2rem 16px 4rem; }
 }
 
@@ -137,9 +158,6 @@ textarea { resize: vertical; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .boot { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); z-index: 50; }
 .boot[hidden] { display: none; }
-.net-spin { position: fixed; top: 12px; right: 14px; z-index: 300; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: #fff; color: var(--brand); box-shadow: 0 2px 10px rgba(0,0,0,.18); pointer-events: none; }
-.net-spin[hidden] { display: none; }
-.net-spin .spinner-sm { margin: 0; width: 18px; height: 18px; }
 .empty-inline { color: var(--muted); padding: 1rem 0; margin: 0; }
 
 /* Kaarten en tabellen */
@@ -229,7 +247,18 @@ textarea { resize: vertical; }
 .thumb { width: 44px; height: 52px; border-radius: 8px; overflow: hidden; background: #f6ede5; flex: none; }
 .thumb img.p-img { object-fit: cover; }
 .p-cell { display: flex; gap: .8rem; align-items: center; }
-.img-edit { display: flex; gap: 1rem; align-items: center; }
+.img-edit { position: relative; display: flex; gap: 1rem; align-items: center; padding: .6rem; border: 2px dashed var(--line); border-radius: 12px; transition: border-color .15s, background .15s; }
+.img-edit.dragging { border-color: var(--brand); background: #fdf0e8; }
+.drop-hint { display: none; position: absolute; inset: 0; place-items: center; border-radius: 10px; font-weight: 700; color: var(--wine); background: rgba(253,240,232,.92); pointer-events: none; }
+.img-edit.dragging .drop-hint { display: grid; }
+/* Productlijst: vinkjes en acties voor de selectie */
+.sel-col { width: 44px; text-align: center; }
+.sel-col input { width: 18px; height: 18px; accent-color: var(--brand); cursor: pointer; }
+tr.is-selected td { background: #fdf3ec; }
+.bulk-bar { position: sticky; top: .6rem; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: .8rem; padding: .6rem .9rem; border-radius: 12px; background: var(--dark-2); color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+.bulk-bar[hidden] { display: none; }
+.bulk-bar strong { margin-right: auto; }
+.bulk-bar .link { color: #e9dcd3; }
 .img-edit .thumb { width: 96px; height: 112px; }
 .img-edit-actions { display: flex; flex-direction: column; gap: .4rem; align-items: flex-start; }
 
@@ -507,7 +536,6 @@ body.pos-mode .main { padding: 0 !important; height: 100vh; }
 }
 
 /* ---------- Kassa-instellingen ---------- */
-.menu a.sub { padding-left: 1.6rem; font-size: .9rem; }
 .settings { display: grid; grid-template-columns: 1fr 340px; gap: 1.2rem; align-items: start; padding-bottom: 5rem; }
 .settings-side { position: sticky; top: 1rem; }
 @media (max-width: 1100px) { .settings { grid-template-columns: 1fr; } .settings-side { position: static; } }
@@ -567,10 +595,13 @@ input[type=radio], input[type=checkbox] { min-height: 0; padding: 0; width: auto
 .notice-warn { background: var(--warn-bg); color: var(--warn); }
 .cat-tag { display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem; font-weight: 600; background: var(--line-2); border-radius: 999px; padding: .1rem .55rem; margin: .2rem 0; }
 .cat-tag i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.cat-list { display: grid; gap: .5rem; margin: 1rem 0; }
-.cat-row { display: grid; grid-template-columns: auto minmax(140px, 1fr) auto auto auto; gap: .6rem; align-items: center; padding: .5rem .6rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
-.cat-move { display: flex; flex-direction: column; }
-.cat-move .icon-btn { width: 26px; height: 20px; font-size: .65rem; border-radius: 5px; color: var(--muted); }
+.cat-table td { vertical-align: middle; }
+.cat-move-col { width: 90px; }
+.cat-table .cat-name { width: 100%; max-width: 340px; }
+.cat-table .cat-colors { max-width: none; flex-wrap: nowrap; }
+@media (max-width: 900px) { .cat-table .cat-colors { flex-wrap: wrap; max-width: 120px; } .cat-table .cat-name { min-width: 120px; } .cat-move-col { width: auto; } }
+.cat-move { display: inline-flex; gap: 4px; }
+.cat-move .icon-btn { width: 30px; height: 30px; font-size: .7rem; border-radius: 7px; color: var(--muted); border: 1px solid var(--line); background: #fff; }
 .cat-move .icon-btn:disabled { opacity: .25; cursor: default; }
 .cat-name { min-height: 36px; font-weight: 600; }
 .cat-colors { display: flex; gap: 4px; flex-wrap: wrap; max-width: 190px; }
@@ -578,6 +609,6 @@ input[type=radio], input[type=checkbox] { min-height: 0; padding: 0; width: auto
 .swatch.active { box-shadow: 0 0 0 2px var(--ink); }
 .swatch-none { background: repeating-linear-gradient(45deg, #fff 0 3px, #e3d6cc 3px 5px); }
 .cat-count { white-space: nowrap; }
-.cat-add { display: flex; gap: .6rem; }
+.cat-add { display: flex; gap: .6rem; padding: .9rem; margin-bottom: 1rem; }
 .cat-add input { flex: 1; }
-@media (max-width: 720px) { .cat-row { grid-template-columns: auto 1fr; } .cat-colors, .cat-count { grid-column: 2; } }
+

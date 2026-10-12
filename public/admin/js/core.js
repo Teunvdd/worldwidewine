@@ -41,31 +41,17 @@ var A = (function () {
   function parseNum(v) { return v === "" || v == null ? null : Number(String(v).replace(",", ".")); }
 
   // ---- API ----
-  // Laad-rondje rechtsboven zolang er iets van de server komt (pas na een korte pauze, zodat snelle verzoeken niet knipperen).
-  var pending = 0, spinTimer;
-  function netBusy(on) {
-    pending = Math.max(0, pending + (on ? 1 : -1));
-    clearTimeout(spinTimer);
-    var el = document.getElementById("net-spin");
-    if (!el) return;
-    // Niet tonen als de pagina zelf al een laad-rondje laat zien.
-    if (pending) spinTimer = setTimeout(function () { el.hidden = !!document.querySelector("#view > .loading, .boot:not([hidden])"); }, 250);
-    else el.hidden = true;
-  }
-
   function api(method, path, body) {
     var opts = { method: method, headers: { Accept: "application/json" }, credentials: "same-origin" };
     if (method !== "GET") opts.headers["X-WWW-Admin"] = "1";
     if (body !== undefined) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
-    netBusy(true);
     return fetch("/api/admin/" + path, opts).then(function (r) {
-      netBusy(false);
       return r.json().catch(function () { return {}; }).then(function (j) {
         if (r.status === 401 && path !== "login") { showLogin(); }
         if (!r.ok) { var e = new Error(j.error || "Er ging iets mis (" + r.status + ")."); e.status = r.status; throw e; }
         return j;
       });
-    }, function () { netBusy(false); throw new Error("Geen verbinding met de server. Controleer de internetverbinding."); });
+    }, function () { throw new Error("Geen verbinding met de server. Controleer de internetverbinding."); });
   }
 
   // Gedeelde gegevens, met eenvoudige cache per sessie.
@@ -143,12 +129,23 @@ var A = (function () {
   var current = null;
   function register(name, view) { views[name] = view; }
 
+  function setGroup(g, open) {
+    g.classList.toggle("open", open);
+    g.querySelector(".menu-head").setAttribute("aria-expanded", String(open));
+  }
+  document.addEventListener("click", function (e) {
+    var head = e.target.closest(".menu-head");
+    if (head) setGroup(head.parentNode, !head.parentNode.classList.contains("open"));
+  });
+
   function route() {
     var name = (location.hash || "#dashboard").slice(1).split("/")[0] || "dashboard";
     if (!views[name]) name = "dashboard";
     if (current && views[current].leave) views[current].leave();
     current = name;
     $$("#menu a").forEach(function (a) { a.classList.toggle("active", a.dataset.view === name); });
+    // Uitklapmenu open als er een pagina binnen actief is.
+    $$("#menu .menu-group").forEach(function (g) { if (g.querySelector("a.active")) setGroup(g, true); });
     document.body.dataset.view = name;
     var el = $("#view");
     el.innerHTML = "<div class='loading'><span class='spinner'></span>Laden…</div>";
