@@ -25,7 +25,7 @@
   });
 
   // Elementen laten infaden
-  var targets = document.querySelectorAll('.section-head, .card, .bottle, .producers li, .visit-card, .split > *');
+  var targets = document.querySelectorAll('.section-head, .card, .bottle, .producers li, .visit-card, .split > *:not(.about-photos)');
   if ('IntersectionObserver' in window) {
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
