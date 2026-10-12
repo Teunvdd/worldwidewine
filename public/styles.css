@@ -230,7 +230,7 @@ select option { color: var(--ink); background: #fff; }
 .checklist li::before { content: ""; position: absolute; left: 0; top: .55em; width: 14px; height: 8px; border-left: 2px solid var(--gold); border-bottom: 2px solid var(--gold); transform: rotate(-45deg); }
 #proeverijen .split:not(.has-slides) { grid-template-columns: 1fr; }
 #proeverijen .split:not(.has-slides) .split-text { max-width: 760px; }
-.slideshow { position: relative; border-radius: 18px; overflow: hidden; background: #1a1310; box-shadow: 0 30px 60px -30px rgba(0,0,0,.7); aspect-ratio: 4 / 5; }
+.slideshow { position: relative; border-radius: 18px; overflow: hidden; background: #1a1310; box-shadow: 0 30px 60px -30px rgba(0,0,0,.7); aspect-ratio: 4 / 3; }
 .slides, .slide { position: absolute; inset: 0; margin: 0; }
 .slide { opacity: 0; transition: opacity .8s ease; }
 .slide.is-active { opacity: 1; }

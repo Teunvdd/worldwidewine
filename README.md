@@ -201,7 +201,7 @@ In de admin onder **Winkel**:
 Deze instellingen staan in de database (tabel `settings`, sleutel `shop`); er is geen extra databasewijziging nodig. Zolang er niets is opgeslagen gelden de standaardwaarden uit `public/data/config.js`.
 
 ### Foto's proeverijen
-Op de pagina **Proeverijen** loopt een slideshow. De foto's staan in de map `public/assets/proeverijen/` en worden in `public/proeverijen.html` genoemd (`proeverij-1.jpg`, `proeverij-2.jpg`, `proeverij-3.jpg`). Foto toevoegen: zet het bestand in die map en kopieer in `proeverijen.html` een `<figure>`-regel met de nieuwe bestandsnaam (en eventueel een onderschrift). Een foto die er niet is wordt overgeslagen; zonder foto's toont de pagina alleen de tekst.
+Op de pagina **Proeverijen** loopt een slideshow. De foto's staan in de map `public/assets/proeverijen/` en worden in `public/proeverijen.html` genoemd (bijv. `worldwidewine-proeftafel-winkel-zaandam.jpg`). Foto toevoegen: zet het bestand in die map en kopieer in `proeverijen.html` een `<figure>`-regel met de nieuwe bestandsnaam (en eventueel een onderschrift). Een foto die er niet is wordt overgeslagen; zonder foto's toont de pagina alleen de tekst.
 
 ### Mijn account (voor klanten)
 Klanten loggen in op **Mijn account** (`account.html`, het poppetje rechtsboven) met hun e-mailadres: ze krijgen een **code van zes cijfers per e-mail**, een wachtwoord is niet nodig. De code is 15 minuten geldig en werkt één keer; na 5 foute pogingen moet er een nieuwe code komen (maximaal 5 codes per uur). Ingelogd blijven ze 30 dagen.
