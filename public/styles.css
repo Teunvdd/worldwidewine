@@ -253,7 +253,10 @@ select option { color: var(--ink); background: #fff; }
 .visit-card.visit-hours { flex-direction: row; gap: 2.5rem; align-items: stretch; margin-bottom: 1.25rem; }
 .visit-shop { flex: 0 0 240px; display: flex; flex-direction: column; }
 .visit-shop .muted { font-size: .92rem; }
-.week-hours { flex: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .5rem; align-content: center; }
+.week-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.week-note { margin: 1rem 0 0; color: var(--muted); font-size: .95rem; }
+.week-note a { color: var(--wine); font-weight: 600; white-space: nowrap; }
+.week-hours { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .5rem; align-content: center; }
 .week-hours > p { grid-column: 1 / -1; }
 .wh-day { border: 1px solid var(--line); border-radius: 12px; padding: 1rem .6rem; text-align: center; display: flex; flex-direction: column; gap: .2rem; background: var(--cream, #fbf7f2); }
 .wh-day .wh-name { font-weight: 700; }
