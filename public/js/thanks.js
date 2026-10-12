@@ -11,10 +11,11 @@
   $("order-text").textContent = saved.text;
 
   var pickup = saved.order && saved.order.delivery && saved.order.delivery.pickup;
+  var moment = pickup && saved.data && saved.data.afhaalmoment; // bijv. "vrijdag 16 oktober 2026 om 14:00 uur"
   var steps = {
-    "bij-afhalen": "Je betaalt bij het afhalen met pin of contant. We laten je weten wanneer je bestelling klaarstaat.",
+    "bij-afhalen": "Je betaalt bij het afhalen met pin of contant." + (moment ? " We zien je " + moment + " in de winkel aan de Westzijde 358 in Zaandam." : ""),
     "betaalverzoek": "Je ontvangt van ons een bevestiging met een betaallink. Na betaling maken we je bestelling klaar" +
-      (pickup ? " om af te halen." : " en " + (saved.data.bezorging === "postnl" ? "versturen we hem met PostNL." : "bezorgen we hem bij je thuis.")),
+      (pickup ? " om af te halen" + (moment ? " op " + moment + "." : ".") : " en " + (saved.data.bezorging === "postnl" ? "versturen we hem met PostNL." : "bezorgen we hem bij je thuis.")),
     "online": "We controleren je betaling…"
   };
 

@@ -152,7 +152,7 @@ select option { color: var(--ink); background: #fff; }
 .section { padding: clamp(4rem, 9vw, 7rem) 0; }
 .section-tint { background: var(--cream-2); }
 .section-dark { background: linear-gradient(135deg, var(--dark-2), var(--dark) 60%, #1a1310); color: #efe4dc; }
-.section-dark h2 { color: #fff; }
+.section-dark h1, .section-dark h2 { color: #fff; }
 .section-head { max-width: 680px; margin-bottom: 3rem; }
 .section-head p:last-child { color: var(--muted); }
 .subhead { margin-top: 4rem; }
@@ -286,3 +286,12 @@ select option { color: var(--ink); background: #fff; }
   .reveal { opacity: 1; transform: none; transition: none; }
   .btn, .card { transition: none; }
 }
+
+/* Losse pagina's (producenten, proeverijen, contact) */
+.page-first { padding-top: clamp(3rem, 6vw, 4.5rem); }
+.page-first h1 { font-size: clamp(2.1rem, 4.4vw, 3.2rem); line-height: 1.1; }
+.page-cta { display: flex; justify-content: center; align-items: center; gap: 1.5rem; flex-wrap: wrap; margin-top: 2.5rem; }
+.contact-shop { margin-top: 2.2rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
+.contact-shop h3 { font-size: 1.2rem; margin-bottom: .3rem; }
+.contact-shop address { font-style: normal; }
+.contact-shop p { margin: .3rem 0 0; color: var(--muted); }

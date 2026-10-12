@@ -12,9 +12,11 @@ De website en de serverfuncties draaien op **Vercel**. De gegevens staan in een 
 
 | Adres | Wat |
 |---|---|
-| `/` | Homepage |
+| `/` | Homepage: hero, over ons, uitgelicht assortiment, openingstijden & levering |
+| `/producenten.html`, `/proeverijen.html`, `/contact.html` | Producenten, proeverijen, en contact (met winkelgegevens en zakelijk) |
+| `/nieuws.html` | Nieuws (beheer in de admin) |
 | `/webshop.html` | Webshop met zoeken en filters. Toont live prijzen en voorraad |
-| `/afrekenen.html`, `/bedankt.html` | Afrekenen (afhalen, bezorgen, PostNL) en bevestiging |
+| `/afrekenen.html`, `/bedankt.html` | Afrekenen (afhalen met dag en tijd, bezorgen in Amsterdam e.o., PostNL) en bevestiging |
 | `/voorwaarden.html` | Voorwaarden & privacy (**concept**) |
 | **`/admin/`** | **Admin-omgeving en kassa** (met wachtwoord) |
 
@@ -181,6 +183,14 @@ In de admin onder **Producten** staan de knoppen **Exporteren** en **Importeren*
   - Rijen met een fout worden overgeslagen; je ziet per rij wat er mis is.
 - Tip: exporteer eerst, pas het bestand aan in Excel en importeer het weer.
 
+### Afrekenen: afhalen en bezorgen
+Bij het afrekenen kiest de klant:
+- **Afhalen in de winkel** (Westzijde 358, Zaandam): de klant kiest meteen een **dag en tijd** (om het halfuur, vandaag pas vanaf twee uur na nu, tot zes weken vooruit). Het afhaalmoment staat in de bestelling, de bevestigingsmail en de admin.
+- **Bezorgen in Amsterdam en omstreken**: zodra de klant zijn postcode invult zie je of we daar zelf bezorgen. Buiten het gebied kan de bestelling niet met deze optie worden geplaatst (ook de server controleert dit).
+- **Verzenden met PostNL** door heel Nederland, tot 18 flessen.
+
+Dagen, tijden en postcodes stel je in in `public/data/config.js` (zie de opmerkingen in dat bestand).
+
 ### Nieuws
 Op de website staat een pagina **Nieuws** (`nieuws.html`, ook in het menu en de footer). Berichten plaats je in de admin onder **Nieuws**.
 - **+ Nieuw bericht**: titel, foto (slepen of kiezen; liggend formaat werkt het mooist), tekst en datum.
@@ -221,7 +231,7 @@ Gebruik voor het testen bij voorkeur een **apart Supabase-project**, niet de ech
 |---|---|
 | `public/` | De website zelf (alles wat Vercel publiceert) |
 | `public/data/products.js` | Startassortiment (en reserve als de server niet bereikbaar is) |
-| `public/data/config.js` | Verzendkosten, afhaallocaties, contactgegevens |
+| `public/data/config.js` | Bezorgwijzen en kosten, postcodes voor eigen bezorging, afhaaldagen en -tijden, contactgegevens |
 | `public/data/order.js` | Berekening van bestelling, korting, verzending en btw. Gedeeld door webshop, kassa en server |
 | `public/admin/` | Admin-omgeving en kassa |
 | `api/` | Vercel-serverfuncties: `products`, `orders`, `payment-status`, `mollie-webhook`, `admin` |
@@ -238,6 +248,7 @@ Gebruik voor het testen bij voorkeur een **apart Supabase-project**, niet de ech
 - [ ] **Voorraad tellen:** zet onder Voorraad per product het aantal ("= Geteld"). Zolang er "—" staat, wordt de voorraad niet bijgehouden.
 - [ ] **Barcodes** koppelen voor snel scannen in de kassa.
 - [ ] **Verzendkosten** in `public/data/config.js` (€ 7,50 lokaal, € 9,95 PostNL, met gratis-grenzen) zijn voorstellen.
+- [ ] **Bezorggebied** (`postcodes` bij *Bezorgen in Amsterdam en omstreken*) en **afhaaltijden** (`pickup.hours`: ma–do 10–18, vr 9–19, za 10–17, zondag dicht) in `public/data/config.js` zijn voorstellen. Feestdagen zet je bij `pickup.closedDates`.
 - [ ] **Voorwaarden & privacy:** dit is een concepttekst; laat hem nakijken.
 - [ ] **PostNL:** gebruik bij alcohol de optie "Leeftijdscheck 18+".
 - [ ] **Kassabon:** controleer bij je boekhouder of de bon voldoet (bedrijfsgegevens, btw).

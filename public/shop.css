@@ -349,3 +349,9 @@
 .news-body p { margin: 0 0 1.1rem; }
 .news-foot { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
 .news-foot .news-back { margin: 0; }
+
+/* Afrekenen: afhaalmoment en postcodecontrole */
+.pickup-note { margin: 0; font-size: .88rem; color: var(--muted); }
+.area-check { margin: 0; padding: .6rem .8rem; border-radius: 8px; font-size: .9rem; font-weight: 500; }
+.area-check.is-ok { background: #e6f3ea; color: #23663b; }
+.area-check.is-bad { background: #fbe7e8; color: #9d2129; }

@@ -27,6 +27,8 @@ test.after(async () => { if (stack) await stack.stop(); });
 const customer = { name: "Test Klant", email: "Test@Example.com", phone: "0612345678", address: "Dorpsstraat 1", postcode: "1234 AB", city: "Utrecht" };
 let seq = 0;
 const nr = () => "WWW-261012-T" + String(++seq).padStart(3, "0");
+// Eerste beschikbare afhaalmoment (afhalen vraagt een dag en tijd).
+const slot = () => { const d = require("../public/data/order.js").pickupDays(require("../public/data/config.js"))[0]; return { pickupDate: d.date, pickupTime: d.times[0] }; };
 
 test("assortiment wordt gevuld vanuit data/products.js", async () => {
   const list = await shop.getProducts();
@@ -48,7 +50,7 @@ test("webshopbestelling verlaagt voorraad en maakt een klant aan", async () => {
 
 test("te weinig voorraad wordt geweigerd", async () => {
   await assert.rejects(
-    shop.createWebOrder({ orderNumber: nr(), items: [{ id: "wiston-estate-brut", qty: 4 }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer }),
+    shop.createWebOrder({ orderNumber: nr(), items: [{ id: "wiston-estate-brut", qty: 4 }], delivery: "afhalen-zaandam", ...slot(), payment: "bij-afhalen", customer }),
     /nog maar 3/
   );
   const p = (await shop.getProducts()).find((x) => x.id === "wiston-estate-brut");
@@ -56,13 +58,13 @@ test("te weinig voorraad wordt geweigerd", async () => {
 });
 
 test("prijzen komen van de server, niet van de klant", async () => {
-  const order = await shop.createWebOrder({ orderNumber: nr(), items: [{ id: "montemercurio-messaggero", qty: 1, price: 0.01 }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer });
+  const order = await shop.createWebOrder({ orderNumber: nr(), items: [{ id: "montemercurio-messaggero", qty: 1, price: 0.01 }], delivery: "afhalen-zaandam", ...slot(), payment: "bij-afhalen", customer });
   assert.strictEqual(order.total, 23);
 });
 
 test("annuleren zet de voorraad terug", async () => {
   const number = nr();
-  await shop.createWebOrder({ orderNumber: number, items: [{ id: "wiston-estate-brut", qty: 1 }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer });
+  await shop.createWebOrder({ orderNumber: number, items: [{ id: "wiston-estate-brut", qty: 1 }], delivery: "afhalen-zaandam", ...slot(), payment: "bij-afhalen", customer });
   assert.strictEqual((await shop.getProducts()).find((x) => x.id === "wiston-estate-brut").stock, 2);
   await shop.setOrderStatus(number, "geannuleerd");
   assert.strictEqual((await shop.getProducts()).find((x) => x.id === "wiston-estate-brut").stock, 3);
@@ -99,7 +101,7 @@ test("product alleen in de winkel: wel in kassa, niet in webshop", async () => {
   await shop.saveProduct({ producer: "Huiswijn", name: "Rood van het vat", type: "rood", price: 7.5, webshop: false, stock: 10, ean: "8710000000001" });
   const pub = await shop.publicProducts();
   assert.ok(!pub.some((p) => p.id === "huiswijn-rood-van-het-vat"));
-  await assert.rejects(shop.createWebOrder({ orderNumber: nr(), items: [{ id: "huiswijn-rood-van-het-vat", qty: 1 }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer }), /niet te bestellen/);
+  await assert.rejects(shop.createWebOrder({ orderNumber: nr(), items: [{ id: "huiswijn-rood-van-het-vat", qty: 1 }], delivery: "afhalen-zaandam", ...slot(), payment: "bij-afhalen", customer }), /niet te bestellen/);
   const { order } = await shop.createPosSale({ items: [{ id: "huiswijn-rood-van-het-vat", qty: 2 }], payment: "pin" });
   assert.strictEqual(order.total, 15);
   await assert.rejects(shop.saveProduct({ producer: "X", name: "Y", price: 1, ean: "8710000000001" }), /barcode/);
@@ -208,7 +210,7 @@ test("gelijktijdige verkopen: geen dubbele bonnummers en nooit te veel verkocht"
   assert.strictEqual(new Set(sales.map((s) => s.order.number)).size, 10, "unieke bonnummers");
   // 10 webshopbestellingen tegelijk voor een product waarvan er 5 zijn
   const results = await Promise.allSettled(Array.from({ length: 10 }, () =>
-    shop.createWebOrder({ orderNumber: nr(), items: [{ id: "domaine-de-la-begude-bandol-blanc", qty: 1 }, { id: "domaine-daridan-cheverny-blanc", qty: 1 }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer })));
+    shop.createWebOrder({ orderNumber: nr(), items: [{ id: "domaine-de-la-begude-bandol-blanc", qty: 1 }, { id: "domaine-daridan-cheverny-blanc", qty: 1 }], delivery: "afhalen-zaandam", ...slot(), payment: "bij-afhalen", customer })));
   const ok = results.filter((r) => r.status === "fulfilled").length;
   assert.strictEqual(ok, 5, "precies 5 bestellingen mogen slagen");
   results.filter((r) => r.status === "rejected").forEach((r) => assert.match(r.reason.message, /nog maar 0 op voorraad|uitverkocht/));
@@ -219,10 +221,10 @@ test("gelijktijdige verkopen: geen dubbele bonnummers en nooit te veel verkocht"
 
 test("mislukte bestelling laat geen halve gegevens achter", async () => {
   const number = nr();
-  await shop.createWebOrder({ orderNumber: number, items: [{ id: "domaine-daridan-cheverny-blanc", qty: 1 }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer });
+  await shop.createWebOrder({ orderNumber: number, items: [{ id: "domaine-daridan-cheverny-blanc", qty: 1 }], delivery: "afhalen-zaandam", ...slot(), payment: "bij-afhalen", customer });
   const before = (await shop.getProducts()).find((p) => p.id === "domaine-daridan-cheverny-blanc").stock;
   // Zelfde ordernummer nog eens: moet geweigerd worden, en de voorraad mag niet veranderen
-  await assert.rejects(shop.createWebOrder({ orderNumber: number, items: [{ id: "domaine-daridan-cheverny-blanc", qty: 1 }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer }), /bestaat al/);
+  await assert.rejects(shop.createWebOrder({ orderNumber: number, items: [{ id: "domaine-daridan-cheverny-blanc", qty: 1 }], delivery: "afhalen-zaandam", ...slot(), payment: "bij-afhalen", customer }), /bestaat al/);
   assert.strictEqual((await shop.getProducts()).find((p) => p.id === "domaine-daridan-cheverny-blanc").stock, before);
 });
 
@@ -295,7 +297,7 @@ test("per doos: eigen aantal en prijs, voorraad in flessen, annuleren en kassa",
   await assert.rejects(shop.saveProduct({ originalId: id, caseSize: 1 }), /2 tot 99/);
   // Niet per doos te koop: doos bestellen wordt geweigerd.
   await assert.rejects(
-    shop.createWebOrder({ orderNumber: nr(), items: [{ id, qty: 1, box: true }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer }),
+    shop.createWebOrder({ orderNumber: nr(), items: [{ id, qty: 1, box: true }], delivery: "afhalen-zaandam", ...slot(), payment: "bij-afhalen", customer }),
     /niet per doos/
   );
   const saved = await shop.saveProduct({ originalId: id, caseSize: 6, casePrice: 120 });
@@ -307,7 +309,7 @@ test("per doos: eigen aantal en prijs, voorraad in flessen, annuleren en kassa",
 
   // Webshop: 1 doos + 2 losse flessen = 8 flessen van de voorraad.
   const number = nr();
-  const order = await shop.createWebOrder({ orderNumber: number, items: [{ id, qty: 1, box: true }, { id, qty: 2 }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer });
+  const order = await shop.createWebOrder({ orderNumber: number, items: [{ id, qty: 1, box: true }, { id, qty: 2 }], delivery: "afhalen-zaandam", ...slot(), payment: "bij-afhalen", customer });
   const fles = order.lines.find((l) => !l.box);
   const doos = order.lines.find((l) => l.box);
   assert.strictEqual(doos.price, 120);
@@ -320,7 +322,7 @@ test("per doos: eigen aantal en prijs, voorraad in flessen, annuleren en kassa",
 
   // Meer dozen dan er flessen zijn: geweigerd.
   await assert.rejects(
-    shop.createWebOrder({ orderNumber: nr(), items: [{ id, qty: 3, box: true }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer }),
+    shop.createWebOrder({ orderNumber: nr(), items: [{ id, qty: 3, box: true }], delivery: "afhalen-zaandam", ...slot(), payment: "bij-afhalen", customer }),
     /nog maar 12 flessen/
   );
   // Annuleren: alle 8 flessen terug.
@@ -425,6 +427,23 @@ test("nieuws: plaatsen met foto, concept en gepland niet zichtbaar, bewerken en 
   for (const n of [a, b, draft, later]) await news.deleteNews(n.id);
   await assert.rejects(news.deleteNews(a.id), /niet gevonden/);
   delete process.env.WWW_LOCAL_UPLOADS;
+});
+
+test("afrekenen: afhaalmoment verplicht en geldig, bezorgen alleen binnen het postcodegebied", async () => {
+  const items = [{ id: "montemercurio-messaggero", qty: 1 }];
+  await assert.rejects(shop.createWebOrder({ orderNumber: nr(), items, delivery: "afhalen-zaandam", payment: "bij-afhalen", customer }), /dag en tijd/);
+  await assert.rejects(shop.createWebOrder({ orderNumber: nr(), items, delivery: "afhalen-zaandam", pickupDate: "2020-01-03", pickupTime: "10:00", payment: "bij-afhalen", customer }), /dag en tijd/);
+  const s = slot();
+  const order = await shop.createWebOrder({ orderNumber: nr(), items, delivery: "afhalen-zaandam", ...s, payment: "bij-afhalen", customer });
+  assert.match(order.pickupMoment, new RegExp(" om " + s.pickupTime + " uur$"));
+  assert.strictEqual((await shop.getOrder(order.number)).pickupMoment, order.pickupMoment);
+  await shop.setOrderStatus(order.number, "geannuleerd");
+  // Utrecht (1234 AB is buiten het gebied) → geweigerd; Amsterdam → goed.
+  await assert.rejects(shop.createWebOrder({ orderNumber: nr(), items, delivery: "bezorgen-regio", payment: "betaalverzoek", customer }), /bezorgen we helaas niet/);
+  const ams = await shop.createWebOrder({ orderNumber: nr(), items, delivery: "bezorgen-regio", payment: "betaalverzoek", customer: Object.assign({}, customer, { postcode: "1012 AB", city: "Amsterdam" }) });
+  assert.strictEqual(ams.delivery, "bezorgen-regio");
+  assert.strictEqual(ams.pickupMoment, null);
+  await shop.setOrderStatus(ams.number, "geannuleerd");
 });
 
 test("kassa sluiten: verwacht kasgeld, telling en verschil", async () => {
@@ -562,7 +581,7 @@ test("e-mails via Resend bij een webshopbestelling, en spamval", async (t) => {
     return realFetch(url, opts);
   };
   t.after(() => { global.fetch = realFetch; delete process.env.RESEND_API_KEY; delete process.env.MAIL_FROM; });
-  const res = await orders.handler({ httpMethod: "POST", headers: {}, body: JSON.stringify({ orderNumber: nr(), items: [{ id: "montemercurio-messaggero", qty: 1 }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer }) });
+  const res = await orders.handler({ httpMethod: "POST", headers: {}, body: JSON.stringify({ orderNumber: nr(), items: [{ id: "montemercurio-messaggero", qty: 1 }], delivery: "afhalen-zaandam", ...slot(), payment: "bij-afhalen", customer }) });
   assert.strictEqual(res.statusCode, 200, res.body);
   assert.strictEqual(mails.length, 2);
   const toShop = mails.find((m) => m.to[0] === "info@worldwidewine.nl");
@@ -573,7 +592,7 @@ test("e-mails via Resend bij een webshopbestelling, en spamval", async (t) => {
   assert.match(toCustomer.html, /betaalt bij het afhalen/i);
   assert.strictEqual(toCustomer.from, "worldwidewine.nl <bestellingen@worldwidewine.nl>");
   // Spamval: ingevuld verborgen veld → geweigerd, geen mail
-  const spam = await orders.handler({ httpMethod: "POST", headers: {}, body: JSON.stringify({ hp: "http://spam", orderNumber: nr(), items: [{ id: "montemercurio-messaggero", qty: 1 }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer }) });
+  const spam = await orders.handler({ httpMethod: "POST", headers: {}, body: JSON.stringify({ hp: "http://spam", orderNumber: nr(), items: [{ id: "montemercurio-messaggero", qty: 1 }], delivery: "afhalen-zaandam", ...slot(), payment: "bij-afhalen", customer }) });
   assert.strictEqual(spam.statusCode, 400);
   assert.strictEqual(mails.length, 2);
 });

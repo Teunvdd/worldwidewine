@@ -3,6 +3,7 @@ window.WWW.ready.then(function () {
   var W = window.WWW;
   var CONFIG = W.CONFIG;
   var computeOrder = window.WWW_ORDER.computeOrder;
+  var ORDER = window.WWW_ORDER;
   var form = document.getElementById("checkout-form");
   var $ = function (id) { return document.getElementById(id); };
 
@@ -80,14 +81,48 @@ window.WWW.ready.then(function () {
 
   function renderFields() {
     var d = CONFIG.delivery[value("bezorging")];
-    var ship = !!(d && !d.pickup);
+    var ship = !!(d && !d.pickup), pick = !!(d && d.pickup);
     $("address-fields").hidden = !ship;
-    $("pickup-fields").hidden = !(d && d.pickup);
+    $("pickup-fields").hidden = !pick;
     form.querySelectorAll("[data-address]").forEach(function (i) { i.required = ship; });
+    form.querySelectorAll("[data-pickup]").forEach(function (i) { i.required = pick; });
+    renderArea();
+  }
+
+  // ---- Afhalen: dag en tijd kiezen ----
+  var days = ORDER.pickupDays(CONFIG);
+  function renderPickupDays() {
+    var sel = form.elements.afhaaldag;
+    sel.innerHTML = '<option value="">Kies een dag…</option>' + days.map(function (d) {
+      return '<option value="' + d.date + '">' + d.label.charAt(0).toUpperCase() + d.label.slice(1) + "</option>";
+    }).join("");
+    renderPickupTimes();
+  }
+  function renderPickupTimes() {
+    var day = days.find(function (d) { return d.date === form.elements.afhaaldag.value; });
+    var sel = form.elements.afhaaltijd, cur = sel.value;
+    sel.innerHTML = day ? '<option value="">Kies een tijd…</option>' + day.times.map(function (t) { return "<option>" + t + "</option>"; }).join("")
+      : '<option value="">Kies eerst een dag</option>';
+    sel.disabled = !day;
+    if (day && day.times.indexOf(cur) >= 0) sel.value = cur;
+  }
+  function pickupMoment() {
+    var day = days.find(function (d) { return d.date === value("afhaaldag"); });
+    return day && value("afhaaltijd") ? ORDER.pickupLabel(day, value("afhaaltijd")) : "";
+  }
+
+  // ---- Bezorgen in de regio: postcode controleren ----
+  function renderArea() {
+    var d = CONFIG.delivery[value("bezorging")], el = $("area-check");
+    var ok = d && d.postcodes ? ORDER.deliversTo(d, value("postcode")) : null;
+    el.hidden = ok === null;
+    el.className = "field-wide area-check " + (ok ? "is-ok" : "is-bad");
+    el.textContent = ok ? "✓ Goed nieuws: we bezorgen zelf op dit adres."
+      : "Op deze postcode bezorgen we helaas niet zelf. Kies verzenden met PostNL of afhalen in de winkel.";
   }
 
   function renderSummary() {
-    var order = computeOrder(W.Cart.items(), value("bezorging") || null, W.PRODUCTS, CONFIG);
+    var order = computeOrder(W.Cart.items(), value("bezorging") || null, W.PRODUCTS, CONFIG, { postcode: value("postcode") });
     var empty = !order.lines.length;
     $("checkout-empty").hidden = !empty;
     $("checkout-grid").hidden = empty;
@@ -112,7 +147,10 @@ window.WWW.ready.then(function () {
 
   form.addEventListener("change", function (e) {
     if (e.target.name === "bezorging") { renderFields(); renderPayments(); renderSummary(); }
+    if (e.target.name === "afhaaldag") renderPickupTimes();
   });
+  form.elements.postcode.addEventListener("input", function () { renderArea(); });
+  renderPickupDays();
   document.addEventListener("cart:change", renderAll);
   renderAll();
 
@@ -135,7 +173,7 @@ window.WWW.ready.then(function () {
       "Verzending: " + (order.shipping ? W.euro(order.shipping) : "gratis") + " — " + order.delivery.label,
       "Totaal: " + W.euro(order.total), "",
       "Betaling: " + PAYMENTS[data.betaling].label,
-      data.afhaalmoment ? "Afhaalmoment: " + data.afhaalmoment : "",
+      data.afhaalmoment ? "Afhalen: " + data.afhaalmoment : "",
       data.opmerkingen ? "Opmerkingen: " + data.opmerkingen : "", "",
       who.join("\n")
     ].filter(function (l, i, a) { return l !== "" || a[i - 1] !== ""; }).join("\n");
@@ -161,12 +199,13 @@ window.WWW.ready.then(function () {
       if (bad) bad.focus();
       return showError("Controleer de gemarkeerde velden.");
     }
-    var order = computeOrder(W.Cart.items(), value("bezorging"), W.PRODUCTS, CONFIG);
+    var order = computeOrder(W.Cart.items(), value("bezorging"), W.PRODUCTS, CONFIG, { postcode: value("postcode") });
     if (order.errors.length) return showError(order.errors.join(" "));
 
     var data = {};
-    ["naam", "email", "telefoon", "adres", "postcode", "plaats", "afhaalmoment", "opmerkingen", "bezorging", "betaling"]
+    ["naam", "email", "telefoon", "adres", "postcode", "plaats", "afhaaldag", "afhaaltijd", "opmerkingen", "bezorging", "betaling"]
       .forEach(function (n) { data[n] = value(n); });
+    data.afhaalmoment = order.delivery.pickup ? pickupMoment() : "";
     data.ordernummer = orderNumber();
     var text = summaryText(order, data);
     var saved = { number: data.ordernummer, order: order, data: data, text: text, payment: data.betaling };
@@ -191,7 +230,8 @@ window.WWW.ready.then(function () {
         delivery: data.bezorging,
         payment: data.betaling,
         notes: data.opmerkingen,
-        pickupMoment: data.afhaalmoment,
+        pickupDate: data.afhaaldag,
+        pickupTime: data.afhaaltijd,
         customer: { name: data.naam, email: data.email, phone: data.telefoon, address: data.adres, postcode: data.postcode, city: data.plaats }
       })
     })

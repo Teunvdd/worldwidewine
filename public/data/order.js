@@ -31,6 +31,45 @@
   // Sleutel van een regel: fles en doos van hetzelfde product zijn aparte regels.
   function lineKey(item) { return item.id + (item.box ? "|doos" : ""); }
 
+  // ---- Bezorggebied (postcode) ----
+  function postcodeNumber(pc) { var m = /^\s*([1-9][0-9]{3})/.exec(String(pc || "")); return m ? Number(m[1]) : null; }
+  // true/false voor een bezorgwijze met een postcodegebied; null als er nog geen (geldige) postcode is.
+  function deliversTo(delivery, postcode) {
+    if (!delivery || !delivery.postcodes) return true;
+    var n = postcodeNumber(postcode);
+    if (n == null) return null;
+    return delivery.postcodes.some(function (r) { return n >= r[0] && n <= r[1]; });
+  }
+
+  // ---- Afhaalmomenten (in Nederlandse tijd) ----
+  var DAYS = ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"];
+  var MONTHS = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];
+  function amsterdamNow(now) {
+    var parts = {};
+    new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Amsterdam", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(now || new Date()).forEach(function (x) { parts[x.type] = x.value; });
+    return { date: parts.year + "-" + parts.month + "-" + parts.day, minutes: Number(parts.hour) * 60 + Number(parts.minute) };
+  }
+  function toMin(hhmm) { var a = String(hhmm).split(":"); return Number(a[0]) * 60 + Number(a[1] || 0); }
+  function hhmm(min) { return String(Math.floor(min / 60)).padStart(2, "0") + ":" + String(min % 60).padStart(2, "0"); }
+  // Lijst met dagen waarop afgehaald kan worden: [{ date: "2026-10-16", label: "vrijdag 16 oktober", times: ["09:00", …] }]
+  function pickupDays(config, now) {
+    var p = (config && config.pickup) || {};
+    var hours = p.hours || {}, slot = p.slotMinutes || 30, closed = p.closedDates || [];
+    var t = amsterdamNow(now), start = t.date.split("-").map(Number), out = [];
+    for (var i = 0; i <= (p.daysAhead || 42); i++) {
+      var d = new Date(Date.UTC(start[0], start[1] - 1, start[2] + i));
+      var iso = d.toISOString().slice(0, 10), wd = d.getUTCDay(), h = hours[wd];
+      if (!h || closed.indexOf(iso) >= 0) continue;
+      var from = toMin(h[0]), to = toMin(h[1]), times = [];
+      if (i === 0) from = Math.max(from, Math.ceil((t.minutes + (p.leadMinutes || 0)) / slot) * slot);
+      for (var m = from; m + slot <= to; m += slot) times.push(hhmm(m));
+      if (times.length) out.push({ date: iso, label: DAYS[wd] + " " + d.getUTCDate() + " " + MONTHS[d.getUTCMonth()], year: d.getUTCFullYear(), times: times });
+    }
+    return out;
+  }
+  function pickupLabel(day, time) { return day.label + " " + day.year + " om " + time + " uur"; }
+
   function vatRate(p) {
     if (typeof p.vat === "number") return p.vat;
     return p.type === "delicatessen" || p.type === "water" ? 9 : 21;
@@ -42,6 +81,7 @@
    * options:  { pos: true }          kassa: geen bezorging, ook producten die niet online staan,
    *                                  verkopen boven de geregistreerde voorraad is toegestaan
    *           { discount: { type: "percent" | "amount", value } }
+   *           { postcode: "1012 AB" }   controleert of we op dat adres bezorgen (bezorgen in de regio)
    */
   function computeOrder(items, deliveryKey, products, config, options) {
     options = options || {};
@@ -137,6 +177,9 @@
       delivery = deliveryKey ? config.delivery[deliveryKey] : null;
       if (deliveryKey && !delivery) errors.push("Kies een geldige verzendmethode.");
       if (delivery) {
+        if (deliversTo(delivery, options.postcode) === false) {
+          errors.push("Op postcode " + String(options.postcode).trim().toUpperCase() + " bezorgen we helaas niet zelf. Kies verzenden met PostNL of afhalen in de winkel.");
+        }
         if (pickupOnly && !delivery.pickup) {
           errors.push("Je bestelling bevat producten die alleen af te halen zijn. Kies voor afhalen.");
         }
@@ -176,7 +219,8 @@
   }
 
   var api = { computeOrder: computeOrder, isAvailable: isAvailable, vatRate: vatRate, round: round,
-    caseSize: caseSize, casePrice: casePrice, lineKey: lineKey };
+    caseSize: caseSize, casePrice: casePrice, lineKey: lineKey,
+    deliversTo: deliversTo, pickupDays: pickupDays, pickupLabel: pickupLabel };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.WWW_ORDER = api;
 })(this);

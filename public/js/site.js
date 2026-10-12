@@ -48,9 +48,19 @@
     gate.hidden = true;
   });
 
+  // Oude links naar onderdelen die nu een eigen pagina hebben (bijv. index.html#proeverijen).
+  var moved = { '#producenten': 'producenten.html', '#proeverijen': 'proeverijen.html', '#contact': 'contact.html', '#zakelijk': 'contact.html#zakelijk', '#wijnen': '#uitgelicht' };
+  if (document.getElementById('over') && moved[location.hash]) {
+    if (moved[location.hash].charAt(0) === '#') location.hash = moved[location.hash];
+    else location.replace(moved[location.hash]);
+  }
+
   // Contactformulier: opent het mailprogramma met een ingevuld bericht
   var form = document.getElementById('contact-form');
   if (!form) return;
+  // Onderwerp vooraf kiezen via de link, bijv. contact.html?onderwerp=Wijnproeverij
+  var subject = new URLSearchParams(location.search).get('onderwerp');
+  if (subject && form.onderwerp) Array.prototype.forEach.call(form.onderwerp.options, function (o) { if (o.text.toLowerCase().indexOf(subject.toLowerCase()) === 0) form.onderwerp.value = o.value || o.text; });
   var note = form.querySelector('.form-note');
   form.addEventListener('submit', function (e) {
     e.preventDefault();
