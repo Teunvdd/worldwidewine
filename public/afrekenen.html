@@ -53,11 +53,17 @@
             <label class="field field-wide">Straat en huisnummer<input name="adres" autocomplete="street-address" data-address></label>
             <label class="field">Postcode<input name="postcode" autocomplete="postal-code" data-address pattern="[1-9][0-9]{3}\s?[A-Za-z]{2}" placeholder="1234 AB"></label>
             <label class="field">Plaats<input name="plaats" autocomplete="address-level2" data-address></label>
+            <p class="field-wide area-check" id="area-check" hidden></p>
           </div>
           <div class="fields" id="pickup-fields" hidden>
-            <label class="field field-wide"><span>Wanneer wil je afhalen? <span class="optional">(optioneel)</span></span>
-              <input name="afhaalmoment" placeholder="Bijv. vrijdag 14 november, na 15:00">
-            </label>
+            <label class="field">Dag van afhalen<select name="afhaaldag" data-pickup></select></label>
+            <label class="field">Tijd<select name="afhaaltijd" data-pickup></select></label>
+            <p class="field-wide pickup-note">Je kunt een moment kiezen binnen onze openingstijden. Op dagen dat we op afspraak open zijn, staan we op het gekozen tijdstip voor je klaar. Je krijgt een bevestiging per e-mail.</p>
+          </div>
+          <div class="fields" id="slot-fields" hidden>
+            <label class="field">Bezorgdag<select name="bezorgdag" data-slot></select></label>
+            <label class="field">Tijdvak<select name="bezorgtijd" data-slot></select></label>
+            <p class="field-wide pickup-note">We bezorgen zelf binnen het gekozen tijdvak. Bij levering vragen we om legitimatie (18+).</p>
           </div>
           <label class="field field-wide"><span>Opmerkingen <span class="optional">(optioneel)</span></span>
             <textarea name="opmerkingen" rows="3" placeholder="Bijv. cadeauverpakking, of bezorgen bij de buren"></textarea>

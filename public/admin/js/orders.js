@@ -78,7 +78,7 @@
             (c.address ? e(c.address) + "<br>" + e(c.postcode) + " " + e(c.city) : "") + "</p>" : "<p class='muted'>Geen klant gekoppeld</p>") + "</div>" +
           "<div><h3>" + (o.channel === "winkel" ? "Betaling" : "Bezorging & betaling") + "</h3><p>" + (o.deliveryLabel ? e(o.deliveryLabel) + "<br>" : "") +
             e(A.PAYMENT[o.paymentMethod] || o.paymentMethod) + " — <strong>" + e(o.paymentStatus) + "</strong>" +
-            (o.pickupMoment ? "<br>Afhaalmoment: " + e(o.pickupMoment) : "") + "</p>" +
+            (o.pickupMoment ? "<br>" + (/^afhalen/.test(o.delivery || "") ? "Afhaalmoment" : "Bezorgmoment") + ": " + e(o.pickupMoment) : "") + "</p>" +
             (o.notes ? "<p class='note'>" + e(o.notes) + "</p>" : "") + "</div>" +
         "</div>" +
         "<table class='table'><thead><tr><th>Product</th><th class='num'>Aantal</th><th class='num'>Prijs</th><th class='num'>Totaal</th></tr></thead><tbody>" +

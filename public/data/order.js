@@ -31,6 +31,87 @@
   // Sleutel van een regel: fles en doos van hetzelfde product zijn aparte regels.
   function lineKey(item) { return item.id + (item.box ? "|doos" : ""); }
 
+  // ---- Bezorggebied (postcode) ----
+  function postcodeNumber(pc) { var m = /^\s*([1-9][0-9]{3})/.exec(String(pc || "")); return m ? Number(m[1]) : null; }
+  // true/false voor een bezorgwijze met een postcodegebied; null als er nog geen (geldige) postcode is.
+  function deliversTo(delivery, postcode) {
+    if (!delivery || !delivery.postcodes) return true;
+    var n = postcodeNumber(postcode);
+    if (n == null) return null;
+    return delivery.postcodes.some(function (r) { return n >= r[0] && n <= r[1]; });
+  }
+
+  // ---- Afhaalmomenten (in Nederlandse tijd) ----
+  var DAYS = ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"];
+  var MONTHS = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];
+  function amsterdamNow(now) {
+    var parts = {};
+    new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Amsterdam", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(now || new Date()).forEach(function (x) { parts[x.type] = x.value; });
+    return { date: parts.year + "-" + parts.month + "-" + parts.day, minutes: Number(parts.hour) * 60 + Number(parts.minute) };
+  }
+  function toMin(hhmm) { var a = String(hhmm).split(":"); return Number(a[0]) * 60 + Number(a[1] || 0); }
+  function hhmm(min) { return String(Math.floor(min / 60)).padStart(2, "0") + ":" + String(min % 60).padStart(2, "0"); }
+  function addDays(iso, n) { var a = iso.split("-").map(Number); return new Date(Date.UTC(a[0], a[1] - 1, a[2] + n)); }
+  function dayInfo(d) { return { date: d.toISOString().slice(0, 10), wd: d.getUTCDay(), label: DAYS[d.getUTCDay()] + " " + d.getUTCDate() + " " + MONTHS[d.getUTCMonth()], year: d.getUTCFullYear() }; }
+
+  // Openingstijden van één dag: { s: "open" | "afspraak" | "dicht", from, to }.
+  // Een datum in hours.dates (een afwijkende week) gaat voor de standaardweek (hours.week).
+  function dayHours(config, iso, wd) {
+    var h = (config && config.hours) || {};
+    var v = (h.dates && h.dates[iso]) || (h.week && h.week[wd]);
+    return v && v.s !== "dicht" && v.from && v.to ? v : { s: "dicht" };
+  }
+  // De zeven dagen van de week waarin iso valt (maandag t/m zondag), met openingstijden.
+  function weekHours(config, iso) {
+    var wd = addDays(iso, 0).getUTCDay(), monday = addDays(iso, -((wd + 6) % 7)).toISOString().slice(0, 10), out = [];
+    for (var i = 0; i < 7; i++) {
+      var d = dayInfo(addDays(monday, i)), h = dayHours(config, d.date, d.wd);
+      out.push(Object.assign(d, { s: h.s, from: h.from || null, to: h.to || null,
+        changed: !!(config.hours && config.hours.dates && config.hours.dates[d.date]) }));
+    }
+    return out;
+  }
+
+  // Lijst met dagen waarop afgehaald kan worden: [{ date: "2026-10-16", label: "vrijdag 16 oktober", times: ["09:00", …] }]
+  // Afhalen kan op dagen dat de winkel open is of op afspraak, binnen die tijden.
+  function pickupDays(config, now) {
+    var p = (config && config.pickup) || {};
+    var slot = p.slotMinutes || 30, t = amsterdamNow(now), out = [];
+    for (var i = 0; i <= (p.daysAhead || 42); i++) {
+      var d = dayInfo(addDays(t.date, i)), h = dayHours(config, d.date, d.wd);
+      if (h.s === "dicht") continue;
+      var from = toMin(h.from), to = toMin(h.to), times = [];
+      if (i === 0) from = Math.max(from, Math.ceil((t.minutes + (p.leadMinutes || 0)) / slot) * slot);
+      for (var m = from; m + slot <= to; m += slot) times.push(hhmm(m));
+      if (times.length) out.push({ date: d.date, label: d.label, year: d.year, times: times });
+    }
+    return out;
+  }
+  function pickupLabel(day, time) { return day.label + " " + day.year + " om " + time + " uur"; }
+
+  // ---- Bezorgmomenten (eigen bezorging in de regio) ----
+  // Tijdvakken van één dag: [["17:00", "21:00"], …]; een lege lijst = die dag niet bezorgen.
+  function deliveryWindows(config, iso, wd) {
+    var b = (config && config.deliveryTimes) || {};
+    var v = b.dates && b.dates[iso] ? b.dates[iso] : (b.week && b.week[wd]) || [];
+    return v.filter(function (w) { return w && w[0] && w[1] && toMin(w[1]) > toMin(w[0]); });
+  }
+  // [{ date, label, year, windows: ["17:00-21:00", …] }] vanaf leadDays dagen na vandaag.
+  function deliveryDays(config, now) {
+    var b = (config && config.deliveryTimes) || {};
+    var t = amsterdamNow(now), out = [];
+    for (var i = Math.max(0, b.leadDays || 0); i <= (b.daysAhead || 21); i++) {
+      var d = dayInfo(addDays(t.date, i));
+      var windows = deliveryWindows(config, d.date, d.wd)
+        .filter(function (w) { return i > 0 || toMin(w[0]) >= t.minutes + 60; }) // vandaag: minstens een uur van tevoren
+        .map(function (w) { return w[0] + "-" + w[1]; });
+      if (windows.length) out.push({ date: d.date, label: d.label, year: d.year, windows: windows });
+    }
+    return out;
+  }
+  function deliveryLabel(day, win) { var w = win.split("-"); return day.label + " " + day.year + " tussen " + w[0] + " en " + w[1] + " uur"; }
+
   function vatRate(p) {
     if (typeof p.vat === "number") return p.vat;
     return p.type === "delicatessen" || p.type === "water" ? 9 : 21;
@@ -42,6 +123,7 @@
    * options:  { pos: true }          kassa: geen bezorging, ook producten die niet online staan,
    *                                  verkopen boven de geregistreerde voorraad is toegestaan
    *           { discount: { type: "percent" | "amount", value } }
+   *           { postcode: "1012 AB" }   controleert of we op dat adres bezorgen (bezorgen in de regio)
    */
   function computeOrder(items, deliveryKey, products, config, options) {
     options = options || {};
@@ -137,6 +219,9 @@
       delivery = deliveryKey ? config.delivery[deliveryKey] : null;
       if (deliveryKey && !delivery) errors.push("Kies een geldige verzendmethode.");
       if (delivery) {
+        if (deliversTo(delivery, options.postcode) === false) {
+          errors.push("Op postcode " + String(options.postcode).trim().toUpperCase() + " bezorgen we helaas niet zelf. Kies verzenden met PostNL of afhalen in de winkel.");
+        }
         if (pickupOnly && !delivery.pickup) {
           errors.push("Je bestelling bevat producten die alleen af te halen zijn. Kies voor afhalen.");
         }
@@ -176,7 +261,9 @@
   }
 
   var api = { computeOrder: computeOrder, isAvailable: isAvailable, vatRate: vatRate, round: round,
-    caseSize: caseSize, casePrice: casePrice, lineKey: lineKey };
+    caseSize: caseSize, casePrice: casePrice, lineKey: lineKey,
+    deliversTo: deliversTo, postcodeNumber: postcodeNumber, dayHours: dayHours, weekHours: weekHours,
+    pickupDays: pickupDays, pickupLabel: pickupLabel, deliveryWindows: deliveryWindows, deliveryDays: deliveryDays, deliveryLabel: deliveryLabel };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.WWW_ORDER = api;
 })(this);
