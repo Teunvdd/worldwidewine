@@ -69,16 +69,36 @@
           <input type="search" id="q" placeholder="Zoek op wijn, druif, streek…" autocomplete="off">
         </label>
         <fieldset>
+          <legend>Prijs</legend>
+          <div class="range" id="f-price"></div>
+        </fieldset>
+        <fieldset>
           <legend>Soort</legend>
           <div id="f-type"></div>
         </fieldset>
-        <fieldset>
+        <fieldset data-group="country">
           <legend>Land</legend>
           <div id="f-country"></div>
         </fieldset>
-        <fieldset>
-          <legend>Prijs</legend>
-          <div id="f-price"></div>
+        <fieldset data-group="region">
+          <legend>Regio</legend>
+          <div id="f-region"></div>
+        </fieldset>
+        <fieldset data-group="grape">
+          <legend>Druivensoort</legend>
+          <div id="f-grape"></div>
+        </fieldset>
+        <fieldset data-group="vintage">
+          <legend>Oogstjaar</legend>
+          <div id="f-vintage"></div>
+        </fieldset>
+        <fieldset data-group="size">
+          <legend>Maat</legend>
+          <div id="f-size"></div>
+        </fieldset>
+        <fieldset data-group="alcohol">
+          <legend>Alcohol volume</legend>
+          <div class="range" id="f-alcohol"></div>
         </fieldset>
         <fieldset>
           <legend>Overig</legend>

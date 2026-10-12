@@ -156,6 +156,14 @@ De pincode wordt versleuteld opgeslagen en is bedoeld om handelingen van medewer
 - **Bonprinter:** elke bonprinter van 80 mm die als printer in Windows of macOS is geïnstalleerd werkt. Kies bij het afdrukken die printer en zet de marges op "geen". In kioskmodus kun je Chrome starten met `--kiosk-printing`; dan wordt de bon zonder printvenster op de standaardprinter afgedrukt.
 - Voor de kassa is internet nodig. Valt het internet uit, gebruik dan tijdelijk de hotspot van je telefoon.
 
+### Wijngegevens en webshopfilters
+Per product vul je in de admin onder **Producten** het blok **Wijngegevens** in: **Land**, **Regio**, **Druivensoort**, **Oogstjaar**, **Maat** en **Alcohol volume (%)**. De **Soort** (rood, wit, …) staat bovenaan het formulier.
+- Deze gegevens staan in de webshop bij het product en zijn daar filters (links). Een filter verschijnt pas als minstens één product die gegevens heeft.
+- Meerdere druiven scheid je met een komma, bijvoorbeeld *Sangiovese, Merlot*: het product verschijnt dan bij beide druiven.
+- Tijdens het typen stelt het formulier bestaande waarden voor. Zo blijft de schrijfwijze gelijk en krijg je geen dubbele filters (*Italië* en *Italie*).
+- **Prijs** en **Alcohol volume** filter je met een schuifje met twee handvatten.
+- Bij een bestaande database: voer na deze update **`supabase/setup.sql`** nog één keer uit (of alleen `supabase/migrations/20261017000000_alcohol.sql`).
+
 ### Productfoto's
 - Foto's voeg je toe in de admin: *Producten → product → Foto kiezen…*.
 - De foto wordt automatisch verkleind en opgeslagen in Supabase Storage (map `product-images`).

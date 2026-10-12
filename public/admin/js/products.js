@@ -73,6 +73,16 @@
     return "<label class='check'><input type='checkbox' name='" + name + "'" + (on ? " checked" : "") + "> " + label + "</label>";
   }
 
+  // Bestaande waarden als suggesties, zodat schrijfwijzen gelijk blijven (één filter per land, regio, …).
+  function datalists() {
+    var list = A.cacheOf("products") || [];
+    return ["country", "region", "grape", "size"].map(function (k) {
+      var vals = {};
+      list.forEach(function (x) { if (x[k]) String(x[k]).split(/\s*[,/&+]\s*/).forEach(function (v) { if (v) vals[v] = 1; }); });
+      return "<datalist id='dl-" + k + "'>" + Object.keys(vals).sort().map(function (v) { return "<option value='" + e(v) + "'>"; }).join("") + "</datalist>";
+    }).join("");
+  }
+
   function edit(p) {
     var isNew = !p;
     p = p || { type: "rood", unit: "fles", bottles: 1, active: true, webshop: true, minStock: 6, size: "75 cl" };
@@ -90,9 +100,17 @@
         field("Oude prijs bij actie (€)", "oldPrice", p.oldPrice != null ? String(p.oldPrice).replace(".", ",") : "", "inputmode='decimal'") +
         field("Inkoopprijs (€, alleen intern)", "cost", p.cost != null ? String(p.cost).replace(".", ",") : "", "inputmode='decimal'") +
         "<label class='field'>Btw<select name='vat'><option value=''>Automatisch</option><option value='21'" + (p.vat === 21 ? " selected" : "") + ">21%</option><option value='9'" + (p.vat === 9 ? " selected" : "") + ">9%</option></select></label>" +
-        field("Land", "country", p.country) + field("Streek", "region", p.region) +
-        field("Druif", "grape", p.grape) + field("Jaargang", "vintage", p.vintage, "inputmode='numeric'") +
-        field("Inhoud", "size", p.size) + field("Aantal flessen (voor PostNL-limiet)", "bottles", p.bottles, "inputmode='numeric'") +
+        // Wijngegevens: staan in de webshop bij het product en zijn daar filters.
+        "<fieldset class='span-2 wine-box'><legend>Wijngegevens (webshopfilters)</legend><div class='form-grid'>" +
+          field("Land", "country", p.country, "list='dl-country' placeholder='bijv. Italië'") +
+          field("Regio", "region", p.region, "list='dl-region' placeholder='bijv. Toscane'") +
+          field("Druivensoort", "grape", p.grape, "list='dl-grape' placeholder='bijv. Sangiovese, Merlot'") +
+          field("Oogstjaar", "vintage", p.vintage, "inputmode='numeric' placeholder='bijv. 2021'") +
+          field("Maat", "size", p.size, "list='dl-size' placeholder='bijv. 75 cl'") +
+          field("Alcohol volume (%)", "alcohol", p.alcohol != null ? String(p.alcohol).replace(".", ",") : "", "inputmode='decimal' placeholder='bijv. 13,5'") +
+          datalists() +
+        "</div></fieldset>" +
+        field("Aantal flessen (voor PostNL-limiet)", "bottles", p.bottles, "inputmode='numeric'") +
         field("Barcode (EAN)", "ean", p.ean, "inputmode='numeric' placeholder='Scan of typ de barcode'") +
         (isNew ? field("Voorraad", "stock", "", "inputmode='numeric' placeholder='leeg = niet bijhouden'") : "<div class='field'>Voorraad<span class='static'>" + A.stockBadge(p) + " <a href='#voorraad'>wijzigen bij Voorraad</a></span></div>") +
         field("Melding bij voorraad ≤", "minStock", p.minStock, "inputmode='numeric'") +
@@ -166,6 +184,7 @@
         tags: ["uitgelicht", "actie", "nieuw", "bio"].filter(function (t) { return d["tag_" + t]; })
       };
       if (isNew) input.stock = d.stock;
+      if (d.alcohol || p.alcohol != null) input.alcohol = d.alcohol; // kolom bestaat pas na migratie 20261017
       // Alleen meesturen als het nodig is (de kolommen bestaan pas na migratie 20261016).
       if (d.caseOn || p.caseSize) {
         input.caseSize = d.caseOn ? d.caseSize : null;
