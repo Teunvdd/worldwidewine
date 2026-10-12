@@ -19,6 +19,8 @@
     cash: svg("<rect x='2.5' y='6.5' width='19' height='11' rx='2'/><circle cx='12' cy='12' r='2.5'/><path d='M6 9.5v5M18 9.5v5'/>"),
     phone: svg("<rect x='7' y='3' width='10' height='18' rx='2'/><path d='M11 17.5h2'/>"),
     other: svg("<path d='M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6-5.3-3-5.3 3 1.2-6-4.5-4.1 6-.7z'/>"),
+    box: svg("<path d='M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z'/><path d='M3 7.5 12 12l9-4.5M12 12v9'/>"),
+    bottle: svg("<path d='M10 2h4v4l1.5 3v12a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V9L10 6z'/><path d='M8.5 13h7'/>"),
     user: svg("<circle cx='12' cy='8' r='4'/><path d='M4 21c1-4.5 4.5-6.5 8-6.5s7 2 8 6.5'/>")
   };
   var METHODS = [
@@ -177,7 +179,11 @@
   function byId(id) { return S.products.find(function (p) { return p.id === id; }); }
   function sellable(p) { return p.active !== false; }
   function totals() { return A.computeOrder(S.ticket.items, null, S.products, A.CONFIG, { pos: true, discount: S.ticket.discount }); }
-  function line(id) { return S.ticket.items.find(function (i) { return i.id === id; }); }
+  // Regels op de bon hebben een sleutel: fles en doos van hetzelfde product zijn aparte regels.
+  var ORDER = window.WWW_ORDER;
+  function keyOf(i) { return ORDER.lineKey(i); }
+  function line(key) { return S.ticket.items.find(function (i) { return keyOf(i) === key; }); }
+  function unitPrice(p, box) { return box ? ORDER.casePrice(p) : p.price; }
 
   function renderPos(el) {
     document.body.classList.add("pos-mode");
@@ -319,6 +325,7 @@
               (c.color ? "<i class='chip-dot'></i>" : "") + e(c.label) + "</button>";
           }).join("") +
         "</div>" +
+        "<div class='pp-choose' id='pp-choose' hidden></div>" +
         "<div class='pp-grid size-" + (S.settings.cardSize || "normaal") + (S.settings.showImages === false ? " no-images" : "") + "' id='pp-grid'></div>" +
       "</section>" +
       "<section class='pos-order'>" +
@@ -358,7 +365,9 @@
     var list = visible();
     grid.innerHTML = list.length ? list.map(function (p) {
       var stock = S.settings.showStock !== false && typeof p.stock === "number" ? "<span class='pp-stock " + (p.stock <= 0 ? "out" : p.stock <= (p.minStock == null ? 6 : p.minStock) ? "low" : "") + "'>" + p.stock + "</span>" : "";
-      return "<button class='pp-card' data-add='" + e(p.id) + "'>" +
+      var n = ORDER.caseSize(p);
+      var caseTag = n ? "<span class='pp-case' title='Ook per doos te koop'>" + ICON.box + n + "</span>" : "";
+      return "<button class='pp-card' data-add='" + e(p.id) + "'>" + caseTag +
         (S.settings.showImages === false
           ? "<span class='pp-noimg'><span class='pp-price'>" + (p.price == null ? "prijs?" : eu(p.price)) + "</span>" + stock + "</span>"
           : "<span class='pp-img'>" + A.productArt(p) + "<span class='pp-price'>" + (p.price == null ? "prijs?" : eu(p.price)) + "</span>" + stock + "</span>") +
@@ -371,20 +380,20 @@
     var box = root.querySelector("#po-lines");
     if (!box) return;
     var t = totals();
-    if (S.ticket.selected && !line(S.ticket.selected)) S.ticket.selected = S.ticket.items.length ? S.ticket.items[S.ticket.items.length - 1].id : null;
+    if (S.ticket.selected && !line(S.ticket.selected)) S.ticket.selected = S.ticket.items.length ? keyOf(S.ticket.items[S.ticket.items.length - 1]) : null;
     var byLine = {};
-    t.lines.forEach(function (l) { byLine[l.id] = l; });
+    t.lines.forEach(function (l) { byLine[l.key] = l; });
     var vat = t.vat.reduce(function (s, v) { return s + v.vat; }, 0);
     var modeHint = { disc: "typ korting", price: "typ prijs" }[S.pad.mode];
     box.innerHTML = S.ticket.items.length
       ? S.ticket.items.map(function (it) {
-          var p = byId(it.id), l = byLine[it.id];
+          var k = keyOf(it), p = byId(it.id), l = byLine[k];
           if (!p) return "";
-          var sel = it.id === S.ticket.selected;
-          var detail = "<b>" + it.qty + "</b> " + e(p.unit || "stuk") + " à " + (l ? eu(l.price) : "<em>prijs invoeren</em>") +
+          var sel = k === S.ticket.selected;
+          var detail = "<b>" + it.qty + "</b> " + (it.box ? "<span class='po-case'>" + ICON.box + "doos van " + ORDER.caseSize(p) + "</span>" : e(p.unit || "stuk")) + " à " + (l ? eu(l.price) : "<em>prijs invoeren</em>") +
             (l && l.listPrice != null ? " <s>" + eu(l.listPrice) + "</s>" : "") +
             (it.discount ? " · <span class='po-disc'>−" + String(it.discount).replace(".", ",") + "% korting</span>" : "");
-          return "<div class='po-line" + (sel ? " selected" : "") + "' data-line='" + e(it.id) + "'>" +
+          return "<div class='po-line" + (sel ? " selected" : "") + "' data-line='" + e(k) + "'>" +
             "<div class='po-line-main'><span class='po-name'>" + e(A.productName(p)) + "</span><strong>" + (l ? eu(l.total) : "—") + "</strong></div>" +
             "<div class='po-line-sub'>" + detail + (sel && modeHint && S.pad.open ? " <span class='po-mode-hint'>" + modeHint + "</span>" : "") + "</div></div>";
         }).join("") +
@@ -436,7 +445,7 @@
     if (!S.pad.open || !p) { S.pad.open = false; box.hidden = true; box.innerHTML = ""; return; }
     var cur = S.pad.mode === "qty" ? String(it.qty)
       : S.pad.mode === "disc" ? (it.discount ? String(it.discount).replace(".", ",") : "0")
-      : it.price != null ? String(it.price).replace(".", ",") : p.price != null ? String(p.price).replace(".", ",") : "";
+      : it.price != null ? String(it.price).replace(".", ",") : unitPrice(p, it.box) != null ? String(unitPrice(p, it.box)).replace(".", ",") : "";
     var unit = { qty: "", disc: " %", price: "" }[S.pad.mode];
     var pre = S.pad.mode === "price" ? "€ " : "";
     var key = function (k, label, cls) { return "<button class='nk" + (cls || "") + "' data-key='" + k + "'>" + label + "</button>"; };
@@ -458,14 +467,39 @@
       "</div>";
   }
 
-  function addProduct(id) {
+  // Tik op een product: per doos te koop? Dan eerst kiezen tussen fles en doos.
+  function pickProduct(id, card) {
     var p = byId(id);
     if (!p || !sellable(p)) return;
-    var it = line(id);
-    if (it) it.qty += 1; else S.ticket.items.push(it = { id: id, qty: 1 });
-    S.ticket.selected = id;
+    if (!ORDER.caseSize(p)) return addProduct(id, false);
+    var n = ORDER.caseSize(p), cp = unitPrice(p, true);
+    var pop = root.querySelector("#pp-choose");
+    pop.innerHTML = "<p class='ch-name'>" + e(A.productName(p)) + "</p>" +
+      "<div class='ch-opts'>" +
+        "<button class='ch-opt' data-pick='" + e(id) + "' data-box='0'><span class='ch-ic'>" + ICON.bottle + "</span><strong>Fles</strong><span>" + (p.price == null ? "prijs invoeren" : eu(p.price)) + "</span></button>" +
+        "<button class='ch-opt ch-box' data-pick='" + e(id) + "' data-box='1'><span class='ch-ic'>" + ICON.box + "</span><strong>Doos van " + n + "</strong><span>" + (cp == null ? "prijs invoeren" : eu(cp)) + "</span></button>" +
+      "</div>";
+    pop.hidden = false;
+    // Naast de aangetikte kaart, binnen het scherm.
+    var r = card ? card.getBoundingClientRect() : { left: innerWidth / 2 - 150, top: innerHeight / 3, width: 300, height: 0 };
+    var w = pop.offsetWidth, h = pop.offsetHeight;
+    var left = Math.max(12, Math.min(innerWidth - w - 12, r.left + r.width / 2 - w / 2));
+    var top = r.top + r.height * 0.35;
+    if (top + h > innerHeight - 12) top = Math.max(12, innerHeight - h - 12);
+    pop.style.left = left + "px"; pop.style.top = top + "px";
+  }
+  function closeChoose() { var pop = root && root.querySelector("#pp-choose"); if (pop && !pop.hidden) { pop.hidden = true; return true; } return false; }
+
+  function addProduct(id, box) {
+    var p = byId(id);
+    if (!p || !sellable(p)) return;
+    box = !!box && !!ORDER.caseSize(p);
+    var key = keyOf({ id: id, box: box });
+    var it = line(key);
+    if (it) it.qty += 1; else S.ticket.items.push(it = box ? { id: id, qty: 1, box: true } : { id: id, qty: 1 });
+    S.ticket.selected = key;
     S.pad.buffer = "";
-    S.pad.mode = p.price == null && it.price == null ? "price" : "qty";
+    S.pad.mode = unitPrice(p, box) == null && it.price == null ? "price" : "qty";
     S.pad.open = S.pad.mode === "price"; // zonder prijs meteen het toetsenblok tonen
     save(); drawTicket();
     var card = root.querySelector("[data-add='" + CSS.escape(id) + "']");
@@ -505,10 +539,10 @@
     return unlock("deleteLine").then(function (ok) {
       if (!ok) return;
       // Na verwijderen de volgende regel selecteren (of de vorige als het de laatste was).
-      var i = S.ticket.items.findIndex(function (x) { return x.id === S.ticket.selected; });
-      S.ticket.items = S.ticket.items.filter(function (x) { return x.id !== S.ticket.selected; });
+      var i = S.ticket.items.findIndex(function (x) { return keyOf(x) === S.ticket.selected; });
+      S.ticket.items = S.ticket.items.filter(function (x) { return keyOf(x) !== S.ticket.selected; });
       var next = S.ticket.items[Math.min(i, S.ticket.items.length - 1)];
-      S.ticket.selected = next ? next.id : null; S.pad.buffer = ""; S.pad.mode = "qty"; S.pad.open = false;
+      S.ticket.selected = next ? keyOf(next) : null; S.pad.buffer = ""; S.pad.mode = "qty"; S.pad.open = false;
       save(); drawTicket();
     });
   }
@@ -798,9 +832,11 @@
     if (!menu.hidden && !ev.target.closest("[data-act=menu]")) toggleMenu(false);
     if (S.pad && S.pad.open && !ev.target.closest(".po-numpad, .po-line, .np-mode")) closePad();
     if (S.screen === "payment" && S.pay.pad && !ev.target.closest(".pt-row")) { S.pay.pad = false; S.pay.buffer = ""; drawPayment(); }
-    var t = ev.target.closest("[data-act],[data-key],[data-add],[data-line],[data-type],[data-method],[data-pline],[data-pdel]");
+    if (!ev.target.closest("#pp-choose")) closeChoose();
+    var t = ev.target.closest("[data-act],[data-key],[data-add],[data-pick],[data-line],[data-type],[data-method],[data-pline],[data-pdel]");
     if (!t) return;
-    if (t.dataset.add) return addProduct(t.dataset.add);
+    if (t.dataset.pick) { closeChoose(); return addProduct(t.dataset.pick, t.dataset.box === "1"); }
+    if (t.dataset.add) return pickProduct(t.dataset.add, t);
     if (t.dataset.key) return padKey(t.dataset.key);
     if (t.dataset.line) { S.ticket.selected = t.dataset.line; return openPad("qty"); }
     if (t.dataset.type !== undefined && t.classList.contains("chip")) {
@@ -909,6 +945,7 @@
     if (ev.key === "Backspace") { ev.preventDefault(); return padKey("back"); }
     if (ev.key === "," || ev.key === ".") { ev.preventDefault(); return padKey(","); }
     if (ev.key === "Delete") { ev.preventDefault(); return padKey("C"); }
+    if (ev.key === "Escape" && closeChoose()) return;
     if (ev.key === "Escape" && !root.querySelector("#pos-menu").hidden) return toggleMenu(false);
     if (ev.key === "Escape" && S.pad.open) return closePad();
     if (ev.key === "Escape" && S.screen === "payment" && S.pay.pad) { S.pay.pad = false; S.pay.buffer = ""; return drawPayment(); }
@@ -916,9 +953,9 @@
     if (ev.key === "ArrowUp" || ev.key === "ArrowDown") {
       if (S.screen !== "products" || !S.ticket.items.length) return;
       ev.preventDefault();
-      var i = S.ticket.items.findIndex(function (x) { return x.id === S.ticket.selected; });
+      var i = S.ticket.items.findIndex(function (x) { return keyOf(x) === S.ticket.selected; });
       i = Math.max(0, Math.min(S.ticket.items.length - 1, i + (ev.key === "ArrowUp" ? -1 : 1)));
-      S.ticket.selected = S.ticket.items[i].id; S.pad.buffer = ""; if (!S.pad.open) S.pad.mode = "qty"; drawTicket();
+      S.ticket.selected = keyOf(S.ticket.items[i]); S.pad.buffer = ""; if (!S.pad.open) S.pad.mode = "qty"; drawTicket();
     }
   }
 
@@ -944,7 +981,7 @@ A.receiptHtml = function (o, set) {
     "<p class='r-center'>" + A.date(o.createdAt, true) + "<br>Bon " + e(o.number) + "</p><hr>" +
     o.lines.map(function (l) {
       var gross = Math.round(l.price * l.qty * 100) / 100;
-      return "<div class='r-line'><span>" + l.qty + " × " + e(l.name) + "</span><span>" + eu(l.discount ? gross : l.total) + "</span></div>" +
+      return "<div class='r-line'><span>" + l.qty + " × " + e(l.name) + (l.box ? " (" + e(l.unit) + ")" : "") + "</span><span>" + eu(l.discount ? gross : l.total) + "</span></div>" +
         (l.qty > 1 || l.listPrice != null ? "<div class='r-sub'>à " + eu(l.price) + (l.listPrice != null ? " (normaal " + eu(l.listPrice) + ")" : "") + "</div>" : "") +
         (l.discount ? "<div class='r-line r-sub'><span>korting " + String(l.discount).replace(".", ",") + "%</span><span>− " + eu(gross - l.total) + "</span></div>" : "");
     }).join("") + "<hr>" +

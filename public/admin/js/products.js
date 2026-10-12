@@ -42,7 +42,7 @@
         el.querySelector("#p-rows").innerHTML = list.map(function (p) {
           var vis = p.active === false ? "<span class='tag tag-off'>Niet actief</span>" : p.webshop === false ? "<span class='tag tag-winkel'>Alleen winkel</span>" : "<span class='tag tag-webshop'>Webshop + winkel</span>";
           return "<tr class='clickable' data-id='" + e(p.id) + "'><td><div class='p-cell'><span class='thumb'>" + A.productArt(p) + "</span><span><span class='muted small'>" + e(p.producer) + "</span><br><strong>" + e(p.name) + "</strong>" + (p.vintage ? " <span class='muted'>" + p.vintage + "</span>" : "") + "</span></div></td>" +
-            "<td>" + e(A.TYPES[p.type] || p.type) + "<br>" + catTag(p) + "<span class='muted small'>" + e(p.unit) + "</span></td>" +
+            "<td>" + e(A.TYPES[p.type] || p.type) + "<br>" + catTag(p) + "<span class='muted small'>" + e(p.unit) + (p.caseSize ? " · ook per doos van " + p.caseSize : "") + "</span></td>" +
             "<td class='num'>" + (p.price == null ? "<span class='muted'>op aanvraag</span>" : (p.oldPrice ? "<s class='muted small'>" + eu(p.oldPrice) + "</s> " : "") + eu(p.price)) + "</td>" +
             "<td class='num'>" + A.stockBadge(p) + "</td><td>" + vis + "</td></tr>";
         }).join("") || "<tr><td colspan='5' class='empty-inline'>Geen producten gevonden.</td></tr>";
@@ -102,6 +102,15 @@
           "<span class='muted small'>Wordt gebruikt in de kassa en de webshop. Zonder foto tonen we een getekende fles.</span></span></div></div>" +
         "<label class='field span-2'>Omschrijving<textarea name='description' rows='4'>" + e(p.description) + "</textarea></label>" +
         "<label class='field span-2'>Interne notitie<textarea name='note' rows='2' placeholder='Alleen zichtbaar in de admin'>" + e(p.note) + "</textarea></label>" +
+        // Per doos: zelfde product (voorraad in flessen), maar ook als doos te koop met eigen aantal en prijs.
+        "<fieldset class='span-2 checks case-box' id='p-case'><legend>Per doos</legend>" +
+          check("Ook per doos te koop", "caseOn", !!p.caseSize) +
+          "<div class='case-fields'>" +
+            field("Flessen per doos", "caseSize", p.caseSize || 6, "inputmode='numeric'") +
+            field("Prijs per doos (€)", "casePrice", p.casePrice != null ? String(p.casePrice).replace(".", ",") : "", "inputmode='decimal'") +
+          "</div>" +
+          "<p class='muted small case-help' id='p-case-help'></p>" +
+        "</fieldset>" +
         "<fieldset class='span-2 checks'><legend>Instellingen</legend>" +
           check("Actief (te koop)", "active", p.active !== false) +
           check("Tonen in de webshop", "webshop", p.webshop !== false) +
@@ -116,6 +125,19 @@
       "</form>", { wide: true });
 
     var form = body.querySelector("form");
+    // Doosvelden alleen aan als "Ook per doos" aangevinkt is; de standaardprijs volgt uit de flesprijs.
+    function caseUi() {
+      var on = form.caseOn.checked;
+      form.caseSize.disabled = form.casePrice.disabled = !on;
+      body.querySelector("#p-case").classList.toggle("is-off", !on);
+      var n = Math.floor(A.parseNum(form.caseSize.value)) || 0, price = A.parseNum(form.price.value);
+      var auto = n >= 2 && price != null ? A.euro(Math.round(price * n * 100) / 100) : null;
+      form.casePrice.placeholder = auto ? "leeg = " + auto : "leeg = flesprijs × aantal";
+      body.querySelector("#p-case-help").textContent = !on ? "Vink aan als klanten dit product ook per doos kunnen kopen. De voorraad blijft in flessen."
+        : "Een doos boekt " + (n >= 2 ? n : "het aantal") + " flessen af van de voorraad." + (auto ? " Zonder doosprijs kost een doos " + auto + "." : "");
+    }
+    ["caseOn", "caseSize", "price"].forEach(function (n) { form[n].addEventListener("input", caseUi); form[n].addEventListener("change", caseUi); });
+    caseUi();
     var pendingImage; // undefined = ongewijzigd, "" = verwijderen, anders data-URL
     body.querySelector("#p-file").addEventListener("change", function () {
       var file = this.files && this.files[0];
@@ -144,6 +166,11 @@
         tags: ["uitgelicht", "actie", "nieuw", "bio"].filter(function (t) { return d["tag_" + t]; })
       };
       if (isNew) input.stock = d.stock;
+      // Alleen meesturen als het nodig is (de kolommen bestaan pas na migratie 20261016).
+      if (d.caseOn || p.caseSize) {
+        input.caseSize = d.caseOn ? d.caseSize : null;
+        input.casePrice = d.caseOn ? A.parseNum(d.casePrice) : null;
+      }
       if (cats) input.categoryId = d.categoryId || null;
       var btn = form.querySelector(".btn-primary");
       A.busy(btn, true, "Opslaan…");

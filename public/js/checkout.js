@@ -95,7 +95,7 @@ window.WWW.ready.then(function () {
     $("summary-lines").innerHTML = order.lines.map(function (l) {
       var p = W.byId[l.id];
       return '<div class="sum-line">' + W.art(p, "sm") +
-        '<div><p class="product-producer">' + W.esc(p.producer) + "</p><p>" + W.esc(p.name) + '</p><p class="muted">' + l.qty + " × " + W.euro(l.price) + "</p></div>" +
+        '<div><p class="product-producer">' + W.esc(p.producer) + "</p><p>" + W.esc(p.name) + '</p><p class="muted">' + l.qty + " × " + (l.box ? W.esc(l.unit) + " à " : "") + W.euro(l.price) + "</p></div>" +
         "<strong>" + W.euro(l.total) + "</strong></div>";
     }).join("");
     $("sum-subtotal").textContent = W.euro(order.subtotal);

@@ -26,7 +26,22 @@
     .then(function () { render(); return PRODUCTS; });
 
   function soldOut(p) { return p.stock === false || (typeof p.stock === "number" && p.stock <= 0); }
-  function maxQty(p) { return typeof p.stock === "number" ? Math.max(0, Math.min(99, p.stock)) : 99; }
+
+  // Per doos (instelbaar per product): aantal flessen in de doos en de doosprijs.
+  var ORDER = window.WWW_ORDER || {};
+  function caseSize(p) { return ORDER.caseSize ? ORDER.caseSize(p) : null; }
+  function casePrice(p) { return ORDER.casePrice ? ORDER.casePrice(p) : null; }
+  function keyOf(i) { return i.id + (i.box ? "|doos" : ""); }
+  function unitSize(p, box) { return box ? caseSize(p) || 1 : 1; }
+  function unitPrice(p, box) { return box ? casePrice(p) : p.price; }
+  function caseSoldOut(p) { return soldOut(p) || (typeof p.stock === "number" && p.stock < caseSize(p)); }
+  // Maximaal aantal van deze regel: de voorraad (in flessen) min wat de andere regel van hetzelfde product al gebruikt.
+  function maxQty(p, box, items) {
+    if (typeof p.stock !== "number") return 99;
+    var used = (items || []).filter(function (i) { return i.id === p.id && !!i.box !== !!box; })
+      .reduce(function (t, i) { return t + i.qty * unitSize(p, i.box); }, 0);
+    return Math.max(0, Math.min(99, Math.floor((p.stock - used) / unitSize(p, box))));
+  }
 
   var TYPES = {
     rood: "Rood", wit: "Wit", rose: "Rosé", mousserend: "Mousserend",
@@ -61,24 +76,26 @@
   var Cart = {
     items: read,
     count: function () { return read().reduce(function (s, i) { return s + i.qty; }, 0); },
-    add: function (id, qty) {
+    // box: true = per doos
+    add: function (id, qty, box) {
       var p = byId[id];
-      if (!p || p.price == null || soldOut(p)) return;
+      box = !!box;
+      if (!p || unitPrice(p, box) == null || (box ? caseSoldOut(p) : soldOut(p))) return;
       var items = read();
-      var found = items.find(function (i) { return i.id === id; });
-      var limit = maxQty(p);
-      if (found && found.qty >= limit) { toast(p, "Meer is er helaas niet op voorraad."); return; }
+      var found = items.find(function (i) { return keyOf(i) === keyOf({ id: id, box: box }); });
+      var limit = maxQty(p, box, items);
+      if ((found ? found.qty : 0) >= limit) { toast(p, "Meer is er helaas niet op voorraad."); return; }
       if (found) found.qty = Math.min(limit, found.qty + (qty || 1));
-      else items.push({ id: id, qty: Math.min(limit, qty || 1) });
+      else items.push(box ? { id: id, qty: Math.min(limit, qty || 1), box: true } : { id: id, qty: Math.min(limit, qty || 1) });
       write(items);
-      toast(p);
+      toast(p, null, box);
     },
-    set: function (id, qty) {
+    set: function (key, qty) {
       var items = read();
-      var found = items.find(function (i) { return i.id === id; });
+      var found = items.find(function (i) { return keyOf(i) === key; });
       if (!found) return;
-      if (qty <= 0) items = items.filter(function (i) { return i.id !== id; });
-      else found.qty = Math.min(byId[id] ? maxQty(byId[id]) : 99, qty);
+      if (qty <= 0) items = items.filter(function (i) { return keyOf(i) !== key; });
+      else found.qty = Math.min(byId[found.id] ? maxQty(byId[found.id], found.box, items) : 99, qty);
       write(items);
     },
     clear: function () { write([]); }
@@ -127,6 +144,20 @@
     return '<button class="btn ' + (cls || "") + '" data-add="' + esc(p.id) + '">In winkelwagen</button>';
   }
 
+  // Knop "per doos" onder de gewone knop (alleen als het product per doos te koop is).
+  var BOX_ICON = '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></svg>';
+  function caseButton(p, big) {
+    var n = caseSize(p), price = casePrice(p);
+    if (!n || price == null || p.price == null) return "";
+    var perBottle = price / n;
+    var save = p.price > perBottle + 0.004 ? Math.round((1 - perBottle / p.price) * 100) : 0;
+    var off = caseSoldOut(p);
+    return '<button class="case-btn' + (big ? " case-btn-lg" : "") + '" data-add-box="' + esc(p.id) + '"' + (off ? " disabled" : "") + '>' +
+      '<span class="case-ic">' + BOX_ICON + "</span>" +
+      '<span class="case-txt"><strong>Doos van ' + n + "</strong><small>" + (off ? "Niet leverbaar" : euro(perBottle) + "/fles" + (save && big ? " · " + save + "% voordeel" : "")) + "</small></span>" +
+      '<span class="case-price">' + euro(price) + "</span></button>";
+  }
+
   function card(p) {
     var meta = [TYPES[p.type], p.country, p.region].filter(Boolean).join(" · ");
     return '<article class="product">' +
@@ -138,6 +169,7 @@
         '<div class="product-foot"><div class="product-price">' + priceHtml(p) +
           '<small>' + esc(p.unit === "fles" ? p.size : p.unit) + "</small></div>" +
           buyButton(p, "btn-small") + "</div>" +
+        caseButton(p) +
       "</div></article>";
   }
 
@@ -166,7 +198,7 @@
   }
 
   function render() {
-    var items = read().filter(function (i) { return byId[i.id]; });
+    var items = read().filter(function (i) { return byId[i.id] && unitPrice(byId[i.id], i.box) != null; });
     countEls = countEls || document.querySelectorAll("[data-cart-count]");
     var count = items.reduce(function (s, i) { return s + i.qty; }, 0);
     countEls.forEach(function (el) { el.textContent = count; el.hidden = count === 0; });
@@ -179,16 +211,16 @@
     drawer.querySelector(".drawer-foot").hidden = false;
     var subtotal = 0;
     list.innerHTML = items.map(function (i) {
-      var p = byId[i.id];
-      subtotal += p.price * i.qty;
+      var p = byId[i.id], k = keyOf(i), price = unitPrice(p, i.box);
+      subtotal += price * i.qty;
       return '<div class="line">' + art(p, "sm") +
         '<div class="line-info"><p class="product-producer">' + esc(p.producer) + "</p>" +
-        '<p class="line-name">' + esc(p.name) + "</p>" +
-        '<div class="qty"><button data-qty="' + esc(p.id) + '" data-delta="-1" aria-label="Eén minder">−</button>' +
+        '<p class="line-name">' + esc(p.name) + (i.box ? ' <span class="line-case">' + BOX_ICON + " doos van " + caseSize(p) + "</span>" : "") + "</p>" +
+        '<div class="qty"><button data-qty="' + esc(k) + '" data-delta="-1" aria-label="Eén minder">−</button>' +
         "<span>" + i.qty + "</span>" +
-        '<button data-qty="' + esc(p.id) + '" data-delta="1" aria-label="Eén meer">+</button></div></div>' +
-        '<div class="line-price">' + euro(p.price * i.qty) +
-        '<button class="link-btn" data-remove="' + esc(p.id) + '">Verwijder</button></div></div>';
+        '<button data-qty="' + esc(k) + '" data-delta="1" aria-label="Eén meer">+</button></div></div>' +
+        '<div class="line-price">' + euro(price * i.qty) +
+        '<button class="link-btn" data-remove="' + esc(k) + '">Verwijder</button></div></div>';
     }).join("");
     totalEl.textContent = euro(subtotal);
   }
@@ -209,14 +241,14 @@
   }
 
   var toastEl, toastTimer;
-  function toast(p, message) {
+  function toast(p, message, box) {
     if (!toastEl) {
       toastEl = document.createElement("div");
       toastEl.className = "toast";
       toastEl.setAttribute("role", "status");
       document.body.appendChild(toastEl);
     }
-    toastEl.innerHTML = (message ? "<span>" + esc(message) + "</span>" : "<span>✓ <strong>" + esc(p.producer) + "</strong> " + esc(p.name) + " toegevoegd</span>") + '<button class="link-btn" data-cart-open>Bekijk winkelwagen</button>';
+    toastEl.innerHTML = (message ? "<span>" + esc(message) + "</span>" : "<span>✓ " + (box ? "Doos van " + caseSize(p) + " " : "") + "<strong>" + esc(p.producer) + "</strong> " + esc(p.name) + " toegevoegd</span>") + '<button class="link-btn" data-cart-open>Bekijk winkelwagen</button>';
     toastEl.classList.add("show");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 3500);
@@ -224,15 +256,16 @@
 
   // ---- Events ----
   document.addEventListener("click", function (e) {
-    var t = e.target.closest("[data-add],[data-cart-open],[data-cart-close],[data-qty],[data-remove]");
+    var t = e.target.closest("[data-add],[data-add-box],[data-cart-open],[data-cart-close],[data-qty],[data-remove]");
     if (!t) return;
     if (t.hasAttribute("data-add")) { e.preventDefault(); Cart.add(t.getAttribute("data-add"), 1); }
+    else if (t.hasAttribute("data-add-box")) { e.preventDefault(); Cart.add(t.getAttribute("data-add-box"), 1, true); }
     else if (t.hasAttribute("data-cart-open")) { e.preventDefault(); if (toastEl) toastEl.classList.remove("show"); open(); }
     else if (t.hasAttribute("data-cart-close")) { e.preventDefault(); close(); }
     else if (t.hasAttribute("data-qty")) {
-      var id = t.getAttribute("data-qty");
-      var item = read().find(function (i) { return i.id === id; });
-      if (item) Cart.set(id, item.qty + Number(t.getAttribute("data-delta")));
+      var key = t.getAttribute("data-qty");
+      var item = read().find(function (i) { return keyOf(i) === key; });
+      if (item) Cart.set(key, item.qty + Number(t.getAttribute("data-delta")));
     }
     else if (t.hasAttribute("data-remove")) Cart.set(t.getAttribute("data-remove"), 0);
   });
@@ -246,6 +279,7 @@
 
   window.WWW = {
     Cart: Cart, PRODUCTS: PRODUCTS, CONFIG: CONFIG, TYPES: TYPES, byId: byId, ready: ready, state: state, soldOut: soldOut,
-    euro: euro, esc: esc, art: art, card: card, priceHtml: priceHtml, badges: badges, buyButton: buyButton
+    euro: euro, esc: esc, art: art, card: card, priceHtml: priceHtml, badges: badges, buyButton: buyButton,
+    caseButton: caseButton, caseSize: caseSize, casePrice: casePrice, BOX_ICON: BOX_ICON
   };
 })();
