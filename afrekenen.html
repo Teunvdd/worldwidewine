@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Afrekenen — WorldWideWine.nl</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#ce542b">
+  <link rel="icon" href="favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="shop.css">
+</head>
+<body class="checkout-page">
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="index.html" aria-label="WorldWideWine.nl — home">
+        <img src="assets/logo.png" alt="worldwidewine.nl — dranken en culinaire projecten" width="986" height="135" class="brand-logo">
+      </a>
+      <a class="link-arrow back-link" href="webshop.html">Verder winkelen</a>
+    </div>
+  </header>
+
+  <main id="main" class="wrap checkout">
+    <h1>Afrekenen</h1>
+
+    <div class="checkout-empty" id="checkout-empty" hidden>
+      <p>Je winkelwagen is leeg.</p>
+      <a class="btn" href="webshop.html">Naar de webshop</a>
+    </div>
+
+    <div class="checkout-grid" id="checkout-grid">
+      <form id="checkout-form" name="bestelling" method="POST" data-netlify="true" netlify-honeypot="website" novalidate>
+        <input type="hidden" name="form-name" value="bestelling">
+        <input type="hidden" name="ordernummer">
+        <input type="hidden" name="bestelling">
+        <input type="hidden" name="totaal">
+        <p class="hp"><label>Laat dit veld leeg <input name="website" tabindex="-1" autocomplete="off"></label></p>
+
+        <section class="step">
+          <h2><span class="step-n">1</span> Hoe wil je je bestelling ontvangen?</h2>
+          <div class="options" id="delivery-options"></div>
+          <p class="notice" id="delivery-notice" hidden></p>
+        </section>
+
+        <section class="step">
+          <h2><span class="step-n">2</span> Je gegevens</h2>
+          <div class="fields">
+            <label class="field field-wide">Naam<input name="naam" autocomplete="name" required></label>
+            <label class="field">E-mailadres<input name="email" type="email" autocomplete="email" required></label>
+            <label class="field">Telefoonnummer<input name="telefoon" type="tel" autocomplete="tel" required></label>
+          </div>
+          <div class="fields" id="address-fields" hidden>
+            <label class="field field-wide">Straat en huisnummer<input name="adres" autocomplete="street-address" data-address></label>
+            <label class="field">Postcode<input name="postcode" autocomplete="postal-code" data-address pattern="[1-9][0-9]{3}\s?[A-Za-z]{2}" placeholder="1234 AB"></label>
+            <label class="field">Plaats<input name="plaats" autocomplete="address-level2" data-address></label>
+          </div>
+          <div class="fields" id="pickup-fields" hidden>
+            <label class="field field-wide"><span>Wanneer wil je afhalen? <span class="optional">(optioneel)</span></span>
+              <input name="afhaalmoment" placeholder="Bijv. vrijdag 14 november, na 15:00">
+            </label>
+          </div>
+          <label class="field field-wide"><span>Opmerkingen <span class="optional">(optioneel)</span></span>
+            <textarea name="opmerkingen" rows="3" placeholder="Bijv. cadeauverpakking, of bezorgen bij de buren"></textarea>
+          </label>
+        </section>
+
+        <section class="step">
+          <h2><span class="step-n">3</span> Betalen</h2>
+          <div class="options" id="payment-options"></div>
+        </section>
+
+        <section class="step step-confirm">
+          <label class="check"><input type="checkbox" name="leeftijd" value="ja" required> <span>Ik ben 18 jaar of ouder. Ik begrijp dat bij afhalen of aflevering om legitimatie kan worden gevraagd.</span></label>
+          <label class="check"><input type="checkbox" name="voorwaarden" value="ja" required> <span>Ik ga akkoord met de <a href="voorwaarden.html" target="_blank">voorwaarden en het privacybeleid</a>.</span></label>
+          <p class="form-error" id="form-error" role="alert" hidden></p>
+          <button class="btn btn-block btn-large" type="submit" id="submit">Bestelling plaatsen</button>
+        </section>
+      </form>
+
+      <aside class="summary" aria-label="Overzicht van je bestelling">
+        <h2>Je bestelling</h2>
+        <div id="summary-lines"></div>
+        <dl class="totals">
+          <dt>Subtotaal</dt><dd id="sum-subtotal"></dd>
+          <dt>Verzending</dt><dd id="sum-shipping"></dd>
+          <dt class="total">Totaal <small>incl. btw</small></dt><dd class="total" id="sum-total"></dd>
+        </dl>
+        <p class="muted" id="sum-free"></p>
+        <a class="link-btn" href="webshop.html">Bestelling aanpassen</a>
+      </aside>
+    </div>
+  </main>
+
+  <script src="data/products.js"></script>
+  <script src="data/config.js"></script>
+  <script src="data/order.js"></script>
+  <script src="js/shop.js"></script>
+  <script src="js/checkout.js"></script>
+</body>
+</html>

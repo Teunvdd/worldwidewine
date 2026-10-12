@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin — WorldWideWine.nl</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#ce542b">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <!-- Inloggen -->
+  <div class="login" id="login" hidden>
+    <form class="login-box" id="login-form">
+      <img src="/assets/logo.png" alt="worldwidewine.nl — dranken en culinaire projecten" width="986" height="135" class="login-logo">
+      <h1 class="sr-only">worldwidewine.nl</h1>
+      <p class="muted">Admin &amp; kassa</p>
+      <label class="field">Wachtwoord<input type="password" name="password" autocomplete="current-password" required autofocus></label>
+      <p class="error" id="login-error" role="alert" hidden></p>
+      <button class="btn btn-primary btn-block" type="submit">Inloggen</button>
+      <a class="muted small" href="/">← Naar de website</a>
+    </form>
+  </div>
+
+  <!-- App -->
+  <div class="app" id="app" hidden>
+    <aside class="sidebar">
+      <a class="logo" href="#dashboard">
+        <img src="/assets/logo-light.png" alt="worldwidewine.nl — dranken en culinaire projecten" width="986" height="135" class="logo-full">
+        <img src="/favicon.png" alt="" width="64" height="64" class="logo-mark">
+      </a>
+      <nav class="menu" id="menu">
+        <a href="#dashboard" data-view="dashboard"><span class="ic">◎</span><span>Overzicht</span></a>
+        <a href="#kassa" data-view="kassa"><span class="ic">▤</span><span>Kassa</span></a>
+        <a href="#kassa-instellingen" data-view="kassa-instellingen" class="sub"><span class="ic">⚙</span><span>Kassa-instellingen</span></a>
+        <a href="#bestellingen" data-view="bestellingen"><span class="ic">≡</span><span>Bestellingen</span><b class="pill" id="open-count" hidden></b></a>
+        <a href="#producten" data-view="producten"><span class="ic">◇</span><span>Producten</span></a>
+        <a href="#voorraad" data-view="voorraad"><span class="ic">▦</span><span>Voorraad</span><b class="pill pill-warn" id="low-count" hidden></b></a>
+        <a href="#klanten" data-view="klanten"><span class="ic">☺</span><span>Klanten</span></a>
+      </nav>
+      <div class="sidebar-foot">
+        <a href="/webshop.html" target="_blank" rel="noopener">Webshop bekijken ↗</a>
+        <button class="link" id="logout" type="button">Uitloggen</button>
+      </div>
+    </aside>
+    <main class="main" id="view" tabindex="-1"></main>
+  </div>
+
+  <!-- Venster voor formulieren en details -->
+  <div class="modal" id="modal" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <header class="modal-head">
+        <h2 id="modal-title"></h2>
+        <button class="icon-btn" type="button" data-modal-close aria-label="Sluiten">×</button>
+      </header>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Kassabon (alleen zichtbaar bij afdrukken) -->
+  <div class="receipt-print" id="receipt-print"></div>
+
+  <script src="/data/products.js"></script>
+  <script src="/data/config.js"></script>
+  <script src="/data/order.js"></script>
+  <script src="/admin/js/core.js"></script>
+  <script src="/admin/js/dashboard.js"></script>
+  <script src="/admin/js/pos.js"></script>
+  <script src="/admin/js/orders.js"></script>
+  <script src="/admin/js/products.js"></script>
+  <script src="/admin/js/stock.js"></script>
+  <script src="/admin/js/customers.js"></script>
+  <script src="/admin/js/settings.js"></script>
+  <script>A.start();</script>
+</body>
+</html>

@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>WorldWideWine.nl — Wijnimporteur &amp; wijnwinkel in Zaandam</title>
   <meta name="description" content="WorldWideWine.nl is een wijnimporteur met eigen winkel in Zaandam. Rechtstreeks geïmporteerde wijnen van kleine wijnhuizen uit Italië, Frankrijk, Oostenrijk en Engeland. Proeverijen, relatiegeschenken en bezorging aan huis.">
-  <meta name="theme-color" content="#5c1621">
-  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#ce542b">
+  <link rel="icon" href="favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 
   <meta property="og:type" content="website">
   <meta property="og:title" content="WorldWideWine.nl — Wijnimporteur &amp; wijnwinkel in Zaandam">
@@ -17,6 +18,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="shop.css">
 
   <script type="application/ld+json">
   {
@@ -50,12 +52,17 @@
   <header class="site-header" id="top">
     <div class="wrap header-inner">
       <a class="brand" href="#top" aria-label="WorldWideWine.nl — naar boven">
-        <img src="assets/logo.svg" alt="" width="36" height="36" class="brand-mark">
-        <span class="brand-name">WorldWide<em>Wine</em><small>.nl</small></span>
+        <img src="assets/logo.png" alt="worldwidewine.nl — dranken en culinaire projecten" width="986" height="135" class="brand-logo">
       </a>
-      <button class="nav-toggle" aria-expanded="false" aria-controls="nav" aria-label="Menu openen">
-        <span></span><span></span><span></span>
-      </button>
+      <div class="header-actions">
+        <button class="cart-btn" data-cart-open aria-label="Winkelwagen openen">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="20.5" r="1.3" fill="currentColor"/><circle cx="17" cy="20.5" r="1.3" fill="currentColor"/></svg>
+          <span class="cart-count" data-cart-count hidden>0</span>
+        </button>
+        <button class="nav-toggle" aria-expanded="false" aria-controls="nav" aria-label="Menu openen">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
       <nav id="nav" class="nav" aria-label="Hoofdmenu">
         <a href="#over">Over ons</a>
         <a href="#wijnen">Onze wijnen</a>
@@ -63,7 +70,7 @@
         <a href="#proeverijen">Proeverijen</a>
         <a href="#zakelijk">Zakelijk</a>
         <a href="#bezoek">Bezoek &amp; bestellen</a>
-        <a class="btn btn-small" href="https://www.worldwidewine.nl/webshop">Webshop</a>
+        <a class="btn btn-small" href="webshop.html">Webshop</a>
       </nav>
     </div>
   </header>
@@ -77,7 +84,7 @@
         <h1>Wijnen met een verhaal,<br><em>rechtstreeks</em> van de maker.</h1>
         <p class="lead">Wij reizen langs kleine, onafhankelijke wijnhuizen in Italië, Frankrijk, Oostenrijk en Engeland — en halen hun wijnen zelf naar Nederland. Geen tussenhandel, wel eerlijke prijzen en persoonlijk advies.</p>
         <div class="hero-cta">
-          <a class="btn" href="https://www.worldwidewine.nl/webshop">Bekijk de webshop</a>
+          <a class="btn" href="webshop.html">Bekijk de webshop</a>
           <a class="btn btn-ghost" href="#bezoek">Kom langs in de winkel</a>
         </div>
         <ul class="hero-facts" aria-label="In het kort">
@@ -115,64 +122,31 @@
           <p>Een selectie uit ons assortiment. Kijk in de webshop voor actuele prijzen en voorraad — en vraag naar doos&shy;korting.</p>
         </div>
         <div class="cards">
-          <article class="card">
+          <article class="card card-link">
             <div class="card-swatch swatch-red" aria-hidden="true"></div>
-            <h3>Rood</h3>
+            <h3><a href="webshop.html?soort=rood">Rood</a></h3>
             <p>Toscaanse klassiekers als Vino Nobile di Montepulciano en Chianti, en elegante Nebbiolo uit de Valtellina.</p>
           </article>
-          <article class="card">
+          <article class="card card-link">
             <div class="card-swatch swatch-white" aria-hidden="true"></div>
-            <h3>Wit</h3>
+            <h3><a href="webshop.html?soort=wit">Wit</a></h3>
             <p>Van Vermentino en Garganega tot Bourgogne als Pouilly-Fuissé en Oostenrijkse Grüner Veltliner.</p>
           </article>
-          <article class="card">
+          <article class="card card-link">
             <div class="card-swatch swatch-sparkling" aria-hidden="true"></div>
-            <h3>Mousserend</h3>
+            <h3><a href="webshop.html?soort=mousserend">Mousserend</a></h3>
             <p>Wij zijn importeur van Engelse mousserende wijn uit het zuiden van Engeland — een echte ontdekking.</p>
           </article>
-          <article class="card">
+          <article class="card card-link">
             <div class="card-swatch swatch-deli" aria-hidden="true"></div>
-            <h3>Delicatessen &amp; water</h3>
+            <h3><a href="webshop.html?soort=delicatessen">Delicatessen &amp; water</a></h3>
             <p>Italiaanse delicatessen en Lauretana, het lichtste mineraalwater van Europa, ook per pallet.</p>
           </article>
         </div>
 
         <h3 class="subhead">Uitgelicht</h3>
-        <div class="featured">
-          <article class="bottle">
-            <div class="bottle-art bottle-white" aria-hidden="true"></div>
-            <div>
-              <p class="bottle-origin">Toscane · Italië</p>
-              <h4>Torre a Cona — Vermentino DOC</h4>
-              <p>Fris, zilt en met tonen van citrus en witte bloemen. Heerlijk bij vis en zomerse gerechten.</p>
-            </div>
-          </article>
-          <article class="bottle">
-            <div class="bottle-art bottle-red" aria-hidden="true"></div>
-            <div>
-              <p class="bottle-origin">Montepulciano · Italië</p>
-              <h4>Montemercurio — Vino Nobile “Messaggero”</h4>
-              <p>Sangiovese met diepgang: rijp rood fruit, kruidigheid en een lange, zijdezachte afdronk.</p>
-            </div>
-          </article>
-          <article class="bottle">
-            <div class="bottle-art bottle-white" aria-hidden="true"></div>
-            <div>
-              <p class="bottle-origin">Bourgogne · Frankrijk</p>
-              <h4>Domaine Bernard — Pouilly-Fuissé</h4>
-              <p>Volle, elegante Chardonnay uit de Mâconnais. Voor een feestelijk diner.</p>
-            </div>
-          </article>
-          <article class="bottle">
-            <div class="bottle-art bottle-sparkling" aria-hidden="true"></div>
-            <div>
-              <p class="bottle-origin">Sussex · Engeland</p>
-              <h4>Wiston Estate — Brut</h4>
-              <p>Engelse mousserende wijn volgens de traditionele methode. Strak, fijn en verrassend.</p>
-            </div>
-          </article>
-        </div>
-        <p class="center"><a class="btn" href="https://www.worldwidewine.nl/webshop">Naar de webshop</a></p>
+        <div class="product-grid home-products" id="home-featured"></div>
+        <p class="center"><a class="btn" href="webshop.html">Bekijk alle wijnen</a></p>
       </div>
     </section>
 
@@ -276,14 +250,14 @@
           </article>
           <article class="visit-card">
             <h3>Afhalen Zaandam of Weesp</h3>
-            <p>Online besteld? Maak een afhaalafspraak op een moment dat jou uitkomt, in Zaandam of Weesp.</p>
-            <a class="link-arrow" href="https://www.worldwidewine.nl/book-online">Afhaalafspraak maken</a>
+            <p>Bestel online en kies bij het afrekenen voor afhalen in Zaandam of Weesp. Gratis, en je betaalt desgewenst bij het ophalen.</p>
+            <a class="link-arrow" href="webshop.html">Bestel en haal af</a>
           </article>
           <article class="visit-card">
             <h3>Bezorgen</h3>
             <p><strong>Zaandam, Weesp &amp; omgeving:</strong> wij bezorgen zelf aan huis.</p>
-            <p><strong>Rest van Nederland:</strong> tot 18 flessen per zending via PostNL — kies bij het afrekenen voor ‘verzenden met PostNL’.</p>
-            <a class="link-arrow" href="https://www.worldwidewine.nl/webshop">Bestellen in de webshop</a>
+            <p><strong>Rest van Nederland:</strong> tot 18 flessen per zending via PostNL — kies bij het afrekenen voor verzenden met PostNL.</p>
+            <a class="link-arrow" href="webshop.html">Bestellen in de webshop</a>
           </article>
         </div>
       </div>
@@ -327,17 +301,18 @@
     <div class="wrap footer-inner">
       <div>
         <a class="brand brand-light" href="#top">
-          <img src="assets/logo-light.svg" alt="" width="32" height="32" class="brand-mark">
-          <span class="brand-name">WorldWide<em>Wine</em><small>.nl</small></span>
+          <img src="assets/logo-light.png" alt="worldwidewine.nl — dranken en culinaire projecten" width="986" height="135" class="brand-logo">
         </a>
         <p>Wijnimporteur met eigen winkel.<br>Westzijde 358, 1506 GK Zaandam</p>
       </div>
       <div>
         <h4>Snel naar</h4>
+        <a href="webshop.html">Webshop</a>
         <a href="#wijnen">Onze wijnen</a>
         <a href="#proeverijen">Proeverijen</a>
         <a href="#zakelijk">Zakelijk</a>
         <a href="#bezoek">Openingstijden</a>
+        <a href="voorwaarden.html">Voorwaarden &amp; privacy</a>
       </div>
       <div>
         <h4>Contact</h4>
@@ -359,7 +334,7 @@
   <!-- Leeftijdscheck -->
   <div class="age-gate" id="age-gate" role="dialog" aria-modal="true" aria-labelledby="age-title" hidden>
     <div class="age-box">
-      <img src="assets/logo.svg" alt="" width="48" height="48">
+      <img src="assets/logo.png" alt="worldwidewine.nl — dranken en culinaire projecten" width="986" height="135" class="age-logo">
       <h2 id="age-title">Ben je 18 jaar of ouder?</h2>
       <p>Op deze website bieden we alcoholhoudende dranken aan. Je moet 18 jaar of ouder zijn om verder te gaan.</p>
       <div class="age-actions">
@@ -369,6 +344,16 @@
     </div>
   </div>
 
-  <script src="script.js"></script>
+  <script src="data/products.js"></script>
+  <script src="data/config.js"></script>
+  <script src="js/site.js"></script>
+  <script src="js/shop.js"></script>
+  <script>
+    WWW.ready.then(function () {
+      var el = document.getElementById("home-featured");
+      var list = WWW.PRODUCTS.filter(function (p) { return (p.tags || []).indexOf("uitgelicht") >= 0; }).slice(0, 4);
+      el.innerHTML = list.map(WWW.card).join("");
+    });
+  </script>
 </body>
 </html>

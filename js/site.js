@@ -12,12 +12,12 @@
   // Mobiel menu
   var toggle = document.querySelector('.nav-toggle');
   var nav = document.getElementById('nav');
-  toggle.addEventListener('click', function () {
+  if (toggle && nav) toggle.addEventListener('click', function () {
     var open = nav.classList.toggle('open');
     toggle.setAttribute('aria-expanded', String(open));
     toggle.setAttribute('aria-label', open ? 'Menu sluiten' : 'Menu openen');
   });
-  nav.addEventListener('click', function (e) {
+  if (nav) nav.addEventListener('click', function (e) {
     if (e.target.tagName === 'A') {
       nav.classList.remove('open');
       toggle.setAttribute('aria-expanded', 'false');
@@ -39,17 +39,18 @@
   var gate = document.getElementById('age-gate');
   var confirmed = false;
   try { confirmed = localStorage.getItem('wwwAge18') === 'ja'; } catch (e) {}
-  if (!confirmed) {
+  if (gate && !confirmed) {
     gate.hidden = false;
     document.getElementById('age-yes').focus();
   }
-  document.getElementById('age-yes').addEventListener('click', function () {
+  if (gate) document.getElementById('age-yes').addEventListener('click', function () {
     try { localStorage.setItem('wwwAge18', 'ja'); } catch (e) {}
     gate.hidden = true;
   });
 
   // Contactformulier: opent het mailprogramma met een ingevuld bericht
   var form = document.getElementById('contact-form');
+  if (!form) return;
   var note = form.querySelector('.form-note');
   form.addEventListener('submit', function (e) {
     e.preventDefault();

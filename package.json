@@ -1,0 +1,15 @@
+{
+  "name": "worldwidewine",
+  "private": true,
+  "description": "Website, webshop, admin en kassa van WorldWideWine.nl",
+  "scripts": {
+    "dev": "node scripts/dev-server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.117.2"
+  }
+}
