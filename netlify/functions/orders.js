@@ -1,11 +1,9 @@
 // POST /api/orders — een webshopbestelling plaatsen (en eventueel een Mollie-betaling starten).
-const { connect } = require("../lib/store");
 const { json, parseBody, siteUrl } = require("../lib/http");
 const shop = require("../lib/shop");
 const mollie = require("../lib/mollie");
 
 exports.handler = async (event) => {
-  connect(event);
   if (event.httpMethod !== "POST") return json(405, { error: "Alleen POST" });
   const input = parseBody(event);
   if (!input) return json(400, { error: "Ongeldige aanvraag." });

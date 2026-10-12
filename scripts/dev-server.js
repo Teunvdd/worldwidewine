@@ -1,7 +1,8 @@
 // Lokale testserver: draait de website en de serverfuncties zonder Netlify.
-// Gegevens worden opgeslagen in de map .data/ (niet in git).
 //
-//   npm run dev            → http://localhost:8888  (admin-wachtwoord: "admin")
+//   npm run dev                → gebruikt de Supabase-database uit .env (zie .env.example)
+//   WWW_LOCAL_DB=1 npm run dev → start een tijdelijke lokale database (Postgres + PostgREST nodig,
+//                                gegevens verdwijnen bij afsluiten)
 //   PORT=3000 npm run dev
 const http = require("http");
 const fs = require("fs");
@@ -9,7 +10,15 @@ const path = require("path");
 
 const ROOT = path.join(__dirname, "..");
 const PORT = Number(process.env.PORT) || 8888;
-process.env.WWW_DATA_DIR = process.env.WWW_DATA_DIR || path.join(ROOT, ".data");
+
+// .env inlezen (KEY=waarde per regel)
+try {
+  fs.readFileSync(path.join(ROOT, ".env"), "utf8").split(/\r?\n/).forEach((line) => {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+  });
+} catch (e) { /* geen .env */ }
+
 if (!process.env.ADMIN_PASSWORD) {
   process.env.ADMIN_PASSWORD = "admin";
   console.log('Let op: lokaal admin-wachtwoord is "admin". Stel ADMIN_PASSWORD in om dit te wijzigen.');
@@ -19,7 +28,7 @@ const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": 
   ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".json": "application/json" };
 const forms = [];
 
-http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
   const url = new URL(req.url, "http://localhost");
   const chunks = [];
   req.on("data", (c) => chunks.push(c));
@@ -47,7 +56,7 @@ http.createServer((req, res) => {
       res.writeHead(200); return res.end("ok");
     }
     let file = path.join(ROOT, decodeURIComponent(url.pathname));
-    if (!file.startsWith(ROOT) || /[\\/]\.(data|git)|node_modules|netlify[\\/]/.test(file)) { res.writeHead(404); return res.end(); }
+    if (!file.startsWith(ROOT) || /[\\/]\.(data|git|env)|node_modules|netlify[\\/]|supabase[\\/]|tests[\\/]/.test(file)) { res.writeHead(404); return res.end(); }
     if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, "index.html");
     fs.readFile(file, (err, data) => {
       if (err) { res.writeHead(404); return res.end("Niet gevonden"); }
@@ -55,4 +64,21 @@ http.createServer((req, res) => {
       res.end(data);
     });
   });
-}).listen(PORT, () => console.log("WorldWideWine.nl draait op http://localhost:" + PORT + "  (admin: /admin/)"));
+});
+
+(async () => {
+  if (process.env.WWW_LOCAL_DB) {
+    const local = require("../tests/helpers/local-supabase");
+    const missing = local.available();
+    if (missing) { console.error("Lokale database niet mogelijk: " + missing); process.exit(1); }
+    const stack = await local.start();
+    process.env.SUPABASE_URL = stack.url;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = stack.serviceKey;
+    console.log("Tijdelijke lokale database gestart.");
+    const stop = () => stack.stop().then(() => process.exit(0));
+    process.on("SIGINT", stop); process.on("SIGTERM", stop);
+  } else if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.log("Let op: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY ontbreken. Zet ze in .env (zie .env.example) of gebruik WWW_LOCAL_DB=1.");
+  }
+  server.listen(PORT, () => console.log("WorldWideWine.nl draait op http://localhost:" + PORT + "  (admin: /admin/)"));
+})();

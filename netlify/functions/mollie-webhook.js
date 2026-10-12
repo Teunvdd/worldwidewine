@@ -1,10 +1,8 @@
 // POST /api/mollie-webhook — Mollie meldt hier een gewijzigde betaalstatus.
-const { connect } = require("../lib/store");
 const shop = require("../lib/shop");
 const mollie = require("../lib/mollie");
 
 exports.handler = async (event) => {
-  connect(event);
   if (event.httpMethod !== "POST") return { statusCode: 405, body: "" };
   const raw = event.isBase64Encoded ? Buffer.from(event.body || "", "base64").toString() : event.body || "";
   const id = new URLSearchParams(raw).get("id") || "";

@@ -1,17 +1,28 @@
-// Tests voor de serverlogica: npm test
+// Tests voor de serverlogica tegen een echte (lokale) Supabase-opzet: npm test
+// Zie tests/helpers/local-supabase.js voor wat er nodig is.
 const test = require("node:test");
 const assert = require("node:assert");
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
+const local = require("./helpers/local-supabase");
 
-process.env.WWW_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "www-test-"));
-process.env.ADMIN_PASSWORD = "geheim";
-const shop = require("../netlify/lib/shop");
-const auth = require("../netlify/lib/auth");
-const admin = require("../netlify/functions/admin");
-const orders = require("../netlify/functions/orders");
-const products = require("../netlify/functions/products");
+const missing = local.available();
+if (missing) {
+  test("databasetests", { skip: missing + " — zie tests/helpers/local-supabase.js" }, () => {});
+  return;
+}
+
+let stack, shop, auth, admin, orders, products;
+test.before(async () => {
+  stack = await local.start();
+  process.env.SUPABASE_URL = stack.url;
+  process.env.SUPABASE_SERVICE_ROLE_KEY = stack.serviceKey;
+  process.env.ADMIN_PASSWORD = "geheim";
+  shop = require("../netlify/lib/shop");
+  auth = require("../netlify/lib/auth");
+  admin = require("../netlify/functions/admin");
+  orders = require("../netlify/functions/orders");
+  products = require("../netlify/functions/products");
+});
+test.after(async () => { if (stack) await stack.stop(); });
 
 const customer = { name: "Test Klant", email: "Test@Example.com", phone: "0612345678", address: "Dorpsstraat 1", postcode: "1234 AB", city: "Utrecht" };
 let seq = 0;
@@ -140,6 +151,7 @@ test("online betalen via Mollie: betaling starten en webhook verwerken", async (
   const realFetch = global.fetch;
   const calls = [];
   global.fetch = async (url, opts) => {
+    if (String(url).indexOf("https://api.mollie.com/") !== 0) return realFetch(url, opts); // database
     calls.push({ url: String(url), opts });
     if (opts && opts.method === "POST") {
       return new Response(JSON.stringify({ id: "tr_abc", _links: { checkout: { href: "https://mollie.test/pay" } } }), { status: 201 });
@@ -164,4 +176,52 @@ test("online betalen via Mollie: betaling starten en webhook verwerken", async (
   const order = await shop.getOrder(number);
   assert.strictEqual(order.paymentStatus, "betaald");
   assert.strictEqual(order.status, "betaald");
+});
+
+test("publieke sleutel (anon) kan niets lezen of wijzigen", async () => {
+  const { createClient } = require("@supabase/supabase-js");
+  const anon = createClient(stack.url, stack.anonKey, { auth: { persistSession: false } });
+  for (const table of ["products", "customers", "orders", "order_lines", "stock_movements"]) {
+    const { data, error } = await anon.from(table).select("*").limit(1);
+    assert.ok(error || (data && data.length === 0), table + " is leesbaar met de anon-sleutel");
+    assert.ok(error, table + " zou een permissiefout moeten geven");
+  }
+  const rpc = await anon.rpc("www_adjust_stock", { p_changes: [{ id: "wiston-estate-brut", set: 999 }], p_reason: "hack", p_ref: null, p_strict: false });
+  assert.ok(rpc.error, "anon mag geen voorraad wijzigen");
+  const ins = await anon.from("orders").insert({ number: "X" });
+  assert.ok(ins.error);
+});
+
+test("gelijktijdige verkopen: geen dubbele bonnummers en nooit te veel verkocht", async () => {
+  await shop.changeStock([{ id: "domaine-daridan-cheverny-blanc", set: 20 }, { id: "domaine-de-la-begude-bandol-blanc", set: 5 }], "Geteld");
+  // 10 kassaverkopen tegelijk
+  const sales = await Promise.all(Array.from({ length: 10 }, () =>
+    shop.createPosSale({ items: [{ id: "domaine-daridan-cheverny-blanc", qty: 1 }], payment: "pin" })));
+  assert.strictEqual(new Set(sales.map((s) => s.order.number)).size, 10, "unieke bonnummers");
+  // 10 webshopbestellingen tegelijk voor een product waarvan er 5 zijn
+  const results = await Promise.allSettled(Array.from({ length: 10 }, () =>
+    shop.createWebOrder({ orderNumber: nr(), items: [{ id: "domaine-de-la-begude-bandol-blanc", qty: 1 }, { id: "domaine-daridan-cheverny-blanc", qty: 1 }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer })));
+  const ok = results.filter((r) => r.status === "fulfilled").length;
+  assert.strictEqual(ok, 5, "precies 5 bestellingen mogen slagen");
+  results.filter((r) => r.status === "rejected").forEach((r) => assert.match(r.reason.message, /nog maar 0 op voorraad|uitverkocht/));
+  const list = await shop.getProducts();
+  assert.strictEqual(list.find((p) => p.id === "domaine-de-la-begude-bandol-blanc").stock, 0);
+  assert.strictEqual(list.find((p) => p.id === "domaine-daridan-cheverny-blanc").stock, 20 - 10 - 5);
+});
+
+test("mislukte bestelling laat geen halve gegevens achter", async () => {
+  const number = nr();
+  await shop.createWebOrder({ orderNumber: number, items: [{ id: "domaine-daridan-cheverny-blanc", qty: 1 }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer });
+  const before = (await shop.getProducts()).find((p) => p.id === "domaine-daridan-cheverny-blanc").stock;
+  // Zelfde ordernummer nog eens: moet geweigerd worden, en de voorraad mag niet veranderen
+  await assert.rejects(shop.createWebOrder({ orderNumber: number, items: [{ id: "domaine-daridan-cheverny-blanc", qty: 1 }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer }), /bestaat al/);
+  assert.strictEqual((await shop.getProducts()).find((p) => p.id === "domaine-daridan-cheverny-blanc").stock, before);
+});
+
+test("product bewerken: velden leegmaken werkt", async () => {
+  await shop.saveProduct({ originalId: "rainoldi-zapel-bianco", oldPrice: "", tags: [] });
+  const p = (await shop.getProducts()).find((x) => x.id === "rainoldi-zapel-bianco");
+  assert.strictEqual(p.oldPrice, undefined);
+  assert.deepStrictEqual(p.tags, []);
+  assert.strictEqual(p.price, 11.9);
 });

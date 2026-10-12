@@ -1,5 +1,4 @@
 // /api/admin/* — alles voor de admin-omgeving en de kassa. Alleen na inloggen.
-const { connect } = require("../lib/store");
 const { json, parseBody, HttpError } = require("../lib/http");
 const auth = require("../lib/auth");
 const shop = require("../lib/shop");
@@ -119,7 +118,6 @@ async function handle(event) {
 }
 
 exports.handler = async (event) => {
-  connect(event);
   try {
     return await handle(event);
   } catch (e) {

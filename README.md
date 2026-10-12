@@ -4,7 +4,7 @@ Website, webshop, admin-omgeving en kassa (POS) voor WorldWideWine.nl, wijnimpor
 
 De webshop en de kassa werken met **dezelfde producten, prijzen, voorraad en klanten**. Een verkoop in de winkel verlaagt de voorraad in de webshop, en een webshop-bestelling verschijnt meteen in de admin.
 
-Alles draait op Netlify: statische pagina's plus serverfuncties, met Netlify Blobs als database. Er is geen eigen server of los database-abonnement nodig. Online betalen loopt via Mollie.
+De website en de serverfuncties draaien op **Netlify**. De gegevens staan in een **Supabase**-database (Postgres). Online betalen loopt via **Mollie**. Alle drie hebben een gratis instap: Netlify en Supabase hebben een gratis abonnement, en bij Mollie betaal je alleen per transactie.
 
 ## Onderdelen
 
@@ -43,22 +43,37 @@ Alles draait op Netlify: statische pagina's plus serverfuncties, met Netlify Blo
 
 ## Hoe de koppeling werkt
 
-Alle onderdelen werken met één database (Netlify Blobs) met daarin producten, voorraad, bestellingen en klanten:
+Alle onderdelen werken met één Supabase-database. Die heeft tabellen voor `products`, `customers`, `orders`, `order_lines` en `stock_movements`.
 
 - De **webshop** leest het assortiment via `/api/products` en plaatst bestellingen via `/api/orders`.
 - De **admin en kassa** werken via `/api/admin/*`. Dat kan alleen na inloggen.
 - **Mollie** meldt betalingen via `/api/mollie-webhook`.
 
-
 - **Prijzen en voorraad worden op de server gecontroleerd.** Een klant kan in de browser geen prijs aanpassen, en de webshop verkoopt niet meer dan er is.
-- Als de webshop en de kassa tegelijk dezelfde voorraad wijzigen, gaat er niets verloren. Dat wordt gecontroleerd met een versiecode (getest met 10 gelijktijdige verkopen).
+- **Voorraad en bestellingen worden in één databasetransactie verwerkt** (functies in `supabase/migrations`). Als de webshop en de kassa tegelijk verkopen, gaat er niets mis. Getest met 10 gelijktijdige bestellingen voor 5 flessen: er slagen er precies 5.
+- **Beveiliging:** alleen de serverfuncties op Netlify kunnen bij de database, met de geheime sleutel. Row Level Security staat aan, en de publieke sleutels van Supabase (anon/publishable) geven geen toegang.
 - Bij de eerste start wordt de database gevuld met het assortiment uit `data/products.js`. Daarna beheer je alles in de admin.
 - Zonder server, bijvoorbeeld als je `index.html` lokaal opent, valt de webshop terug op `data/products.js`. Bestellingen gaan dan per e-mail.
 
-## Online zetten (Netlify)
+## Online zetten
+
+### 1. Database (Supabase)
+
+1. Maak een gratis account op [supabase.com](https://supabase.com) en een nieuw project. Kies als regio **EU (Frankfurt of Amsterdam)**, in verband met de AVG.
+2. Ga naar **SQL Editor**, plak de inhoud van `supabase/migrations/20261012000000_init.sql` en klik **Run**. Dat maakt de tabellen, functies en rechten aan.
+3. Noteer bij **Project Settings → API (Data API / API Keys)**:
+   - de **Project URL**, bijvoorbeeld `https://abcdefgh.supabase.co`;
+   - de **secret key** (`sb_secret_…`) of de oude **service_role**-sleutel. Deel deze sleutel nooit en zet hem niet in de website zelf.
+4. **Back-ups en abonnement:** controleer bij Supabase welke back-ups bij je abonnement horen. Voor een winkel raad ik het Pro-abonnement met dagelijkse back-ups aan. Gratis projecten worden bovendien gepauzeerd na een periode zonder activiteit. Met *Bestellingen → Exporteren* kun je ook zelf regelmatig een kopie maken.
+
+Bij het eerste bezoek wordt de database automatisch gevuld met het startassortiment uit `data/products.js`. Je kunt producten daarna ook in Supabase zelf bekijken onder **Table Editor**, maar wijzig ze bij voorkeur in de admin.
+
+### 2. Website (Netlify)
 
 1. Maak een account op [netlify.com](https://www.netlify.com) en kies **Add new site → Import from GitHub**. Kies deze repository. Een build-commando is niet nodig; `netlify.toml` regelt de rest.
-2. **Admin-wachtwoord instellen (verplicht voor de admin):** ga naar *Site configuration → Environment variables* en voeg toe:
+2. **Instellingen (verplicht):** ga naar *Site configuration → Environment variables* en voeg toe:
+   - `SUPABASE_URL`: de Project URL uit stap 1.
+   - `SUPABASE_SERVICE_ROLE_KEY`: de secret key uit stap 1.
    - `ADMIN_PASSWORD`: een sterk wachtwoord, bijvoorbeeld een zin van minstens 4 woorden.
    - `ADMIN_SECRET` (optioneel): een lange willekeurige tekst. Als je die verandert, wordt iedereen uitgelogd.
 
@@ -79,15 +94,23 @@ Alle onderdelen werken met één database (Netlify Blobs) met daarin producten, 
 
 ## Lokaal draaien en testen
 
-Vereist Node.js 18 of nieuwer.
+Vereist Node.js 22 of nieuwer.
 
 ```bash
 npm install
-npm run dev     # http://localhost:8888 — admin op /admin/ met wachtwoord "admin"
-npm test        # tests voor voorraad, bestellingen, kassa, inloggen en Mollie
+cp .env.example .env   # en vul SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY en ADMIN_PASSWORD in
+npm run dev            # http://localhost:8888 — admin op /admin/
+npm test               # tests voor voorraad, bestellingen, kassa, beveiliging en Mollie
 ```
 
-Lokaal worden de gegevens opgeslagen in de map `.data/` (staat niet in git).
+Gebruik voor het testen bij voorkeur een **apart Supabase-project**, niet de echte winkeldatabase.
+
+**Zonder Supabase-account** kan het ook, als Postgres en [PostgREST](https://postgrest.org) op je computer staan:
+- `npm test` start dan zelf een tijdelijke database die is opgezet zoals Supabase (zelfde rollen en sleutels).
+- `WWW_LOCAL_DB=1 npm run dev` doet hetzelfde voor de lokale testserver.
+- Zie `tests/helpers/local-supabase.js` voor de instellingen (`WWW_TEST_PG`, `POSTGREST_BIN`). Zonder deze programma's worden de databasetests overgeslagen.
+
+**Later iets aan de database veranderen?** Voeg een nieuw bestand toe in `supabase/migrations/` en voer het uit in de SQL Editor. Herhaal daarin voor nieuwe tabellen de `revoke … from anon, authenticated` en `enable row level security`. Supabase geeft nieuwe tabellen namelijk standaard publieke rechten.
 
 ## Bestanden
 
@@ -97,9 +120,11 @@ Lokaal worden de gegevens opgeslagen in de map `.data/` (staat niet in git).
 | `data/config.js` | Verzendkosten, afhaallocaties, contactgegevens |
 | `data/order.js` | Berekening van bestelling, korting, verzending en btw. Gedeeld door webshop, kassa en server |
 | `netlify/functions/` | Serverfuncties: `products`, `orders`, `payment-status`, `mollie-webhook`, `admin` |
-| `netlify/lib/` | Opslag, inloggen, Mollie, bedrijfslogica |
+| `netlify/lib/` | Databaseverbinding (`db.js`), inloggen, Mollie, bedrijfslogica (`shop.js`) |
+| `supabase/migrations/` | Databaseschema: tabellen, transactiefuncties en rechten |
 | `admin/` | Admin-omgeving en kassa |
-| `tests/` | Automatische tests |
+| `tests/` | Automatische tests (plus `helpers/local-supabase.js`) |
+| `.env.example` | Voorbeeld van de instellingen voor lokaal gebruik |
 
 ## Graag controleren voordat de site live gaat
 

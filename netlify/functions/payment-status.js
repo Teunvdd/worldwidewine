@@ -1,11 +1,9 @@
 // GET /api/payment-status?order=WWW-... — betaalstatus voor de bedankpagina.
-const { connect } = require("../lib/store");
 const { json } = require("../lib/http");
 const shop = require("../lib/shop");
 const mollie = require("../lib/mollie");
 
 exports.handler = async (event) => {
-  connect(event);
   const number = String((event.queryStringParameters || {}).order || "");
   if (!/^WWW-\d{6}-[A-Z0-9]{4}$/.test(number)) return json(400, { error: "Ongeldig ordernummer." });
   try {
