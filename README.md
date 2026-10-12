@@ -126,7 +126,7 @@ Een product kan naast per fles ook per doos te koop zijn. Dat stel je per produc
 - **Flessen per doos**: bijvoorbeeld 6 of 12.
 - **Prijs per doos**: laat je dit leeg, dan kost een doos de flesprijs × het aantal. Vul je een bedrag in, dan geldt die prijs (bijvoorbeeld met doosvoordeel).
 - De voorraad blijft in losse flessen. Een verkochte doos boekt het aantal flessen in de doos af; annuleren zet ze terug.
-- **Webshop:** onder de knop *In winkelwagen* staat een knop *Doos van 6* met de doosprijs en de prijs per fles. In de winkelwagen staat de doos als eigen regel. Is er niet genoeg voorraad voor een hele doos, dan is de knop uitgeschakeld.
+- **Webshop:** de knop *In winkelwagen* krijgt rechts een doosje met een pijltje. Daarmee open je een keuzemenu: **Per fles** of **Per doos van 6**, met de doosprijs, de prijs per fles en het voordeel. In de winkelwagen staat de doos als eigen regel. Is er niet genoeg voorraad voor een hele doos, dan is die keuze uitgeschakeld.
 - **Kassa:** een product dat per doos te koop is, heeft een doos-label op de kaart. Tik je erop, dan kies je **Fles** of **Doos**. Een gescande barcode voegt altijd een fles toe.
 - Bij een bestaande database: voer na deze update **`supabase/setup.sql`** nog één keer uit in Supabase → SQL Editor (of alleen `supabase/migrations/20261016000000_per_doos.sql`).
 

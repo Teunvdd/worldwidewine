@@ -135,27 +135,45 @@
     return out.length ? '<div class="badges">' + out.join("") + "</div>" : "";
   }
 
+  var BOX_ICON = '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></svg>';
+  var BOTTLE_ICON = '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2h4v4l1.5 3v12a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V9L10 6z"/><path d="M8.5 13h7"/></svg>';
+  var CHEVRON = '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+
+  // Winkelwagenknop. Is het product ook per doos te koop, dan krijgt de knop een tweede deel
+  // (doosje + pijltje) dat een keuzemenu opent: per fles of per doos.
   function buyButton(p, cls) {
+    cls = cls || "";
     if (p.price == null) {
-      return '<a class="btn ' + (cls || "") + '" href="mailto:' + esc(CONFIG.email) + "?subject=" +
+      return '<a class="btn ' + cls + '" href="mailto:' + esc(CONFIG.email) + "?subject=" +
         encodeURIComponent("Offerte: " + p.producer + " " + p.name) + '">Offerte aanvragen</a>';
     }
-    if (soldOut(p)) return '<button class="btn ' + (cls || "") + '" disabled>Uitverkocht</button>';
-    return '<button class="btn ' + (cls || "") + '" data-add="' + esc(p.id) + '">In winkelwagen</button>';
-  }
-
-  // Knop "per doos" onder de gewone knop (alleen als het product per doos te koop is).
-  var BOX_ICON = '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></svg>';
-  function caseButton(p, big) {
+    if (soldOut(p)) return '<button class="btn ' + cls + '" disabled>Uitverkocht</button>';
+    var main = '<button class="btn ' + cls + ' buy-main" data-add="' + esc(p.id) + '">In winkelwagen</button>';
     var n = caseSize(p), price = casePrice(p);
-    if (!n || price == null || p.price == null) return "";
+    if (!n || price == null) return main;
     var perBottle = price / n;
     var save = p.price > perBottle + 0.004 ? Math.round((1 - perBottle / p.price) * 100) : 0;
     var off = caseSoldOut(p);
-    return '<button class="case-btn' + (big ? " case-btn-lg" : "") + '" data-add-box="' + esc(p.id) + '"' + (off ? " disabled" : "") + '>' +
-      '<span class="case-ic">' + BOX_ICON + "</span>" +
-      '<span class="case-txt"><strong>Doos van ' + n + "</strong><small>" + (off ? "Niet leverbaar" : euro(perBottle) + "/fles" + (save && big ? " · " + save + "% voordeel" : "")) + "</small></span>" +
-      '<span class="case-price">' + euro(price) + "</span></button>";
+    return '<div class="buy-split">' + main +
+      '<button class="btn ' + cls + ' buy-more" data-buy-menu aria-haspopup="true" aria-expanded="false" aria-label="Kies per fles of per doos" title="Ook per doos te koop">' +
+        BOX_ICON + CHEVRON + "</button>" +
+      '<div class="buy-menu" role="menu" hidden>' +
+        '<button class="buy-opt" role="menuitem" data-add="' + esc(p.id) + '"><span class="buy-ic">' + BOTTLE_ICON + "</span>" +
+          '<span class="buy-txt"><strong>Per fles</strong><small>' + esc(p.size || "1 fles") + "</small></span>" +
+          '<span class="buy-price">' + euro(p.price) + "</span></button>" +
+        '<button class="buy-opt buy-opt-box" role="menuitem" data-add-box="' + esc(p.id) + '"' + (off ? " disabled" : "") + '><span class="buy-ic">' + BOX_ICON + "</span>" +
+          '<span class="buy-txt"><strong>Per doos van ' + n + "</strong><small>" + (off ? "Niet genoeg op voorraad" : euro(perBottle) + " per fles" + (save ? " · " + save + "% voordeel" : "")) + "</small></span>" +
+          '<span class="buy-price">' + euro(price) + "</span></button>" +
+      "</div></div>";
+  }
+
+  function closeBuyMenus(except) {
+    document.querySelectorAll(".buy-split.open").forEach(function (el) {
+      if (el === except) return;
+      el.classList.remove("open");
+      el.querySelector(".buy-menu").hidden = true;
+      el.querySelector(".buy-more").setAttribute("aria-expanded", "false");
+    });
   }
 
   function card(p) {
@@ -169,7 +187,6 @@
         '<div class="product-foot"><div class="product-price">' + priceHtml(p) +
           '<small>' + esc(p.unit === "fles" ? p.size : p.unit) + "</small></div>" +
           buyButton(p, "btn-small") + "</div>" +
-        caseButton(p) +
       "</div></article>";
   }
 
@@ -256,6 +273,26 @@
 
   // ---- Events ----
   document.addEventListener("click", function (e) {
+    var menuBtn = e.target.closest("[data-buy-menu]");
+    closeBuyMenus(menuBtn && menuBtn.parentNode);
+    if (menuBtn) {
+      e.preventDefault();
+      var split = menuBtn.parentNode, open = !split.classList.contains("open");
+      split.classList.toggle("open", open);
+      var menu = split.querySelector(".buy-menu");
+      menu.hidden = !open;
+      menuBtn.setAttribute("aria-expanded", String(open));
+      // Te weinig ruimte onder de knop? Dan klapt het menu naar boven uit. Valt het links buiten
+      // het scherm (smalle telefoon), dan schuift het naar rechts.
+      split.classList.remove("up");
+      menu.style.right = "";
+      if (open) {
+        var r = menu.getBoundingClientRect();
+        if (r.bottom > window.innerHeight - 8) split.classList.add("up");
+        if (r.left < 8) menu.style.right = (r.left - 8) + "px";
+      }
+      return;
+    }
     var t = e.target.closest("[data-add],[data-add-box],[data-cart-open],[data-cart-close],[data-qty],[data-remove]");
     if (!t) return;
     if (t.hasAttribute("data-add")) { e.preventDefault(); Cart.add(t.getAttribute("data-add"), 1); }
@@ -270,6 +307,7 @@
     else if (t.hasAttribute("data-remove")) Cart.set(t.getAttribute("data-remove"), 0);
   });
   document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && document.querySelector(".buy-split.open")) { e.stopImmediatePropagation(); closeBuyMenus(); return; }
     if (e.key === "Escape" && drawer && !drawer.hidden) close();
   });
   window.addEventListener("storage", function (e) { if (e.key === KEY) render(); });
@@ -280,6 +318,6 @@
   window.WWW = {
     Cart: Cart, PRODUCTS: PRODUCTS, CONFIG: CONFIG, TYPES: TYPES, byId: byId, ready: ready, state: state, soldOut: soldOut,
     euro: euro, esc: esc, art: art, card: card, priceHtml: priceHtml, badges: badges, buyButton: buyButton,
-    caseButton: caseButton, caseSize: caseSize, casePrice: casePrice, BOX_ICON: BOX_ICON
+    caseSize: caseSize, casePrice: casePrice, BOX_ICON: BOX_ICON
   };
 })();
