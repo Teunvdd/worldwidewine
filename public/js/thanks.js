@@ -35,6 +35,7 @@
   setSteps(steps[saved.payment] || steps.betaalverzoek);
 
   if (saved.payment === "online") {
+    $("next-steps").innerHTML = "<div class='loading'><span class='spinner'></span>Betaling controleren…</div>";
     fetch("/api/payment-status?order=" + encodeURIComponent(saved.number))
       .then(function (r) { return r.json(); })
       .then(function (s) {

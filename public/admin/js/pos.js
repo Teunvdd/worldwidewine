@@ -11,6 +11,10 @@
     trash: svg("<path d='M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3'/>"),
     tag: svg("<path d='M3 12V4h8l10 10-8 8z'/><circle cx='7.5' cy='8.5' r='1.3'/>"),
     keypad: svg("<path d='M5 5h2M11 5h2M17 5h2M5 11h2M11 11h2M17 11h2M5 17h2M11 17h2M17 17h2' stroke-width='3.4'/>"),
+    gear: svg("<circle cx='12' cy='12' r='3'/><path d='M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z'/>"),
+    expand: svg("<path d='M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'/>"),
+    lock: svg("<rect x='5' y='11' width='14' height='10' rx='2'/><path d='M8 11V7a4 4 0 0 1 8 0v4'/>"),
+    back: svg("<path d='M15 5l-7 7 7 7'/>"),
     user: svg("<circle cx='12' cy='8' r='4'/><path d='M4 21c1-4.5 4.5-6.5 8-6.5s7 2 8 6.5'/>")
   };
   var METHODS = [
@@ -186,14 +190,18 @@
       el.innerHTML =
         "<div class='pos2'>" +
           "<header class='pos-top'>" +
+            "<div class='pos-menu'>" +
+              "<button class='top-btn pos-gear' data-act='menu' aria-label='Instellingen' aria-haspopup='true' aria-expanded='false'>" + ICON.gear + "</button>" +
+              "<div class='pos-menu-list' id='pos-menu' hidden>" +
+                "<button data-act='fullscreen'>" + ICON.expand + "Volledig scherm</button>" +
+                "<button data-act='settings'>" + ICON.gear + "Kassa-instellingen</button>" +
+                "<button data-act='close-session'>" + ICON.lock + "Kassa sluiten</button>" +
+                "<button data-act='exit'>" + ICON.back + "Terug naar de admin</button>" +
+              "</div>" +
+            "</div>" +
             "<img src='/assets/logo-light.png' alt='worldwidewine.nl' class='pos-logo'>" +
             "<div class='pos-search'><input type='search' id='pos-q' placeholder='Zoek product of scan barcode…' autocomplete='off'></div>" +
             "<div class='pos-session' id='pos-session'></div>" +
-            "<div class='pos-top-actions'>" +
-              "<button class='top-btn' data-act='fullscreen' title='Volledig scherm (F11)'>⛶</button>" +
-              "<button class='top-btn' data-act='close-session'>Kassa sluiten</button>" +
-              "<button class='top-btn' data-act='exit'>← Admin</button>" +
-            "</div>" +
           "</header>" +
           "<div class='pos-screen' id='pos-screen'></div>" +
         "</div>";
@@ -203,13 +211,21 @@
       root.querySelector("#pos-q").addEventListener("keydown", onSearchKey);
       keyHandler = onKey;
       document.addEventListener("keydown", keyHandler);
-      fsHandler = function () { var b = root.querySelector("[data-act=fullscreen]"); if (b) b.classList.toggle("active", A.isFullscreen()); };
+      fsHandler = function () { var b = root.querySelector("[data-act=fullscreen]"); if (b) b.innerHTML = ICON.expand + (A.isFullscreen() ? "Volledig scherm uit" : "Volledig scherm"); };
       document.addEventListener("fullscreenchange", fsHandler);
       fsHandler();
       draw();
       // Zonder kastelling opent de kassa direct.
       if (!S.session && S.settings.cashControl === false) autoOpen();
     });
+  }
+
+  function toggleMenu(open) {
+    var menu = root.querySelector("#pos-menu");
+    if (open === undefined) open = menu.hidden;
+    menu.hidden = !open;
+    root.querySelector("[data-act=menu]").setAttribute("aria-expanded", String(open));
+    root.querySelector("[data-act=menu]").classList.toggle("active", open);
   }
 
   function leavePos() {
@@ -766,6 +782,8 @@
 
   function onClick(ev) {
     // Tik buiten het toetsenblok: toetsenblok dicht.
+    var menu = root.querySelector("#pos-menu");
+    if (!menu.hidden && !ev.target.closest("[data-act=menu]")) toggleMenu(false);
     if (S.pad && S.pad.open && !ev.target.closest(".po-numpad, .po-line, .np-mode")) closePad();
     if (S.screen === "payment" && S.pay.pad && !ev.target.closest(".pt-row")) { S.pay.pad = false; S.pay.buffer = ""; drawPayment(); }
     var t = ev.target.closest("[data-act],[data-key],[data-add],[data-line],[data-type],[data-method],[data-pline],[data-pdel]");
@@ -786,6 +804,12 @@
       return;
     }
     switch (t.dataset.act) {
+      case "menu": return toggleMenu();
+      case "settings":
+        return A.askPin(S.settings, "exitPos", "").then(function (pin) {
+          if (pin === null) return;
+          A.exitFullscreen(); location.hash = "#kassa-instellingen";
+        });
       case "fullscreen": return A.isFullscreen() ? A.exitFullscreen() : A.enterFullscreen();
       case "exit":
         return A.askPin(S.settings, "exitPos", "").then(function (pin) {
@@ -873,6 +897,7 @@
     if (ev.key === "Backspace") { ev.preventDefault(); return padKey("back"); }
     if (ev.key === "," || ev.key === ".") { ev.preventDefault(); return padKey(","); }
     if (ev.key === "Delete") { ev.preventDefault(); return padKey("C"); }
+    if (ev.key === "Escape" && !root.querySelector("#pos-menu").hidden) return toggleMenu(false);
     if (ev.key === "Escape" && S.pad.open) return closePad();
     if (ev.key === "Escape" && S.screen === "payment" && S.pay.pad) { S.pay.pad = false; S.pay.buffer = ""; return drawPayment(); }
     if (ev.key === "Escape" && S.screen === "payment") { S.screen = "products"; return draw(); }
