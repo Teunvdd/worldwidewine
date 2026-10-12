@@ -56,8 +56,16 @@
             <p class="field-wide area-check" id="area-check" hidden></p>
           </div>
           <div class="fields" id="pickup-fields" hidden>
-            <label class="field">Dag van afhalen<select name="afhaaldag" data-pickup></select></label>
-            <label class="field">Tijd<select name="afhaaltijd" data-pickup></select></label>
+            <div class="field-wide pick" id="pick">
+              <p class="pick-title">Wanneer kom je je bestelling ophalen?</p>
+              <div class="pick-grid">
+                <div class="cal" id="pick-cal" aria-label="Kies een dag"></div>
+                <div class="slots" id="pick-slots" aria-live="polite"></div>
+              </div>
+              <p class="pick-summary" id="pick-summary" hidden></p>
+              <input type="hidden" name="afhaaldag">
+              <input type="hidden" name="afhaaltijd">
+            </div>
             <p class="field-wide pickup-note">We staan op het gekozen tijdstip voor je klaar in de winkel. Je krijgt een bevestiging per e-mail.</p>
           </div>
           <label class="field field-wide"><span>Opmerkingen <span class="optional">(optioneel)</span></span>
