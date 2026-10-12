@@ -38,6 +38,7 @@ De website en de serverfuncties draaien op **Vercel**. De gegevens staan in een 
 - **Klanten:** webshopklanten worden automatisch aangemaakt op basis van hun e-mailadres. Winkelklanten voeg je zelf toe.
   - Per klant: contactgegevens, notities, toestemming voor de nieuwsbrief en de bestelgeschiedenis.
   - Een klant verwijderen kan op verzoek (AVG). Bestellingen blijven bewaard voor de administratie.
+- **Winkel** (uitklapmenu): openingstijden, bezorgtijden en bezorggebied. Zie "Winkel: openingstijden en bezorging" hieronder.
 
 ## Hoe de koppeling werkt
 
@@ -185,11 +186,17 @@ In de admin onder **Producten** staan de knoppen **Exporteren** en **Importeren*
 
 ### Afrekenen: afhalen en bezorgen
 Bij het afrekenen kiest de klant:
-- **Afhalen in de winkel** (Westzijde 358, Zaandam): de klant kiest meteen een **dag en tijd** (om het halfuur, vandaag pas vanaf twee uur na nu, tot zes weken vooruit). Het afhaalmoment staat in de bestelling, de bevestigingsmail en de admin.
-- **Bezorgen in Amsterdam en omstreken**: zodra de klant zijn postcode invult zie je of we daar zelf bezorgen. Buiten het gebied kan de bestelling niet met deze optie worden geplaatst (ook de server controleert dit).
+- **Afhalen in de winkel** (Westzijde 358, Zaandam): de klant kiest meteen een **dag en tijd** binnen de openingstijden (om het halfuur, vandaag pas vanaf twee uur na nu, tot zes weken vooruit). Het afhaalmoment staat in de bestelling, de bevestigingsmail en de admin.
+- **Bezorgen in Amsterdam en omstreken**: zodra de klant zijn postcode invult zie je of we daar zelf bezorgen. Buiten het gebied kan de bestelling niet met deze optie worden geplaatst (ook de server controleert dit). De klant kiest een **bezorgdag en tijdvak**; dat bezorgmoment staat in de bestelling, de mails en de admin.
 - **Verzenden met PostNL** door heel Nederland, tot 18 flessen.
 
-Dagen, tijden en postcodes stel je in in `public/data/config.js` (zie de opmerkingen in dat bestand).
+### Winkel: openingstijden en bezorging
+In de admin onder **Winkel**:
+- **Openingstijden:** een standaardweek, plus per week aan te passen (vakantie, feestdagen, een week met andere tijden). Blader met de pijltjes naar een week, pas de dagen aan en klik **Week opslaan**; alleen de dagen die afwijken van de standaardweek worden onthouden. Met **Kopieer naar volgende week** neem je een afwijkende week over, met **Terug naar standaardweek** maak je hem ongedaan. Per dag: *Open*, *Op afspraak* of *Dicht*. De website (homepage, contact) toont de tijden van de huidige week; afhalen kan op dagen die open zijn of op afspraak.
+- **Bezorgtijden:** per dag één of meer tijdvakken, ook per week aan te passen, en hoe snel na bestellen (bijv. vanaf de volgende dag) en hoe ver vooruit een klant kan kiezen.
+- **Bezorggebied:** de postcodegebieden (eerste vier cijfers, van – tot en met) waar we zelf bezorgen, de bezorgkosten en vanaf welk bedrag bezorgen gratis is. Met **Postcode controleren** test je direct een adres.
+
+Deze instellingen staan in de database (tabel `settings`, sleutel `shop`); er is geen extra databasewijziging nodig. Zolang er niets is opgeslagen gelden de standaardwaarden uit `public/data/config.js`.
 
 ### Nieuws
 Op de website staat een pagina **Nieuws** (`nieuws.html`, ook in het menu en de footer). Berichten plaats je in de admin onder **Nieuws**.
@@ -231,10 +238,10 @@ Gebruik voor het testen bij voorkeur een **apart Supabase-project**, niet de ech
 |---|---|
 | `public/` | De website zelf (alles wat Vercel publiceert) |
 | `public/data/products.js` | Startassortiment (en reserve als de server niet bereikbaar is) |
-| `public/data/config.js` | Bezorgwijzen en kosten, postcodes voor eigen bezorging, afhaaldagen en -tijden, contactgegevens |
+| `public/data/config.js` | Bezorgwijzen, contactgegevens en de standaardwaarden voor openingstijden, bezorgtijden en bezorggebied (aan te passen in de admin onder Winkel) |
 | `public/data/order.js` | Berekening van bestelling, korting, verzending en btw. Gedeeld door webshop, kassa en server |
 | `public/admin/` | Admin-omgeving en kassa |
-| `api/` | Vercel-serverfuncties: `products`, `orders`, `payment-status`, `mollie-webhook`, `admin` |
+| `api/` | Vercel-serverfuncties: `products`, `orders`, `payment-status`, `mollie-webhook`, `news`, `shop-info`, `admin` |
 | `lib/` | Serverlogica: database (`db.js`), bedrijfslogica (`shop.js`), inloggen, Mollie, e-mail, foto's; `lib/handlers/` bevat de functies, `lib/vercel.js` koppelt ze aan Vercel |
 | `vercel.json` | Vercel-instellingen: publicatiemap, doorverwijzing `/api/admin/*`, beveiligingsheaders |
 | `supabase/setup.sql` | Complete database-installatie (alle migraties achter elkaar) |

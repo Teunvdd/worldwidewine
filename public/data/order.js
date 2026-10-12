@@ -52,23 +52,65 @@
   }
   function toMin(hhmm) { var a = String(hhmm).split(":"); return Number(a[0]) * 60 + Number(a[1] || 0); }
   function hhmm(min) { return String(Math.floor(min / 60)).padStart(2, "0") + ":" + String(min % 60).padStart(2, "0"); }
+  function addDays(iso, n) { var a = iso.split("-").map(Number); return new Date(Date.UTC(a[0], a[1] - 1, a[2] + n)); }
+  function dayInfo(d) { return { date: d.toISOString().slice(0, 10), wd: d.getUTCDay(), label: DAYS[d.getUTCDay()] + " " + d.getUTCDate() + " " + MONTHS[d.getUTCMonth()], year: d.getUTCFullYear() }; }
+
+  // Openingstijden van één dag: { s: "open" | "afspraak" | "dicht", from, to }.
+  // Een datum in hours.dates (een afwijkende week) gaat voor de standaardweek (hours.week).
+  function dayHours(config, iso, wd) {
+    var h = (config && config.hours) || {};
+    var v = (h.dates && h.dates[iso]) || (h.week && h.week[wd]);
+    return v && v.s !== "dicht" && v.from && v.to ? v : { s: "dicht" };
+  }
+  // De zeven dagen van de week waarin iso valt (maandag t/m zondag), met openingstijden.
+  function weekHours(config, iso) {
+    var wd = addDays(iso, 0).getUTCDay(), monday = addDays(iso, -((wd + 6) % 7)).toISOString().slice(0, 10), out = [];
+    for (var i = 0; i < 7; i++) {
+      var d = dayInfo(addDays(monday, i)), h = dayHours(config, d.date, d.wd);
+      out.push(Object.assign(d, { s: h.s, from: h.from || null, to: h.to || null,
+        changed: !!(config.hours && config.hours.dates && config.hours.dates[d.date]) }));
+    }
+    return out;
+  }
+
   // Lijst met dagen waarop afgehaald kan worden: [{ date: "2026-10-16", label: "vrijdag 16 oktober", times: ["09:00", …] }]
+  // Afhalen kan op dagen dat de winkel open is of op afspraak, binnen die tijden.
   function pickupDays(config, now) {
     var p = (config && config.pickup) || {};
-    var hours = p.hours || {}, slot = p.slotMinutes || 30, closed = p.closedDates || [];
-    var t = amsterdamNow(now), start = t.date.split("-").map(Number), out = [];
+    var slot = p.slotMinutes || 30, t = amsterdamNow(now), out = [];
     for (var i = 0; i <= (p.daysAhead || 42); i++) {
-      var d = new Date(Date.UTC(start[0], start[1] - 1, start[2] + i));
-      var iso = d.toISOString().slice(0, 10), wd = d.getUTCDay(), h = hours[wd];
-      if (!h || closed.indexOf(iso) >= 0) continue;
-      var from = toMin(h[0]), to = toMin(h[1]), times = [];
+      var d = dayInfo(addDays(t.date, i)), h = dayHours(config, d.date, d.wd);
+      if (h.s === "dicht") continue;
+      var from = toMin(h.from), to = toMin(h.to), times = [];
       if (i === 0) from = Math.max(from, Math.ceil((t.minutes + (p.leadMinutes || 0)) / slot) * slot);
       for (var m = from; m + slot <= to; m += slot) times.push(hhmm(m));
-      if (times.length) out.push({ date: iso, label: DAYS[wd] + " " + d.getUTCDate() + " " + MONTHS[d.getUTCMonth()], year: d.getUTCFullYear(), times: times });
+      if (times.length) out.push({ date: d.date, label: d.label, year: d.year, times: times });
     }
     return out;
   }
   function pickupLabel(day, time) { return day.label + " " + day.year + " om " + time + " uur"; }
+
+  // ---- Bezorgmomenten (eigen bezorging in de regio) ----
+  // Tijdvakken van één dag: [["17:00", "21:00"], …]; een lege lijst = die dag niet bezorgen.
+  function deliveryWindows(config, iso, wd) {
+    var b = (config && config.deliveryTimes) || {};
+    var v = b.dates && b.dates[iso] ? b.dates[iso] : (b.week && b.week[wd]) || [];
+    return v.filter(function (w) { return w && w[0] && w[1] && toMin(w[1]) > toMin(w[0]); });
+  }
+  // [{ date, label, year, windows: ["17:00-21:00", …] }] vanaf leadDays dagen na vandaag.
+  function deliveryDays(config, now) {
+    var b = (config && config.deliveryTimes) || {};
+    var t = amsterdamNow(now), out = [];
+    for (var i = Math.max(0, b.leadDays || 0); i <= (b.daysAhead || 21); i++) {
+      var d = dayInfo(addDays(t.date, i));
+      var windows = deliveryWindows(config, d.date, d.wd)
+        .filter(function (w) { return i > 0 || toMin(w[0]) >= t.minutes + 60; }) // vandaag: minstens een uur van tevoren
+        .map(function (w) { return w[0] + "-" + w[1]; });
+      if (windows.length) out.push({ date: d.date, label: d.label, year: d.year, windows: windows });
+    }
+    return out;
+  }
+  function deliveryLabel(day, win) { var w = win.split("-"); return day.label + " " + day.year + " tussen " + w[0] + " en " + w[1] + " uur"; }
 
   function vatRate(p) {
     if (typeof p.vat === "number") return p.vat;
@@ -220,7 +262,8 @@
 
   var api = { computeOrder: computeOrder, isAvailable: isAvailable, vatRate: vatRate, round: round,
     caseSize: caseSize, casePrice: casePrice, lineKey: lineKey,
-    deliversTo: deliversTo, pickupDays: pickupDays, pickupLabel: pickupLabel };
+    deliversTo: deliversTo, postcodeNumber: postcodeNumber, dayHours: dayHours, weekHours: weekHours,
+    pickupDays: pickupDays, pickupLabel: pickupLabel, deliveryWindows: deliveryWindows, deliveryDays: deliveryDays, deliveryLabel: deliveryLabel };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.WWW_ORDER = api;
 })(this);

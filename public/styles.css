@@ -295,3 +295,9 @@ select option { color: var(--ink); background: #fff; }
 .contact-shop h3 { font-size: 1.2rem; margin-bottom: .3rem; }
 .contact-shop address { font-style: normal; }
 .contact-shop p { margin: .3rem 0 0; color: var(--muted); }
+
+/* Openingstijden van deze week (uit de admin) */
+.hours caption { caption-side: top; text-align: left; font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding-bottom: .3rem; }
+.hours tr.is-quiet td { color: var(--muted); font-weight: 500; }
+.hours tr.is-today th, .hours tr.is-today td { font-weight: 700; }
+.hours .today { display: inline-block; margin-left: .35rem; padding: .05rem .45rem; border-radius: 999px; background: var(--wine); color: #fff; font-size: .7rem; font-weight: 600; vertical-align: 1px; }

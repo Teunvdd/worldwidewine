@@ -144,7 +144,7 @@
       </div>
       <div class="wrap">
         <p class="hero-strip">
-          <span><strong>Winkel</strong> Westzijde 358, Zaandam · vrijdag 9–19 uur</span>
+          <span><strong>Winkel</strong> Westzijde 358, Zaandam · <span data-hours-short>vrijdag 9–19 uur</span></span>
           <span><strong>Bezorgen</strong> Amsterdam en omstreken</span>
           <span><strong>Verzenden</strong> heel Nederland, tot 18 flessen</span>
         </p>
@@ -193,11 +193,11 @@
           <article class="visit-card">
             <h3>Winkel Zaandam</h3>
             <address>Westzijde 358<br>1506 GK Zaandam</address>
-            <table class="hours" aria-label="Openingstijden">
+            <table class="hours" aria-label="Openingstijden" data-hours-table>
               <tr><th>Vrijdag</th><td>09:00 – 19:00</td></tr>
               <tr><th>Overige dagen</th><td>op afspraak</td></tr>
             </table>
-            <p class="muted">Rond feestdagen kunnen de tijden afwijken.</p>
+            <p class="muted">Rond feestdagen en vakanties kunnen de tijden per week verschillen; hierboven zie je de tijden van deze week.</p>
             <a class="link-arrow" href="https://www.google.com/maps/search/?api=1&amp;query=Westzijde+358+1506+GK+Zaandam" target="_blank" rel="noopener">Route plannen</a>
           </article>
           <article class="visit-card">
@@ -207,7 +207,7 @@
           </article>
           <article class="visit-card">
             <h3>Bezorgen</h3>
-            <p><strong>Amsterdam en omstreken:</strong> wij bezorgen zelf, ook in Zaandam en Weesp. € 7,50, gratis vanaf € 100. Bij het afrekenen zie je meteen of we op jouw postcode bezorgen.</p>
+            <p><strong>Amsterdam en omstreken:</strong> wij bezorgen zelf, ook in Zaandam en Weesp, op vaste bezorgmomenten. <span data-area-price>€ 7,50</span><span data-area-free>, gratis vanaf € 100</span>. Bij het afrekenen zie je meteen of we op jouw postcode bezorgen.</p>
             <p><strong>Heel Nederland:</strong> met PostNL, tot 18 flessen per zending. € 9,95, gratis vanaf € 150.</p>
             <a class="link-arrow" href="webshop.html">Bestellen in de webshop</a>
           </article>
@@ -269,6 +269,7 @@
   <script src="js/site.js"></script>
   <script src="data/order.js"></script>
   <script src="js/shop.js"></script>
+  <script src="js/hours.js"></script>
   <script>
     WWW.ready.then(function () {
       var el = document.getElementById("home-featured");

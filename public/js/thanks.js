@@ -12,10 +12,11 @@
 
   var pickup = saved.order && saved.order.delivery && saved.order.delivery.pickup;
   var moment = pickup && saved.data && saved.data.afhaalmoment; // bijv. "vrijdag 16 oktober 2026 om 14:00 uur"
+  var drop = !pickup && saved.data && saved.data.bezorgmoment; // bijv. "vrijdag 16 oktober 2026 tussen 17:00 en 21:00 uur"
   var steps = {
     "bij-afhalen": "Je betaalt bij het afhalen met pin of contant." + (moment ? " We zien je " + moment + " in de winkel aan de Westzijde 358 in Zaandam." : ""),
     "betaalverzoek": "Je ontvangt van ons een bevestiging met een betaallink. Na betaling maken we je bestelling klaar" +
-      (pickup ? " om af te halen" + (moment ? " op " + moment + "." : ".") : " en " + (saved.data.bezorging === "postnl" ? "versturen we hem met PostNL." : "bezorgen we hem bij je thuis.")),
+      (pickup ? " om af te halen" + (moment ? " op " + moment + "." : ".") : " en " + (saved.data.bezorging === "postnl" ? "versturen we hem met PostNL." : "bezorgen we hem bij je thuis" + (drop ? " op " + drop + "." : "."))),
     "online": "We controleren je betaling…"
   };
 
@@ -41,7 +42,7 @@
       .then(function (r) { return r.json(); })
       .then(function (s) {
         if (s.status === "betaald") {
-          setSteps("Je betaling is gelukt. " + (pickup ? "We laten je weten wanneer je bestelling klaarstaat." : "We maken je bestelling zo snel mogelijk klaar voor verzending."));
+          setSteps("Je betaling is gelukt. " + (pickup ? "We laten je weten wanneer je bestelling klaarstaat." : drop ? "We bezorgen je bestelling op " + drop + "." : "We maken je bestelling zo snel mogelijk klaar voor verzending."));
         } else if (s.status === "open") {
           setSteps("Je betaling wordt nog verwerkt. Je ontvangt een bevestiging zodra die binnen is.");
         } else {

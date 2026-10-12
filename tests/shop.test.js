@@ -27,6 +27,8 @@ test.after(async () => { if (stack) await stack.stop(); });
 const customer = { name: "Test Klant", email: "Test@Example.com", phone: "0612345678", address: "Dorpsstraat 1", postcode: "1234 AB", city: "Utrecht" };
 let seq = 0;
 const nr = () => "WWW-261012-T" + String(++seq).padStart(3, "0");
+// Eerste beschikbare bezorgmoment (eigen bezorging vraagt een dag en tijdvak).
+const drop = () => { const d = require("../public/data/order.js").deliveryDays(require("../public/data/config.js"))[0]; return { deliveryDate: d.date, deliveryWindow: d.windows[0] }; };
 // Eerste beschikbare afhaalmoment (afhalen vraagt een dag en tijd).
 const slot = () => { const d = require("../public/data/order.js").pickupDays(require("../public/data/config.js"))[0]; return { pickupDate: d.date, pickupTime: d.times[0] }; };
 
@@ -440,10 +442,68 @@ test("afrekenen: afhaalmoment verplicht en geldig, bezorgen alleen binnen het po
   await shop.setOrderStatus(order.number, "geannuleerd");
   // Utrecht (1234 AB is buiten het gebied) → geweigerd; Amsterdam → goed.
   await assert.rejects(shop.createWebOrder({ orderNumber: nr(), items, delivery: "bezorgen-regio", payment: "betaalverzoek", customer }), /bezorgen we helaas niet/);
-  const ams = await shop.createWebOrder({ orderNumber: nr(), items, delivery: "bezorgen-regio", payment: "betaalverzoek", customer: Object.assign({}, customer, { postcode: "1012 AB", city: "Amsterdam" }) });
+  const amsCustomer = Object.assign({}, customer, { postcode: "1012 AB", city: "Amsterdam" });
+  await assert.rejects(shop.createWebOrder({ orderNumber: nr(), items, delivery: "bezorgen-regio", payment: "betaalverzoek", customer: amsCustomer }), /dag en tijdvak/);
+  const d = drop();
+  const ams = await shop.createWebOrder({ orderNumber: nr(), items, delivery: "bezorgen-regio", ...d, payment: "betaalverzoek", customer: amsCustomer });
   assert.strictEqual(ams.delivery, "bezorgen-regio");
-  assert.strictEqual(ams.pickupMoment, null);
+  assert.match(ams.pickupMoment, new RegExp(" tussen " + d.deliveryWindow.replace("-", " en ") + " uur$"));
   await shop.setOrderStatus(ams.number, "geannuleerd");
+});
+
+test("winkel: openingstijden per week, bezorgtijden en bezorggebied uit de admin", async () => {
+  const shopinfo = require("../lib/shopinfo");
+  const ORDER = require("../public/data/order.js");
+  const items = [{ id: "montemercurio-messaggero", qty: 1 }];
+  const s0 = await shopinfo.getShopSettings();
+  assert.strictEqual(s0.hours.week[5].s, "open");
+  assert.strictEqual(s0.area.price, 7.5);
+
+  // Ongeldige invoer wordt geweigerd.
+  await assert.rejects(shopinfo.saveShopSettings({ hours: { week: { 1: { s: "open", from: "18:00", to: "10:00" } } } }), /maandag/);
+  await assert.rejects(shopinfo.saveShopSettings({ area: { postcodes: [[1100, 1000, "x"]], price: 5 } }), /klopt niet/);
+  await assert.rejects(shopinfo.saveShopSettings({ deliveryTimes: { week: {}, leadDays: 30, daysAhead: 10 } }), /Vroegst bezorgen/);
+
+  // Eerste afhaaldag dicht in die week → die dag verdwijnt uit de afhaalmomenten en wordt geweigerd.
+  const first = slot();
+  await shopinfo.saveShopSettings({ hours: { week: s0.hours.week, dates: { [first.pickupDate]: { s: "dicht" }, "2020-01-01": { s: "dicht" } } } });
+  const s1 = await shopinfo.getShopSettings();
+  assert.deepStrictEqual(Object.keys(s1.hours.dates), [first.pickupDate]); // oude datums worden opgeruimd
+  await assert.rejects(shop.createWebOrder({ orderNumber: nr(), items, delivery: "afhalen-zaandam", ...first, payment: "bij-afhalen", customer }), /dag en tijd/);
+  const info = await shopinfo.publicInfo();
+  assert.ok(info.pickupDays.every((d) => d.date !== first.pickupDate));
+  assert.strictEqual(info.hours.thisWeek.length, 7);
+
+  // Bezorgtijden: alleen nog een tijdvak op zondag.
+  await shopinfo.saveShopSettings({ deliveryTimes: { week: { 0: [["12:00", "15:00"]] }, dates: {}, leadDays: 1, daysAhead: 14 } });
+  const days = (await shopinfo.publicInfo()).deliveryDays;
+  assert.ok(days.length >= 1 && days.every((d) => d.label.startsWith("zondag") && d.windows[0] === "12:00-15:00"));
+
+  // Bezorggebied: alleen Utrecht, andere prijs, altijd bezorgkosten.
+  await shopinfo.saveShopSettings({ area: { postcodes: [[1234, 1234, "Testgebied"]], price: 4.5, freeFrom: "" } });
+  const amsCustomer = Object.assign({}, customer, { postcode: "1012 AB", city: "Amsterdam" });
+  const slotDay = days[0];
+  const input = { items, delivery: "bezorgen-regio", deliveryDate: slotDay.date, deliveryWindow: slotDay.windows[0], payment: "betaalverzoek" };
+  await assert.rejects(shop.createWebOrder(Object.assign({ orderNumber: nr(), customer: amsCustomer }, input)), /bezorgen we helaas niet/);
+  const o = await shop.createWebOrder(Object.assign({ orderNumber: nr(), customer }, input));
+  assert.strictEqual(o.shipping, 4.5);
+  assert.match(o.pickupMoment, /^zondag .* tussen 12:00 en 15:00 uur$/);
+  await shop.setOrderStatus(o.number, "geannuleerd");
+
+  // Via de admin-API en de publieke API.
+  const login = await admin.handler({ httpMethod: "POST", path: "/api/admin/login", headers: {}, body: JSON.stringify({ password: "geheim" }) });
+  const cookie = login.headers["Set-Cookie"].split(";")[0];
+  const get = await admin.handler({ httpMethod: "GET", path: "/api/admin/shop-settings", headers: { cookie } });
+  assert.strictEqual(JSON.parse(get.body).settings.area.price, 4.5);
+  const pub = await require("../lib/handlers/shop-info").handler({ httpMethod: "GET", headers: {} });
+  const body = JSON.parse(pub.body);
+  assert.strictEqual(body.area.freeFrom, null);
+  assert.ok(Array.isArray(body.pickupDays) && Array.isArray(body.deliveryDays));
+  assert.strictEqual(ORDER.deliversTo({ postcodes: body.area.postcodes }, "1234 AB"), true);
+
+  // Terug naar de standaardwaarden voor de andere tests.
+  const d = shopinfo.defaults();
+  await shopinfo.saveShopSettings(d);
 });
 
 test("kassa sluiten: verwacht kasgeld, telling en verschil", async () => {
