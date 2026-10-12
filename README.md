@@ -1,4 +1,4 @@
-# WorldWideWine.nl — website, webshop, admin & kassa 
+# WorldWideWine.nl — website, webshop, admin & kassa  
 
 Website, webshop, admin-omgeving en kassa (POS) voor WorldWideWine.nl, wijnimporteur met eigen winkel in Zaandam.
 
