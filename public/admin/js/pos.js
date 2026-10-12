@@ -373,9 +373,7 @@
     var list = visible();
     grid.innerHTML = list.length ? list.map(function (p) {
       var stock = S.settings.showStock !== false && typeof p.stock === "number" ? "<span class='pp-stock " + (p.stock <= 0 ? "out" : p.stock <= (p.minStock == null ? 6 : p.minStock) ? "low" : "") + "'>" + p.stock + "</span>" : "";
-      var n = ORDER.caseSize(p);
-      var caseTag = n ? "<span class='pp-case' title='Ook per doos te koop'>" + ICON.box + n + "</span>" : "";
-      return "<button class='pp-card' data-add='" + e(p.id) + "'>" + caseTag +
+      return "<button class='pp-card' data-add='" + e(p.id) + "'>" +
         (S.settings.showImages === false
           ? "<span class='pp-noimg'><span class='pp-price'>" + (p.price == null ? "prijs?" : eu(p.price)) + "</span>" + stock + "</span>"
           : "<span class='pp-img'>" + A.productArt(p) + "<span class='pp-price'>" + (p.price == null ? "prijs?" : eu(p.price)) + "</span>" + stock + "</span>") +
@@ -398,7 +396,7 @@
           var k = keyOf(it), p = byId(it.id), l = byLine[k];
           if (!p) return "";
           var sel = k === S.ticket.selected;
-          var detail = "<b>" + it.qty + "</b> " + (it.box ? "<span class='po-case'>" + ICON.box + "doos van " + ORDER.caseSize(p) + "</span>" : e(p.unit || "stuk")) + " à " + (l ? eu(l.price) : "<em>prijs invoeren</em>") +
+          var detail = "<b>" + it.qty + "</b> " + (it.box ? "<span class='po-case'>doos van " + ORDER.caseSize(p) + "</span>" : e(p.unit || "stuk")) + " à " + (l ? eu(l.price) : "<em>prijs invoeren</em>") +
             (l && l.listPrice != null ? " <s>" + eu(l.listPrice) + "</s>" : "") +
             (it.discount ? " · <span class='po-disc'>−" + String(it.discount).replace(".", ",") + "% korting</span>" : "");
           return "<div class='po-line" + (sel ? " selected" : "") + "' data-line='" + e(k) + "'>" +
