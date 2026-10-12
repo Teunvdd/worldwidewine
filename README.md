@@ -127,7 +127,7 @@ Een product kan naast per fles ook per doos te koop zijn. Dat stel je per produc
 - **Prijs per doos**: laat je dit leeg, dan kost een doos de flesprijs × het aantal. Vul je een bedrag in, dan geldt die prijs (bijvoorbeeld met doosvoordeel).
 - De voorraad blijft in losse flessen. Een verkochte doos boekt het aantal flessen in de doos af; annuleren zet ze terug.
 - **Webshop:** de knop *In winkelwagen* krijgt rechts een doosje met een pijltje. Daarmee open je een keuzemenu: **Per fles** of **Per doos van 6**, met de doosprijs, de prijs per fles en het voordeel. In de winkelwagen staat de doos als eigen regel. Is er niet genoeg voorraad voor een hele doos, dan is die keuze uitgeschakeld.
-- **Kassa:** een product dat per doos te koop is, heeft een doos-label op de kaart. Tik je erop, dan kies je **Fles** of **Doos**. Een gescande barcode voegt altijd een fles toe.
+- **Kassa:** tik je op een product dat per doos te koop is, dan kies je **Fles** of **Doos**. Een gescande barcode voegt altijd een fles toe.
 - Bij een bestaande database: voer na deze update **`supabase/setup.sql`** nog één keer uit in Supabase → SQL Editor (of alleen `supabase/migrations/20261016000000_per_doos.sql`).
 
 ### Kassa-instellingen
@@ -167,6 +167,19 @@ Per product vul je in de admin onder **Producten** bij **Eigenschappen** in: **S
 
 ### Producten in één keer aanpassen
 In de productlijst zet je vinkjes voor de producten (of met het vinkje bovenaan alle producten die je nu ziet). Er verschijnt een balk waarmee je ze in één keer **actief** of **niet actief** maakt of **verwijdert**.
+
+### Producten importeren en exporteren (Excel)
+In de admin onder **Producten** staan de knoppen **Exporteren** en **Importeren**.
+- **Exporteren** downloadt alle producten als Excel-bestand (`producten-JJJJ-MM-DD.xlsx`), één rij per product. De kolommen zijn: Code, Wijnhuis, Naam, Soort, Land, Regio, Druivensoort, Oogstjaar, Inhoud, Alcohol (%), Eenheid, Prijs, Oude prijs, Inkoopprijs, Btw (%), Flessen per doos, Doosprijs, Voorraad, Melding bij voorraad, Barcode, Aantal flessen (PostNL), Categorie (kassa), Webshop, Actief, Alleen afhalen, Kenmerken, Omschrijving en Interne notitie.
+- **Importeren**: kies een Excel-bestand (.xlsx). Je ziet eerst hoeveel producten nieuw zijn en hoeveel worden bijgewerkt; pas na *Importeren* wordt er iets opgeslagen.
+  - Een rij met een bestaande **Code** werkt dat product bij; zonder (bekende) code wordt het een nieuw product (Wijnhuis en Naam zijn dan verplicht).
+  - Alleen de kolommen die in het bestand staan worden gewijzigd. Je kunt dus ook een bestand met alleen *Code* en *Prijs* importeren om prijzen aan te passen.
+  - Een lege cel maakt het veld leeg, behalve bij Code, Wijnhuis, Naam en Soort.
+  - Ja/nee-kolommen (Webshop, Actief, Alleen afhalen) accepteren *ja*/*nee*; Kenmerken scheid je met komma's (*actie, nieuw, bio, uitgelicht*).
+  - Een andere **Voorraad** wordt opgeslagen als voorraadmutatie *Import uit Excel*, zodat je hem terugziet bij Voorraad.
+  - Een onbekende categorie wordt automatisch aangemaakt.
+  - Rijen met een fout worden overgeslagen; je ziet per rij wat er mis is.
+- Tip: exporteer eerst, pas het bestand aan in Excel en importeer het weer.
 
 ### Productfoto's
 - Foto's voeg je toe in de admin: *Producten → product*. Sleep een foto op het fotovak of klik op *Foto kiezen…*.

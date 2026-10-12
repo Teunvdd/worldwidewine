@@ -389,8 +389,6 @@ body.pos-mode .main { padding: 0 !important; height: 100vh; }
 .pp-stock.out { background: var(--bad-bg); color: var(--bad); }
 /* Per doos: label op de kaart, keuze fles/doos en de doos op de bon */
 .pp-card { position: relative; }
-.pp-case { position: absolute; z-index: 2; bottom: auto; top: .45rem; left: .45rem; display: inline-flex; align-items: center; gap: .2rem; background: #fbe2d5; color: var(--wine); font-size: .72rem; font-weight: 700; border-radius: 999px; padding: .12rem .45rem; }
-.pp-case svg { font-size: .85rem; }
 .pp-choose { position: fixed; z-index: 30; width: 300px; background: #fff; border: 1px solid #eadfd6; border-radius: 16px; box-shadow: 0 18px 50px rgba(40,25,15,.25); padding: 12px; animation: pop .15s ease; }
 .pp-choose[hidden] { display: none; }
 .ch-name { margin: .1rem .2rem .7rem; font-size: .88rem; font-weight: 600; color: var(--ink); line-height: 1.3; }

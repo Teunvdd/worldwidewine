@@ -367,6 +367,38 @@ test("soort is vrij in te vullen; vaste soorten worden herkend", async () => {
   await shop.saveProduct({ originalId: id, type: before });
 });
 
+test("import uit Excel: bijwerken op code, nieuw product, voorraad en fouten per rij", async () => {
+  const id = "montemercurio-messaggero";
+  const before = (await shop.getProducts()).find((x) => x.id === id);
+  const res = await shop.importProducts([
+    { _row: 2, id: "Montemercurio Messaggero", price: 25.5, region: "Toscane", stock: 33, category: "Import test" },
+    { _row: 3, id: "nieuw-import-product", producer: "Testhuis", name: "Importwijn", type: "Oranje wijn", price: 12, stock: 7, webshop: false },
+    { _row: 4, producer: "Testhuis", name: "Kapot", price: "abc" },
+    { _row: 5, id: id, alcohol: 250 }
+  ]);
+  assert.strictEqual(res.updated, 1);
+  assert.strictEqual(res.created, 1);
+  assert.strictEqual(res.stock, 1);
+  assert.deepStrictEqual(res.errors.map((x) => x.row), [4, 5]);
+  const all = await shop.getProducts();
+  const upd = all.find((x) => x.id === id);
+  assert.strictEqual(upd.price, 25.5);
+  assert.strictEqual(upd.region, "Toscane");
+  assert.strictEqual(upd.stock, 33);
+  assert.strictEqual(upd.name, before.name); // niet in het bestand → ongewijzigd
+  const cat = (await shop.getCategories()).find((c) => c.name === "Import test");
+  assert.strictEqual(upd.categoryId, cat.id);
+  const nieuw = all.find((x) => x.id === "nieuw-import-product");
+  assert.strictEqual(nieuw.type, "Oranje wijn");
+  assert.strictEqual(nieuw.stock, 7);
+  assert.strictEqual(nieuw.webshop, false);
+  const log = await shop.stockLog(1);
+  assert.ok(log.some((m) => m.id === id && m.reason === "Import uit Excel" && m.after === 33));
+  await shop.deleteProduct("nieuw-import-product");
+  await shop.saveProduct({ originalId: id, price: before.price, region: before.region || "", categoryId: null });
+  await shop.deleteCategory(cat.id);
+});
+
 test("kassa sluiten: verwacht kasgeld, telling en verschil", async () => {
   const { session } = await shop.currentSession();
   const expected = session.summary.expectedCash;
