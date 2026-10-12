@@ -4,7 +4,9 @@ Website, webshop, admin-omgeving en kassa (POS) voor WorldWideWine.nl, wijnimpor
 
 De webshop en de kassa werken met **dezelfde producten, prijzen, voorraad en klanten**. Een verkoop in de winkel verlaagt de voorraad in de webshop, en een webshop-bestelling verschijnt meteen in de admin.
 
-De website en de serverfuncties draaien op **Netlify**. De gegevens staan in een **Supabase**-database (Postgres). Online betalen loopt via **Mollie**. Alle drie hebben een gratis instap: Netlify en Supabase hebben een gratis abonnement, en bij Mollie betaal je alleen per transactie.
+De website en de serverfuncties draaien op **Vercel**. De gegevens staan in een **Supabase**-database (Postgres). Online betalen loopt via **Mollie**, en e-mails gaan via **Resend**.
+
+> Let op: het gratis Hobby-abonnement van Vercel is volgens Vercel niet bedoeld voor commercieel gebruik. Voor een winkel heb je **Vercel Pro** nodig ([fair use](https://vercel.com/docs/limits/fair-use-guidelines)).
 
 ## Onderdelen
 
@@ -45,41 +47,50 @@ Alle onderdelen werken met één Supabase-database. Die heeft tabellen voor `pro
 
 - **Prijzen en voorraad worden op de server gecontroleerd.** Een klant kan in de browser geen prijs aanpassen, en de webshop verkoopt niet meer dan er is.
 - **Voorraad en bestellingen worden in één databasetransactie verwerkt** (functies in `supabase/migrations`). Als de webshop en de kassa tegelijk verkopen, gaat er niets mis. Getest met 10 gelijktijdige bestellingen voor 5 flessen: er slagen er precies 5.
-- **Beveiliging:** alleen de serverfuncties op Netlify kunnen bij de database, met de geheime sleutel. Row Level Security staat aan, en de publieke sleutels van Supabase (anon/publishable) geven geen toegang.
-- Bij de eerste start wordt de database gevuld met het assortiment uit `data/products.js`. Daarna beheer je alles in de admin.
-- Zonder server, bijvoorbeeld als je `index.html` lokaal opent, valt de webshop terug op `data/products.js`. Bestellingen gaan dan per e-mail.
+- **Beveiliging:** alleen de serverfuncties op Vercel kunnen bij de database, met de geheime sleutel. Row Level Security staat aan, en de publieke sleutels van Supabase (anon/publishable) geven geen toegang.
+- Bij de eerste start wordt de database gevuld met het assortiment uit `public/data/products.js`. Daarna beheer je alles in de admin.
+- Zonder server, bijvoorbeeld als je `index.html` lokaal opent, valt de webshop terug op `public/data/products.js`. Bestellingen gaan dan per e-mail.
 
 ## Online zetten
 
 ### 1. Database (Supabase)
 
 1. Maak een gratis account op [supabase.com](https://supabase.com) en een nieuw project. Kies als regio **EU (Frankfurt of Amsterdam)**, in verband met de AVG.
-2. Ga naar **SQL Editor** en voer de bestanden in `supabase/migrations/` **op volgorde** uit (plakken en **Run**):
-   - eerst `20261012000000_init.sql` (tabellen, functies en rechten);
-   - daarna `20261013000000_kassa.sql` (kassadiensten, gesplitst betalen en de opslagmap voor productfoto's);
-   - daarna `20261014000000_instellingen.sql` (kassa-instellingen).
+2. Ga naar **SQL Editor → New query**, plak de hele inhoud van **`supabase/setup.sql`** en klik op **Run**. Dit maakt alle tabellen, functies, rechten en de opslagmap voor productfoto's aan. Je kunt het bestand veilig opnieuw uitvoeren. Het zijn de bestanden uit `supabase/migrations/` achter elkaar; latere wijzigingen komen als nieuw bestand in die map.
 3. Noteer bij **Project Settings → API (Data API / API Keys)**:
    - de **Project URL**, bijvoorbeeld `https://abcdefgh.supabase.co`;
    - de **secret key** (`sb_secret_…`) of de oude **service_role**-sleutel. Deel deze sleutel nooit en zet hem niet in de website zelf.
 4. **Back-ups en abonnement:** controleer bij Supabase welke back-ups bij je abonnement horen. Voor een winkel raad ik het Pro-abonnement met dagelijkse back-ups aan. Gratis projecten worden bovendien gepauzeerd na een periode zonder activiteit. Met *Bestellingen → Exporteren* kun je ook zelf regelmatig een kopie maken.
 
-Bij het eerste bezoek wordt de database automatisch gevuld met het startassortiment uit `data/products.js`. Je kunt producten daarna ook in Supabase zelf bekijken onder **Table Editor**, maar wijzig ze bij voorkeur in de admin.
+Bij het eerste bezoek wordt de database automatisch gevuld met het startassortiment uit `public/data/products.js`. Je kunt producten daarna ook in Supabase zelf bekijken onder **Table Editor**, maar wijzig ze bij voorkeur in de admin.
 
-### 2. Website (Netlify)
+### 2. Website (Vercel)
 
-1. Maak een account op [netlify.com](https://www.netlify.com) en kies **Add new site → Import from GitHub**. Kies deze repository. Een build-commando is niet nodig; `netlify.toml` regelt de rest.
-2. **Instellingen (verplicht):** ga naar *Site configuration → Environment variables* en voeg toe:
-   - `SUPABASE_URL`: de Project URL uit stap 1.
-   - `SUPABASE_SERVICE_ROLE_KEY`: de secret key uit stap 1.
-   - `ADMIN_PASSWORD`: een sterk wachtwoord, bijvoorbeeld een zin van minstens 4 woorden.
-   - `ADMIN_SECRET` (optioneel): een lange willekeurige tekst. Als je die verandert, wordt iedereen uitgelogd.
+1. Ga in Vercel naar **Add New… → Project** en importeer deze GitHub-repository.
+   - **Framework Preset:** Other. Laat Build Command en Output Directory leeg; `vercel.json` regelt dat. De website staat in `public/`, de serverfuncties in `api/`.
+2. **Environment Variables** (bij het importeren, of later via *Settings → Environment Variables*):
 
-   Deploy daarna opnieuw (*Deploys → Trigger deploy*).
-3. **Bestellingen per e-mail ontvangen:** *Forms → bestelling → Form notifications* → e-mailmelding naar info@worldwidewine.nl. Bestellingen staan daarnaast altijd in de admin.
+   | Naam | Waarde | |
+   |---|---|---|
+   | `SUPABASE_URL` | de Project URL uit stap 1 | verplicht |
+   | `SUPABASE_SERVICE_ROLE_KEY` | de secret key uit stap 1 | verplicht |
+   | `ADMIN_PASSWORD` | een sterk wachtwoord voor de admin, bijv. een zin van 4+ woorden | verplicht |
+   | `SITE_URL` | het adres van de site, bijv. `https://www.worldwidewine.nl` | aanbevolen |
+   | `MOLLIE_API_KEY` | de Mollie-sleutel (`test_…` of `live_…`) | voor online betalen |
+   | `RESEND_API_KEY` | de API-sleutel van Resend | voor e-mails |
+   | `MAIL_FROM` | afzender, bijv. `worldwidewine.nl <bestellingen@worldwidewine.nl>` | voor e-mails |
+   | `SHOP_EMAIL` | waar bestelmeldingen heen gaan (standaard info@worldwidewine.nl) | optioneel |
+   | `ADMIN_SECRET` | een lange willekeurige tekst; wijzigen logt iedereen uit | optioneel |
+
+   Na het wijzigen van een variabele: *Deployments → ⋯ → Redeploy*.
+3. **E-mails (Resend):**
+   - Maak een gratis account op [resend.com](https://resend.com). Voeg bij **Domains** het domein `worldwidewine.nl` toe en zet de DNS-records die Resend toont bij je domeinregistrar.
+   - Maak bij **API Keys** een sleutel aan en zet die als `RESEND_API_KEY`.
+   - Bij elke webshopbestelling krijgt de winkel een melding en de klant een bevestiging. Bestellingen staan daarnaast altijd in de admin.
 4. **Online betalen (optioneel):** maak een account op [mollie.com](https://www.mollie.com) en zet de API-sleutel als `MOLLIE_API_KEY`. Test eerst met de `test_`-sleutel, daarna de `live_`-sleutel.
    - Zodra de sleutel is ingesteld, verschijnt "Direct online betalen" automatisch bij het afrekenen.
-   - Betalingen worden via de webhook automatisch op "betaald" gezet.
-5. **Domein koppelen:** voeg `worldwidewine.nl` toe bij *Domain management*. Zeg daarna het Wix-abonnement op.
+   - Betalingen worden via de webhook (`/api/mollie-webhook`) automatisch op "betaald" gezet.
+5. **Domein koppelen:** *Settings → Domains* → voeg `worldwidewine.nl` en `www.worldwidewine.nl` toe en volg de DNS-instructies. Zeg daarna het Wix-abonnement op.
 
 ## Kassa
 
@@ -158,13 +169,16 @@ Gebruik voor het testen bij voorkeur een **apart Supabase-project**, niet de ech
 
 | Pad | Inhoud |
 |---|---|
-| `data/products.js` | Startassortiment (en reserve als de server niet bereikbaar is) |
-| `data/config.js` | Verzendkosten, afhaallocaties, contactgegevens |
-| `data/order.js` | Berekening van bestelling, korting, verzending en btw. Gedeeld door webshop, kassa en server |
-| `netlify/functions/` | Serverfuncties: `products`, `orders`, `payment-status`, `mollie-webhook`, `admin` |
-| `netlify/lib/` | Databaseverbinding (`db.js`), inloggen, Mollie, bedrijfslogica (`shop.js`) |
-| `supabase/migrations/` | Databaseschema: tabellen, transactiefuncties en rechten |
-| `admin/` | Admin-omgeving en kassa |
+| `public/` | De website zelf (alles wat Vercel publiceert) |
+| `public/data/products.js` | Startassortiment (en reserve als de server niet bereikbaar is) |
+| `public/data/config.js` | Verzendkosten, afhaallocaties, contactgegevens |
+| `public/data/order.js` | Berekening van bestelling, korting, verzending en btw. Gedeeld door webshop, kassa en server |
+| `public/admin/` | Admin-omgeving en kassa |
+| `api/` | Vercel-serverfuncties: `products`, `orders`, `payment-status`, `mollie-webhook`, `admin` |
+| `lib/` | Serverlogica: database (`db.js`), bedrijfslogica (`shop.js`), inloggen, Mollie, e-mail, foto's; `lib/handlers/` bevat de functies, `lib/vercel.js` koppelt ze aan Vercel |
+| `vercel.json` | Vercel-instellingen: publicatiemap, doorverwijzing `/api/admin/*`, beveiligingsheaders |
+| `supabase/setup.sql` | Complete database-installatie (alle migraties achter elkaar) |
+| `supabase/migrations/` | Databaseschema per wijziging |
 | `tests/` | Automatische tests (plus `helpers/local-supabase.js`) |
 | `.env.example` | Voorbeeld van de instellingen voor lokaal gebruik |
 
@@ -173,7 +187,7 @@ Gebruik voor het testen bij voorkeur een **apart Supabase-project**, niet de ech
 - [ ] **Prijzen en assortiment:** controleer en corrigeer ze in de admin onder Producten. De gegevens komen van de oude webshop zoals die in zoekmachines te vinden was.
 - [ ] **Voorraad tellen:** zet onder Voorraad per product het aantal ("= Geteld"). Zolang er "—" staat, wordt de voorraad niet bijgehouden.
 - [ ] **Barcodes** koppelen voor snel scannen in de kassa.
-- [ ] **Verzendkosten** in `data/config.js` (€ 7,50 lokaal, € 9,95 PostNL, met gratis-grenzen) zijn voorstellen.
+- [ ] **Verzendkosten** in `public/data/config.js` (€ 7,50 lokaal, € 9,95 PostNL, met gratis-grenzen) zijn voorstellen.
 - [ ] **Voorwaarden & privacy:** dit is een concepttekst; laat hem nakijken.
 - [ ] **PostNL:** gebruik bij alcohol de optie "Leeftijdscheck 18+".
 - [ ] **Kassabon:** controleer bij je boekhouder of de bon voldoet (bedrijfsgegevens, btw).

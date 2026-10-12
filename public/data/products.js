@@ -1,7 +1,7 @@
 /*
  * Startassortiment van de webshop en de kassa.
  *
- * Wanneer de site op Netlify draait, worden de producten beheerd in de admin-omgeving
+ * Wanneer de site op Vercel draait, worden de producten beheerd in de admin-omgeving
  * (/admin). Dit bestand wordt dan alleen gebruikt om de database de eerste keer te vullen,
  * en als reserve wanneer de server tijdelijk niet bereikbaar is.
  *

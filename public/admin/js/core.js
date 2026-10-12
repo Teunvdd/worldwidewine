@@ -197,7 +197,7 @@ var A = (function () {
       if (!s.configured) return showLogin("Er is nog geen admin-wachtwoord ingesteld. Zet ADMIN_PASSWORD bij de hosting (zie README).");
       if (s.loggedIn) showApp(); else showLogin();
     }).catch(function () {
-      showLogin("De server is niet bereikbaar. De admin werkt alleen als de site op Netlify draait (of via npm run dev).");
+      showLogin("De server is niet bereikbaar. De admin werkt alleen als de site op Vercel draait (of via npm run dev).");
     });
   }
 

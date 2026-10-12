@@ -5,7 +5,7 @@
 --
 -- Beveiliging: alle tabellen hebben Row Level Security aan zonder policies, en de
 -- publieke rollen (anon, authenticated) hebben geen rechten. Alleen de serverfuncties
--- op Netlify (met de service_role-sleutel) kunnen lezen en schrijven.
+-- op Vercel (met de service_role-sleutel) kunnen lezen en schrijven.
 
 -- ---------------------------------------------------------------- tabellen
 

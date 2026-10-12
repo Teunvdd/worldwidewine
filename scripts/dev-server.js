@@ -1,4 +1,4 @@
-// Lokale testserver: draait de website en de serverfuncties zonder Netlify.
+// Lokale testserver: draait de website en de serverfuncties zoals op Vercel.
 //
 //   npm run dev                → gebruikt de Supabase-database uit .env (zie .env.example)
 //   WWW_LOCAL_DB=1 npm run dev → start een tijdelijke lokale database (Postgres + PostgREST nodig,
@@ -26,51 +26,44 @@ if (!process.env.ADMIN_PASSWORD) {
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".svg": "image/svg+xml",
   ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".json": "application/json" };
-const forms = [];
+const PUBLIC = path.join(ROOT, "public");
 
-const server = http.createServer((req, res) => {
+// Bootst Vercel na: statische bestanden uit public/, serverfuncties uit api/,
+// en de doorverwijzing /api/admin/<pad> → /api/admin?path=<pad> uit vercel.json.
+const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
-  const chunks = [];
-  req.on("data", (c) => chunks.push(c));
-  req.on("end", async () => {
-    const body = Buffer.concat(chunks).toString("utf8");
-    if (url.pathname.startsWith("/api/")) {
-      const name = url.pathname.split("/")[2];
-      const file = path.join(ROOT, "netlify/functions", name + ".js");
-      if (!/^[a-z-]+$/.test(name) || !fs.existsSync(file)) { res.writeHead(404); return res.end(); }
-      const event = {
-        httpMethod: req.method, path: url.pathname, headers: req.headers, body,
-        queryStringParameters: Object.fromEntries(url.searchParams)
-      };
-      try {
-        const r = await require(file).handler(event);
-        res.writeHead(r.statusCode, r.headers || {});
-        return res.end(r.body || "");
-      } catch (e) {
-        console.error(e); res.writeHead(500); return res.end(String(e));
-      }
+
+  if (url.pathname.startsWith("/api/")) {
+    let name = url.pathname.split("/")[2];
+    if (name === "admin") {
+      const rest = url.pathname.replace(/^\/api\/admin\/?/, "");
+      url.searchParams.set("path", rest);
+      req.url = "/api/admin?" + url.searchParams.toString();
     }
-    if (req.method === "POST") { // nabootsing van Netlify Forms
-      forms.push(Object.fromEntries(new URLSearchParams(body)));
-      console.log("Formulier ontvangen:", forms[forms.length - 1]["form-name"]);
-      res.writeHead(200); return res.end("ok");
-    }
-    if (url.pathname.startsWith("/uploads/") && process.env.WWW_LOCAL_UPLOADS) {
-      const name = path.basename(decodeURIComponent(url.pathname));
-      return fs.readFile(path.join(process.env.WWW_LOCAL_UPLOADS, name), (err, data) => {
-        if (err) { res.writeHead(404); return res.end(); }
-        res.writeHead(200, { "Content-Type": TYPES[path.extname(name)] || "application/octet-stream" });
-        res.end(data);
-      });
-    }
-    let file = path.join(ROOT, decodeURIComponent(url.pathname));
-    if (!file.startsWith(ROOT) || /[\\/]\.(data|git|env)|node_modules|netlify[\\/]|supabase[\\/]|tests[\\/]/.test(file)) { res.writeHead(404); return res.end(); }
-    if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, "index.html");
-    fs.readFile(file, (err, data) => {
-      if (err) { res.writeHead(404); return res.end("Niet gevonden"); }
-      res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream" });
+    const file = path.join(ROOT, "api", name + ".js");
+    if (!/^[a-z-]+$/.test(name) || !fs.existsSync(file)) { res.writeHead(404); return res.end(); }
+    try { return await require(file)(req, res); }
+    catch (e) { console.error(e); res.writeHead(500); return res.end(String(e)); }
+  }
+
+  if (url.pathname.startsWith("/uploads/") && process.env.WWW_LOCAL_UPLOADS) {
+    const name = path.basename(decodeURIComponent(url.pathname));
+    return fs.readFile(path.join(process.env.WWW_LOCAL_UPLOADS, name), (err, data) => {
+      if (err) { res.writeHead(404); return res.end(); }
+      res.writeHead(200, { "Content-Type": TYPES[path.extname(name)] || "application/octet-stream" });
       res.end(data);
     });
+  }
+
+  let file = path.join(PUBLIC, decodeURIComponent(url.pathname));
+  if (!file.startsWith(PUBLIC)) { res.writeHead(404); return res.end(); }
+  if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, "index.html");
+  fs.readFile(file, (err, data) => {
+    if (err) {
+      return fs.readFile(path.join(PUBLIC, "404.html"), (e2, page) => { res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" }); res.end(page || "Niet gevonden"); });
+    }
+    res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream" });
+    res.end(data);
   });
 });
 

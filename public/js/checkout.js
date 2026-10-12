@@ -169,20 +169,8 @@ window.WWW.ready.then(function () {
       .forEach(function (n) { data[n] = value(n); });
     data.ordernummer = orderNumber();
     var text = summaryText(order, data);
-    form.elements.ordernummer.value = data.ordernummer;
-    form.elements.bestelling.value = text;
-    form.elements.totaal.value = W.euro(order.total);
-
     var saved = { number: data.ordernummer, order: order, data: data, text: text, payment: data.betaling };
     busy(true);
-
-    function sendForm() {
-      return fetch("/", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams(new FormData(form)).toString()
-      }).then(function (r) { if (!r.ok) throw new Error("form " + r.status); });
-    }
 
     function viaMail() {
       // Geen server beschikbaar (bijv. lokaal geopend): bestelling per e-mail versturen.
@@ -198,6 +186,7 @@ window.WWW.ready.then(function () {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         orderNumber: data.ordernummer,
+        hp: form.elements.website.value, // spamval: echte klanten vullen dit verborgen veld niet in
         items: W.Cart.items(),
         delivery: data.bezorging,
         payment: data.betaling,
@@ -213,24 +202,22 @@ window.WWW.ready.then(function () {
       }, function () { return { offline: true }; })
       .then(function (res) {
         if (res.offline) {
-          // Geen bestel-API: dan via Netlify Forms, en anders per e-mail.
-          return sendForm().then(function () { finish(saved); }, viaMail);
+          // Geen bestel-API bereikbaar (bijv. lokaal geopend): bestelling per e-mail.
+          return viaMail();
         }
         if (!res.ok) {
           busy(false);
           return showError(res.body.error || "Je bestelling kon niet worden geplaatst.");
         }
-        // Bestelling staat in het systeem. Het formulier zorgt voor een e-mail naar de winkel.
-        return sendForm().catch(function () {}).then(function () {
-          if (res.body.checkoutUrl) {
-            store(saved);
-            W.Cart.clear();
-            location.href = res.body.checkoutUrl;
-          } else {
-            if (res.body.paymentFailed) { saved.payment = "betaalverzoek"; saved.paymentFailed = true; }
-            finish(saved);
-          }
-        });
+        // Bestelling staat in het systeem; de server stuurt de e-mails.
+        if (res.body.checkoutUrl) {
+          store(saved);
+          W.Cart.clear();
+          location.href = res.body.checkoutUrl;
+        } else {
+          if (res.body.paymentFailed) { saved.payment = "betaalverzoek"; saved.paymentFailed = true; }
+          finish(saved);
+        }
       });
   });
 
