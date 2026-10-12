@@ -170,10 +170,11 @@ select option { color: var(--ink); background: #fff; }
 .polaroid { position: absolute; margin: 0; background: #fff; padding: 12px 12px 0; border-radius: 4px; box-shadow: 0 24px 50px -22px rgba(60, 35, 25, .55), 0 2px 6px rgba(60, 35, 25, .12); transition: transform .5s cubic-bezier(.2, .8, .2, 1), box-shadow .5s; }
 .polaroid img { display: block; width: 100%; height: auto; border-radius: 2px; }
 .polaroid figcaption { font-family: var(--display); font-style: italic; font-size: .95rem; color: var(--muted); text-align: center; padding: .7rem .4rem .85rem; }
+.polaroid-shop figcaption { text-align: left; padding-left: .3rem; }
 .polaroid-shop { width: 64%; top: 0; left: 0; transform: rotate(-3deg); z-index: 1; }
 .polaroid-visit { width: 58%; right: 0; bottom: 0; transform: rotate(3.5deg); z-index: 2; }
 .polaroid:hover { transform: rotate(0) scale(1.03); z-index: 3; box-shadow: 0 30px 60px -20px rgba(60, 35, 25, .6), 0 2px 6px rgba(60, 35, 25, .12); }
-.about-stamp { position: absolute; z-index: 4; bottom: -150px; left: 10%; width: 108px; height: 108px; border-radius: 50%; display: grid; place-items: center; text-align: center;
+.about-stamp { position: absolute; z-index: 4; top: -54px; left: -54px; width: 108px; height: 108px; border-radius: 50%; display: grid; place-items: center; text-align: center;
   background: var(--wine); color: #fff; font-family: var(--display); font-weight: 700; font-size: .72rem; line-height: 1.2; letter-spacing: .06em; text-transform: uppercase;
   transform: rotate(-12deg); box-shadow: 0 0 0 5px var(--cream), 0 0 0 6px var(--gold), 0 12px 24px -10px rgba(60, 35, 25, .6); }
 @media (max-width: 1100px) { .about-photos { min-height: 610px; } }
@@ -182,7 +183,7 @@ select option { color: var(--ink); background: #fff; }
   .polaroid { position: relative; width: auto; top: auto; left: auto; right: auto; bottom: auto; padding: 8px 8px 0; }
   .polaroid-visit { margin-top: 2.2rem; }
   .polaroid figcaption { font-size: .8rem; padding: .5rem .2rem .6rem; }
-  .about-stamp { width: 74px; height: 74px; font-size: .52rem; top: -1.6rem; bottom: auto; left: -.25rem; }
+  .about-stamp { width: 74px; height: 74px; font-size: .52rem; top: -37px; left: -37px; }
 }
 @media (prefers-reduced-motion: reduce) { .polaroid { transition: none; } }
 
