@@ -100,7 +100,7 @@ Bij het eerste bezoek wordt de database automatisch gevuld met het startassortim
    - De producten staan links, de bon rechts. Met de knoppen boven de producten kies je een **categorie** (zie hieronder).
    - Producten toevoeg je door op een productkaart te tikken, de barcode te scannen of te zoeken.
    - Kies naast de bon **Aantal**, **Korting** of **Prijs** en typ met het **toetsenblok** de nieuwe waarde voor de geselecteerde regel. ⌫ wist een cijfer; **Verwijder** haalt de regel weg.
-   - **Bonkorting** geeft korting op de hele bon, **Klant** koppelt een klant aan de verkoop.
+   - Onder de bon staan **Orders** (de bonnen van deze dienst bekijken en opnieuw afdrukken) en **Bonkorting** (korting op de hele bon). **Klant** koppelt een klant aan de verkoop.
 3. **Betalen:** op het betaalscherm kies je **Pin**, **Contant** of **Tikkie**.
    - Gesplitst betalen kan ook, bijvoorbeeld € 50 pin en de rest contant.
    - Bij contant typ je het ontvangen bedrag, of tik je op +10, +20 of +50 voor een briefje. Het wisselgeld wordt meteen getoond.
