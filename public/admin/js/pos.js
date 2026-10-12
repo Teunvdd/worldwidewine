@@ -190,6 +190,9 @@
       el.innerHTML =
         "<div class='pos2'>" +
           "<header class='pos-top'>" +
+            "<img src='/assets/logo-light.png' alt='worldwidewine.nl' class='pos-logo'>" +
+            "<div class='pos-search'><input type='search' id='pos-q' placeholder='Zoek product of scan barcode…' autocomplete='off'></div>" +
+            "<div class='pos-session' id='pos-session'></div>" +
             "<div class='pos-menu'>" +
               "<button class='top-btn pos-gear' data-act='menu' aria-label='Instellingen' aria-haspopup='true' aria-expanded='false'>" + ICON.gear + "</button>" +
               "<div class='pos-menu-list' id='pos-menu' hidden>" +
@@ -199,9 +202,6 @@
                 "<button data-act='exit'>" + ICON.back + "Terug naar de admin</button>" +
               "</div>" +
             "</div>" +
-            "<img src='/assets/logo-light.png' alt='worldwidewine.nl' class='pos-logo'>" +
-            "<div class='pos-search'><input type='search' id='pos-q' placeholder='Zoek product of scan barcode…' autocomplete='off'></div>" +
-            "<div class='pos-session' id='pos-session'></div>" +
           "</header>" +
           "<div class='pos-screen' id='pos-screen'></div>" +
         "</div>";
