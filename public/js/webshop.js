@@ -135,6 +135,7 @@ window.WWW.ready.then(function () {
     document.querySelectorAll(".filters input[type=checkbox]").forEach(function (i) { i.checked = false; });
     if (priceRange) priceRange.reset();
     if (alcRange) alcRange.reset();
+    setTimeout(badges);
     $("q").value = "";
     apply();
   }
@@ -150,6 +151,38 @@ window.WWW.ready.then(function () {
     b.textContent = open ? "Toon minder" : "Toon alle " + b.parentNode.querySelectorAll(".check").length;
   });
 
+  // ---- Filtergroepen: eerst dichtgeklapt, open met een tik op de kop ----
+  var CHEV = '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+  Array.prototype.forEach.call(document.querySelectorAll("#filters fieldset"), function (fs, i) {
+    var legend = fs.querySelector("legend");
+    var body = document.createElement("div");
+    body.className = "f-body";
+    body.id = "f-body-" + i;
+    while (legend.nextSibling) body.appendChild(legend.nextSibling);
+    fs.appendChild(body);
+    legend.innerHTML = '<button type="button" class="f-toggle" aria-expanded="false" aria-controls="' + body.id + '"><span>' + legend.textContent + '</span><span class="f-badge" hidden></span>' + CHEV + "</button>";
+    fs.classList.add("f-closed");
+  });
+  function setOpen(fs, open) {
+    fs.classList.toggle("f-closed", !open);
+    fs.querySelector(".f-toggle").setAttribute("aria-expanded", String(open));
+  }
+  $("filters").addEventListener("click", function (e) {
+    var t = e.target.closest(".f-toggle");
+    if (t) { var fs = t.closest("fieldset"); setOpen(fs, fs.classList.contains("f-closed")); }
+  });
+  // Bij een dichte groep laat een bolletje zien hoeveel filters er aan staan.
+  function badges() {
+    Array.prototype.forEach.call(document.querySelectorAll("#filters fieldset"), function (fs) {
+      var n = fs.querySelectorAll("input[type=checkbox]:checked").length;
+      var r = fs.querySelectorAll("input[type=range]");
+      if (r.length === 2 && (Number(r[0].value) > Number(r[0].min) || Number(r[1].value) < Number(r[1].max))) n++;
+      var b = fs.querySelector(".f-badge");
+      b.hidden = !n; b.textContent = n;
+    });
+  }
+  $("filters").addEventListener("input", badges);
+
   // Filters op mobiel als uitklapscherm
   $("filters-open").addEventListener("click", function () { document.body.classList.add("filters-shown", "no-scroll"); });
   $("filters-done").addEventListener("click", function () { document.body.classList.remove("filters-shown", "no-scroll"); });
@@ -163,7 +196,10 @@ window.WWW.ready.then(function () {
   }
   if (params.get("actie")) $("f-sale").checked = true;
   if (params.get("q")) $("q").value = params.get("q");
+  // Groepen waarin via de link al iets aangevinkt is, staan open.
+  Array.prototype.forEach.call(document.querySelectorAll("#filters fieldset"), function (fs) { if (fs.querySelector("input:checked")) setOpen(fs, true); });
   apply();
+  badges();
 
   // ---- Productdetail ----
   var modal = $("product-modal");
