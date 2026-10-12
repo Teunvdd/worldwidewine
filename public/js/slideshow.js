@@ -1,31 +1,42 @@
-/* Slideshow met foto's van proeverijen (beheer in de admin: Website → Foto's proeverijen). */
+/* Slideshow op de pagina Proeverijen. De foto's staan vast in proeverijen.html (assets/proeverijen/).
+ * Een foto die (nog) niet bestaat wordt overgeslagen; zonder foto's blijft alleen de tekst staan. */
 (function () {
   var box = document.getElementById("slideshow");
   if (!box) return;
-  var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
   var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var figs = Array.prototype.slice.call(box.querySelectorAll(".slide"));
 
-  function start(photos) {
-    if (!photos || !photos.length) return;
+  // Wacht tot elke foto geladen of mislukt is en houd alleen de goede over.
+  Promise.all(figs.map(function (f) {
+    var img = f.querySelector("img");
+    img.loading = "eager";
+    return new Promise(function (done) {
+      if (img.complete) return done(img.naturalWidth > 0);
+      img.addEventListener("load", function () { done(true); });
+      img.addEventListener("error", function () { done(false); });
+    });
+  })).then(function (ok) {
+    figs.forEach(function (f, i) { if (!ok[i]) f.remove(); });
+    start(box.querySelectorAll(".slide"));
+  });
+
+  function start(slides) {
+    if (!slides.length) return;
     box.hidden = false;
     box.parentNode.classList.add("has-slides");
-    box.innerHTML = "<div class='slides'>" + photos.map(function (p, i) {
-      return "<figure class='slide" + (i ? "" : " is-active") + "' aria-hidden='" + (i ? "true" : "false") + "'>" +
-        "<img src='" + esc(p.url) + "' alt='" + esc(p.caption || "Foto van een proeverij") + "'" + (i ? " loading='lazy'" : "") + ">" +
-        (p.caption ? "<figcaption>" + esc(p.caption) + "</figcaption>" : "") + "</figure>";
-    }).join("") + "</div>" +
-      (photos.length > 1 ? "<button class='slide-nav prev' type='button' aria-label='Vorige foto'>‹</button><button class='slide-nav next' type='button' aria-label='Volgende foto'>›</button>" +
-        "<div class='slide-dots'>" + photos.map(function (p, i) { return "<button type='button' aria-label='Foto " + (i + 1) + "'" + (i ? "" : " aria-current='true'") + "></button>"; }).join("") + "</div>" : "");
-    if (photos.length < 2) return;
+    slides.forEach(function (s, i) { s.classList.toggle("is-active", !i); s.setAttribute("aria-hidden", i ? "true" : "false"); });
+    if (slides.length < 2) return;
+    box.insertAdjacentHTML("beforeend", "<button class='slide-nav prev' type='button' aria-label='Vorige foto'>‹</button><button class='slide-nav next' type='button' aria-label='Volgende foto'>›</button>" +
+      "<div class='slide-dots'>" + Array.prototype.map.call(slides, function (s, i) { return "<button type='button' aria-label='Foto " + (i + 1) + "'" + (i ? "" : " aria-current='true'") + "></button>"; }).join("") + "</div>");
 
-    var slides = box.querySelectorAll(".slide"), dots = box.querySelectorAll(".slide-dots button"), cur = 0, timer;
+    var dots = box.querySelectorAll(".slide-dots button"), cur = 0, timer;
     function show(n) {
       cur = (n + slides.length) % slides.length;
       slides.forEach(function (s, i) { s.classList.toggle("is-active", i === cur); s.setAttribute("aria-hidden", i === cur ? "false" : "true"); });
       dots.forEach(function (d, i) { if (i === cur) d.setAttribute("aria-current", "true"); else d.removeAttribute("aria-current"); });
     }
-    function play() { stop(); if (!still) timer = setInterval(function () { show(cur + 1); }, 5000); }
     function stop() { clearInterval(timer); }
+    function play() { stop(); if (!still) timer = setInterval(function () { show(cur + 1); }, 5000); }
     box.querySelector(".prev").addEventListener("click", function () { show(cur - 1); play(); });
     box.querySelector(".next").addEventListener("click", function () { show(cur + 1); play(); });
     dots.forEach(function (d, i) { d.addEventListener("click", function () { show(i); play(); }); });
@@ -41,9 +52,4 @@
     });
     play();
   }
-
-  fetch("/api/shop-info", { headers: { Accept: "application/json" } })
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (info) { start(info && info.tastingPhotos); })
-    .catch(function () {});
 })();

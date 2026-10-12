@@ -499,27 +499,12 @@ test("winkel: openingstijden, afhaaltijden per week en bezorggebied uit de admin
   const pub = await require("../lib/handlers/shop-info").handler({ httpMethod: "GET", headers: {} });
   const body = JSON.parse(pub.body);
   assert.strictEqual(body.area.freeFrom, null);
-  assert.ok(Array.isArray(body.pickupDays) && Array.isArray(body.tastingPhotos));
+  assert.ok(Array.isArray(body.pickupDays));
   assert.strictEqual(ORDER.deliversTo({ postcodes: body.area.postcodes }, "1234 AB"), true);
 
   // Terug naar de standaardwaarden voor de andere tests.
   const d = shopinfo.defaults();
   await shopinfo.saveShopSettings(d);
-});
-
-test("foto's proeverijen: toevoegen, volgorde, onderschrift en verwijderen", async () => {
-  const shopinfo = require("../lib/shopinfo");
-  const png = "data:image/png;base64," + Buffer.from("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a4c30000000049454e44ae426082", "hex").toString("base64");
-  process.env.WWW_LOCAL_UPLOADS = process.env.WWW_LOCAL_UPLOADS || require("path").join(require("os").tmpdir(), "www-test-uploads");
-  await assert.rejects(shopinfo.addTastingPhoto("data:text/plain;base64,aGFsbG8="), /JPG/);
-  await shopinfo.addTastingPhoto(png, "Proeverij in de winkel");
-  const list = await shopinfo.addTastingPhoto(png);
-  assert.strictEqual(list.length, 2);
-  // Volgorde omdraaien; onbekende adressen worden genegeerd.
-  const swapped = await shopinfo.saveTastingPhotos([{ url: list[1].url, caption: "Bij een klant thuis" }, list[0], { url: "https://evil.example/x.jpg" }]);
-  assert.deepStrictEqual(swapped.map((p) => p.caption), ["Bij een klant thuis", "Proeverij in de winkel"]);
-  assert.strictEqual((await shopinfo.publicInfo()).tastingPhotos.length, 2);
-  assert.deepStrictEqual(await shopinfo.saveTastingPhotos([]), []);
 });
 
 test("mijn account: inloggen met code, bestellingen met afhaalmoment, gegevens en nieuwsbrief", async () => {

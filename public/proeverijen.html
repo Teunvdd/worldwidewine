@@ -57,7 +57,15 @@
           </ul>
           <a class="btn btn-light" href="contact.html?onderwerp=Wijnproeverij">Vraag een proeverij aan</a>
         </div>
-        <div class="slideshow" id="slideshow" hidden aria-roledescription="carrousel" aria-label="Foto's van onze proeverijen"></div>
+        <!-- Slideshow: foto's staan in assets/proeverijen/. Een foto toevoegen = een <figure> erbij kopiëren.
+             Liggend of staand werkt; de foto wordt passend bijgesneden. Het onderschrift is optioneel. -->
+        <div class="slideshow" id="slideshow" hidden aria-roledescription="carrousel" aria-label="Foto's van onze proeverijen">
+          <div class="slides">
+            <figure class="slide"><img src="assets/proeverijen/proeverij-1.jpg" alt="Wijnproeverij in de winkel in Zaandam"><figcaption>Proeverij in de winkel in Zaandam</figcaption></figure>
+            <figure class="slide"><img src="assets/proeverijen/proeverij-2.jpg" alt="Wijnproeverij bij een klant thuis" loading="lazy"></figure>
+            <figure class="slide"><img src="assets/proeverijen/proeverij-3.jpg" alt="Wijnen klaar om te proeven" loading="lazy"></figure>
+          </div>
+        </div>
       </div>
     </section>
 

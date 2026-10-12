@@ -679,17 +679,3 @@ input[type=radio], input[type=checkbox] { min-height: 0; padding: 0; width: auto
   .wk-table .wk-badge { grid-row: 1; grid-column: 2; }
   .wk-title { min-width: 0; }
 }
-
-/* ---------- Foto's proeverijen ---------- */
-.photo-drop { position: relative; border: 2px dashed var(--line); background: #fffaf6; text-align: center; padding: 2rem 1rem; }
-.photo-drop > div { display: flex; flex-direction: column; align-items: center; gap: .6rem; }
-.photo-drop.dragging { border-color: var(--brand); background: #fdf0e8; }
-.photo-drop.dragging .drop-hint { display: grid; }
-.photo-drop.busy { opacity: .7; pointer-events: none; }
-.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
-.photo-card { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
-.photo-img { position: relative; aspect-ratio: 3 / 2; background: var(--line-2); }
-.photo-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.photo-n { position: absolute; top: .5rem; left: .5rem; background: rgba(0,0,0,.6); color: #fff; font-size: .75rem; font-weight: 700; border-radius: 999px; padding: .1rem .55rem; }
-.photo-cap { margin: .7rem .7rem 0; }
-.photo-tools { display: flex; gap: .4rem; padding: .7rem; align-items: center; }
