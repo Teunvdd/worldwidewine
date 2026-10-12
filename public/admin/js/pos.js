@@ -15,6 +15,10 @@
     expand: svg("<path d='M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'/>"),
     lock: svg("<rect x='5' y='11' width='14' height='10' rx='2'/><path d='M8 11V7a4 4 0 0 1 8 0v4'/>"),
     back: svg("<path d='M15 5l-7 7 7 7'/>"),
+    card: svg("<rect x='3' y='6' width='18' height='13' rx='2'/><path d='M3 10h18M7 15h4'/>"),
+    cash: svg("<rect x='2.5' y='6.5' width='19' height='11' rx='2'/><circle cx='12' cy='12' r='2.5'/><path d='M6 9.5v5M18 9.5v5'/>"),
+    phone: svg("<rect x='7' y='3' width='10' height='18' rx='2'/><path d='M11 17.5h2'/>"),
+    other: svg("<path d='M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6-5.3-3-5.3 3 1.2-6-4.5-4.1 6-.7z'/>"),
     user: svg("<circle cx='12' cy='8' r='4'/><path d='M4 21c1-4.5 4.5-6.5 8-6.5s7 2 8 6.5'/>")
   };
   var METHODS = [
@@ -563,7 +567,7 @@
       "<div class='pay-mid'></div>" +
       "<footer class='pay-foot'>" +
         "<div class='pay-methods'>" + methods().map(function (m) {
-          return "<button class='pm-btn' data-method='" + m.key + "'>" + e(m.label) + "</button>";
+          return "<button class='pm-btn pm-" + m.key + "' data-method='" + m.key + "'><span class='pm-icon'>" + methodIcon(m.key) + "</span>" + e(m.label) + "</button>";
         }).join("") + "</div>" +
         "<div class='pay-extra'>" +
           "<button class='pm-extra' data-act='customer' id='pay-customer'></button>" +
@@ -571,6 +575,8 @@
       "</footer>" +
     "</div>";
   }
+
+  function methodIcon(key) { return ({ pin: ICON.card, contant: ICON.cash, tikkie: ICON.phone })[key] || ICON.other; }
 
   function methods() {
     var on = S.settings.methods || { pin: true, contant: true, tikkie: true };
@@ -634,13 +640,19 @@
             "<span class='pt-due'>" + num(r.due) + "</span>" +
             "<span class='pt-got'>" + num(r.line.amount) + "<i class='pt-pad-ic'>" + ICON.keypad + "</i>" + (sel && S.pay.pad ? pad : "") + "</span>" +
             "<span class='pt-change'>" + (r.change ? num(r.change) : "") + "</span>" +
-            "<span class='pt-method'>" + e(A.PAYMENT[r.line.method]) + "</span>" +
+            "<span class='pt-method'><b class='pt-badge pm-" + r.line.method + "'>" + methodIcon(r.line.method) + e(A.PAYMENT[r.line.method]) + "</b></span>" +
             "<button class='pt-del' data-pdel='" + i + "' aria-label='Verwijderen'>×</button>" +
           "</div>";
         }).join("") +
-        (st.remaining > 0.004 ? "<p class='ps-remaining'>Nog te betalen " + eu(st.remaining) + "</p>"
-          : st.tooMuchCard ? "<p class='ps-remaining'>Te veel betaald; alleen contant kan wisselgeld geven.</p>"
-          : st.rounding ? "<p class='muted'>Afronding contant " + (st.rounding > 0 ? "+ " : "− ") + eu(Math.abs(st.rounding)) + "</p>" : "");
+        "<div class='pt-sum'>" +
+          "<span>Totaal <strong>" + eu(st.total) + "</strong></span>" +
+          "<span>Ontvangen <strong>" + eu(st.paid) + "</strong></span>" +
+          (st.rounding ? "<span>Afronding <strong>" + (st.rounding > 0 ? "+ " : "− ") + eu(Math.abs(st.rounding)) + "</strong></span>" : "") +
+          (st.tooMuchCard ? "<span class='pt-state is-bad'>Te veel betaald; alleen contant geeft wisselgeld</span>"
+            : st.remaining > 0.004 ? "<span class='pt-state is-bad'>Nog te betalen " + eu(st.remaining) + "</span>"
+            : st.change > 0.004 ? "<span class='pt-state is-change'>Wisselgeld " + eu(st.change) + "</span>"
+            : "<span class='pt-state is-ok'>Betaald ✓</span>") +
+        "</div>";
     root.querySelector("#pay-validate").disabled = !st.ok;
     var c = S.ticket.customer;
     var btn = root.querySelector("#pay-customer");
