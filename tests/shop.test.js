@@ -16,11 +16,11 @@ test.before(async () => {
   process.env.SUPABASE_URL = stack.url;
   process.env.SUPABASE_SERVICE_ROLE_KEY = stack.serviceKey;
   process.env.ADMIN_PASSWORD = "geheim";
-  shop = require("../netlify/lib/shop");
-  auth = require("../netlify/lib/auth");
-  admin = require("../netlify/functions/admin");
-  orders = require("../netlify/functions/orders");
-  products = require("../netlify/functions/products");
+  shop = require("../lib/shop");
+  auth = require("../lib/auth");
+  admin = require("../lib/handlers/admin");
+  orders = require("../lib/handlers/orders");
+  products = require("../lib/handlers/products");
 });
 test.after(async () => { if (stack) await stack.stop(); });
 
@@ -155,7 +155,7 @@ test("dashboard en export", async () => {
 
 test("online betalen via Mollie: betaling starten en webhook verwerken", async (t) => {
   process.env.MOLLIE_API_KEY = "test_x";
-  process.env.URL = "https://www.worldwidewine.nl";
+  process.env.SITE_URL = "https://www.worldwidewine.nl";
   const realFetch = global.fetch;
   const calls = [];
   global.fetch = async (url, opts) => {
@@ -166,7 +166,7 @@ test("online betalen via Mollie: betaling starten en webhook verwerken", async (
     }
     return new Response(JSON.stringify({ id: "tr_abc", status: "paid", metadata: { orderNumber: calls.number } }), { status: 200 });
   };
-  t.after(() => { global.fetch = realFetch; delete process.env.MOLLIE_API_KEY; delete process.env.URL; });
+  t.after(() => { global.fetch = realFetch; delete process.env.MOLLIE_API_KEY; delete process.env.SITE_URL; });
 
   const number = nr();
   calls.number = number;
@@ -178,7 +178,7 @@ test("online betalen via Mollie: betaling starten en webhook verwerken", async (
   assert.strictEqual(sent.amount.value, "55.95");
   assert.strictEqual(sent.webhookUrl, "https://www.worldwidewine.nl/api/mollie-webhook");
 
-  const webhook = require("../netlify/functions/mollie-webhook");
+  const webhook = require("../lib/handlers/mollie-webhook");
   const wh = await webhook.handler({ httpMethod: "POST", headers: {}, body: "id=tr_abc" });
   assert.strictEqual(wh.statusCode, 200);
   const order = await shop.getOrder(number);
@@ -353,4 +353,67 @@ test("kassa zonder kastelling en sluiten met pincode", async () => {
   assert.strictEqual(opened.openingCash, closed.expectedCash);
   await shop.savePosSettings({ cashControl: true, pinFor: { closeSession: false } });
   await shop.closeSession({ countedCash: opened.openingCash });
+});
+
+test("Vercel: functies in api/ werken met req/res, inclusief admin-doorverwijzing en webhook-body", async () => {
+  const { Readable } = require("stream");
+  function call(file, { method = "GET", url, headers = {}, body = "" }) {
+    const req = Readable.from(body ? [Buffer.from(body)] : []);
+    Object.assign(req, { method, url, headers });
+    return new Promise((resolve) => {
+      const res = { statusCode: 200, headers: {}, setHeader(k, v) { this.headers[k.toLowerCase()] = v; }, end(b) { resolve({ status: this.statusCode, headers: this.headers, body: String(b || "") }); } };
+      require(file)(req, res);
+    });
+  }
+  const pr = await call("../api/products.js", { url: "/api/products" });
+  assert.strictEqual(pr.status, 200);
+  assert.ok(JSON.parse(pr.body).products.length > 20);
+  // Admin via /api/admin?path=… (zoals vercel.json doorverwijst)
+  const login = await call("../api/admin.js", { method: "POST", url: "/api/admin?path=login", headers: { host: "localhost", "content-type": "application/json" }, body: JSON.stringify({ password: "geheim" }) });
+  assert.strictEqual(login.status, 200);
+  const cookie = login.headers["set-cookie"].split(";")[0];
+  const order = await call("../api/admin.js", { url: "/api/admin?path=orders&months=1", headers: { host: "localhost", cookie } });
+  assert.strictEqual(order.status, 200);
+  assert.ok(Array.isArray(JSON.parse(order.body).orders));
+  const nested = await call("../api/admin.js", { url: "/api/admin?path=pos%2Fsettings", headers: { host: "localhost", cookie } });
+  assert.strictEqual(nested.status, 200);
+  // Webhook met form-urlencoded body: zonder Mollie-sleutel netjes afgehandeld (geen crash)
+  const wh = await call("../api/mollie-webhook.js", { method: "POST", url: "/api/mollie-webhook", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "id=tr_onbekend" });
+  assert.ok(wh.status === 200 || wh.status === 500);
+});
+
+test("e-mails via Resend bij een webshopbestelling, en spamval", async (t) => {
+  process.env.RESEND_API_KEY = "re_test";
+  process.env.MAIL_FROM = "worldwidewine.nl <bestellingen@worldwidewine.nl>";
+  const realFetch = global.fetch;
+  const mails = [];
+  global.fetch = async (url, opts) => {
+    if (String(url) === "https://api.resend.com/emails") { mails.push(JSON.parse(opts.body)); return new Response(JSON.stringify({ id: "m" + mails.length }), { status: 200 }); }
+    return realFetch(url, opts);
+  };
+  t.after(() => { global.fetch = realFetch; delete process.env.RESEND_API_KEY; delete process.env.MAIL_FROM; });
+  const res = await orders.handler({ httpMethod: "POST", headers: {}, body: JSON.stringify({ orderNumber: nr(), items: [{ id: "montemercurio-messaggero", qty: 1 }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer }) });
+  assert.strictEqual(res.statusCode, 200, res.body);
+  assert.strictEqual(mails.length, 2);
+  const toShop = mails.find((m) => m.to[0] === "info@worldwidewine.nl");
+  const toCustomer = mails.find((m) => m.to[0] === "test@example.com");
+  assert.ok(toShop && /Nieuwe bestelling WWW-/.test(toShop.subject));
+  assert.strictEqual(toShop.reply_to, "test@example.com");
+  assert.ok(toCustomer && /Bedankt voor je bestelling/.test(toCustomer.subject));
+  assert.match(toCustomer.html, /betaalt bij het afhalen/i);
+  assert.strictEqual(toCustomer.from, "worldwidewine.nl <bestellingen@worldwidewine.nl>");
+  // Spamval: ingevuld verborgen veld → geweigerd, geen mail
+  const spam = await orders.handler({ httpMethod: "POST", headers: {}, body: JSON.stringify({ hp: "http://spam", orderNumber: nr(), items: [{ id: "montemercurio-messaggero", qty: 1 }], delivery: "afhalen-zaandam", payment: "bij-afhalen", customer }) });
+  assert.strictEqual(spam.statusCode, 400);
+  assert.strictEqual(mails.length, 2);
+});
+
+test("site-adres: SITE_URL, anders het productie-adres van Vercel", () => {
+  const { siteUrl } = require("../lib/http");
+  process.env.VERCEL_PROJECT_PRODUCTION_URL = "worldwidewine.vercel.app";
+  assert.strictEqual(siteUrl({ headers: { host: "x" } }), "https://worldwidewine.vercel.app");
+  process.env.SITE_URL = "https://www.worldwidewine.nl/";
+  assert.strictEqual(siteUrl({ headers: {} }), "https://www.worldwidewine.nl");
+  delete process.env.SITE_URL; delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  assert.strictEqual(siteUrl({ headers: { "x-forwarded-proto": "https", host: "a.b" } }), "https://a.b");
 });
