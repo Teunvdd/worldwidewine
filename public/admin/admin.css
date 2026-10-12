@@ -9,7 +9,7 @@
   --ok: #2f7a4a; --ok-bg: #e6f3ea; --warn: #9a6400; --warn-bg: #fdf1d8; --bad: #b3262e; --bad-bg: #fbe7e8;
   --radius: 12px; --shadow: 0 8px 24px -14px rgba(60, 35, 25, .35);
   --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --serif: "Cormorant Garamond", Georgia, serif;
+  --display: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
 }
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -17,7 +17,7 @@ html, body { height: 100%; }
 body { margin: 0; font-family: var(--sans); font-size: 15px; line-height: 1.5; color: var(--ink); background: var(--bg); -webkit-font-smoothing: antialiased; }
 a { color: var(--wine-2); }
 h1, h2, h3 { margin: 0 0 .4em; line-height: 1.2; }
-h1 { font-family: var(--serif); font-size: 2.1rem; color: var(--ink); font-weight: 700; }
+h1 { font-family: var(--display); font-size: 1.7rem; letter-spacing: -.02em; color: var(--ink); font-weight: 700; }
 h2 { font-size: 1.05rem; font-weight: 600; }
 h3 { font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-top: 1.2rem; }
 p { margin: 0 0 .8em; }

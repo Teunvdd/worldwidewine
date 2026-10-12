@@ -23,7 +23,7 @@
 
 /* Shop hero */
 .shop-hero { padding: clamp(2.5rem, 6vw, 4rem) 0 2rem; background: linear-gradient(180deg, var(--cream-2), var(--cream)); }
-.shop-hero h1 { font-size: clamp(2.4rem, 5vw, 3.6rem); }
+.shop-hero h1 { font-size: clamp(2.1rem, 4.4vw, 3.2rem); }
 .usp { list-style: none; padding: 0; margin: 1.5rem 0 0; display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; font-size: .9rem; font-weight: 500; }
 .usp li::before { content: "✓"; color: var(--gold); font-weight: 700; margin-right: .4rem; }
 
@@ -96,7 +96,7 @@
 .art-body { position: relative; display: block; width: 100%; height: 72%; border-radius: 12px 12px 8px 8px; background: var(--c, #4a1219); box-shadow: inset -9px 0 14px rgba(0,0,0,.28), inset 7px 0 10px rgba(255,255,255,.14); }
 .art-body::before { content: ""; position: absolute; left: 50%; translate: -50% 0; bottom: 100%; width: 32%; height: 40%; background: var(--c, #4a1219); border-radius: 5px 5px 0 0; box-shadow: inset -3px 0 5px rgba(0,0,0,.25); }
 .art-body::after { content: ""; position: absolute; left: 50%; translate: -50% 0; bottom: calc(100% + 40% - 4px); width: 36%; height: 14%; background: var(--cap, var(--gold)); border-radius: 3px; }
-.art-label { position: absolute; left: 9%; right: 9%; top: 26%; height: 38%; background: var(--cream); border-radius: 3px; border-top: 3px solid var(--gold); display: grid; place-items: center; font-family: var(--serif); font-weight: 700; font-size: .95rem; color: var(--wine); letter-spacing: .04em; }
+.art-label { position: absolute; left: 9%; right: 9%; top: 26%; height: 38%; background: var(--cream); border-radius: 3px; border-top: 3px solid var(--gold); display: grid; place-items: center; font-family: var(--display); font-weight: 800; font-size: .8rem; color: var(--wine); letter-spacing: .02em; }
 .art-rood { --c: linear-gradient(90deg, #2c0b10, #4a1219); }
 .art-wit { --c: linear-gradient(90deg, #5c6b2c, #8a9a47); }
 .art-rose { --c: linear-gradient(90deg, #d98a8f, #f0b9b5); --cap: #c0414f; }
@@ -131,7 +131,7 @@
 .pm-media { position: relative; display: grid; place-items: center; min-height: 380px; background: radial-gradient(70% 60% at 50% 60%, #fff 0%, var(--cream-2) 100%); }
 .pm-media .product-img { max-height: 420px; }
 .pm-body { padding: clamp(1.5rem, 4vw, 2.75rem); }
-.pm-body h2 { font-size: clamp(1.8rem, 3.5vw, 2.4rem); margin-bottom: .3em; }
+.pm-body h2 { font-size: clamp(1.5rem, 3vw, 2rem); margin-bottom: .3em; }
 .pm-price { font-size: 1.3rem; }
 .pm-price .price { font-size: 1.6rem; }
 .pm-price small { color: var(--muted); font-size: .85rem; }
@@ -177,7 +177,7 @@
 /* Afrekenen */
 .checkout-page { background: var(--cream); }
 .checkout { padding: 2.5rem 0 5rem; }
-.checkout h1 { font-size: clamp(2.2rem, 4vw, 3rem); }
+.checkout h1 { font-size: clamp(1.9rem, 3.6vw, 2.6rem); }
 .checkout-empty { text-align: center; padding: 3rem 0; }
 .checkout-grid { display: grid; grid-template-columns: 1fr 380px; gap: 2.5rem; align-items: start; }
 @media (max-width: 900px) { .checkout-grid { grid-template-columns: 1fr; } .summary { order: -1; } }

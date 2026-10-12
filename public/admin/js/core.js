@@ -228,7 +228,7 @@ var A = (function () {
       shape = "<ellipse cx='60' cy='86' rx='38' ry='30' fill='url(#" + id + ")'/><ellipse cx='60' cy='86' rx='16' ry='12' fill='#f6e6d6'/>";
     } else if (p.type === "likeur") {
       shape = "<rect x='44' y='24' width='32' height='12' rx='3' fill='#2a1a1c'/><rect x='38' y='36' width='44' height='92' rx='8' fill='url(#" + id + ")'/>" +
-        "<rect x='42' y='66' width='36' height='34' rx='3' fill='#fbf7f3'/><text x='60' y='89' text-anchor='middle' font-family='Georgia,serif' font-weight='700' font-size='14' fill='#a9441f'>" + esc(initials) + "</text>";
+        "<rect x='42' y='66' width='36' height='34' rx='3' fill='#fbf7f3'/><text x='60' y='89' text-anchor='middle' font-family='Plus Jakarta Sans,Inter,sans-serif' font-weight='700' font-size='14' fill='#a9441f'>" + esc(initials) + "</text>";
     } else {
       var wide = p.type === "mousserend" || p.type === "water";
       var w = wide ? 16 : 12;
@@ -236,7 +236,7 @@ var A = (function () {
       shape = "<rect x='53' y='12' width='14' height='12' rx='2' fill='" + cap + "'/>" +
         "<path d='M54 24h12v22c0 6 " + w + " 10 " + w + " 22v66a6 6 0 0 1-6 6H" + (60 - w) + "a6 6 0 0 1-6-6V68c0-12 " + w + "-16 " + w + "-22Z' fill='url(#" + id + ")'/>" +
         "<rect x='44' y='76' width='32' height='30' rx='3' fill='#fbf7f3'/><rect x='44' y='76' width='32' height='3' fill='#e08a62'/>" +
-        "<text x='60' y='97' text-anchor='middle' font-family='Georgia,serif' font-weight='700' font-size='12' fill='#a9441f'>" + esc(initials) + "</text>";
+        "<text x='60' y='97' text-anchor='middle' font-family='Plus Jakarta Sans,Inter,sans-serif' font-weight='700' font-size='12' fill='#a9441f'>" + esc(initials) + "</text>";
     }
     var cases = p.unit === "doos van 6" ? "<rect x='78' y='112' width='30' height='16' rx='3' fill='#a9441f'/><text x='93' y='124' text-anchor='middle' font-family='Arial,sans-serif' font-weight='700' font-size='10' fill='#fff'>6×</text>" : "";
     return "<svg class='p-img p-art " + (cls || "") + "' viewBox='0 0 120 140' role='img' aria-hidden='true'>" + grad + shape + cases + "</svg>";

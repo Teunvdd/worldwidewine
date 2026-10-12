@@ -14,7 +14,7 @@
   --ink: #1f1a17;
   --muted: #6e625c;
   --line: #ebddd2;
-  --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --display: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
   --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --radius: 14px;
   --shadow: 0 10px 30px -12px rgba(60, 35, 25, .25);
@@ -33,11 +33,11 @@ body {
 }
 img, svg { display: block; max-width: 100%; }
 a { color: var(--wine-2); }
-h1, h2, h3, h4 { font-family: var(--serif); font-weight: 600; line-height: 1.15; margin: 0 0 .5em; color: var(--ink); }
-h1 { font-size: clamp(2.5rem, 6vw, 4.6rem); letter-spacing: -.01em; }
-h2 { font-size: clamp(2rem, 4vw, 3rem); }
-h3 { font-size: 1.55rem; }
-h4 { font-size: 1.3rem; }
+h1, h2, h3, h4 { font-family: var(--display); font-weight: 700; line-height: 1.15; margin: 0 0 .5em; color: var(--ink); letter-spacing: -.015em; }
+h1 { font-size: clamp(2.2rem, 5vw, 3.8rem); font-weight: 800; letter-spacing: -.025em; line-height: 1.08; }
+h2 { font-size: clamp(1.75rem, 3.4vw, 2.5rem); }
+h3 { font-size: 1.3rem; }
+h4 { font-size: 1.12rem; }
 p { margin: 0 0 1em; }
 em { font-style: italic; }
 
@@ -131,7 +131,7 @@ em { font-style: italic; }
 .hero-cta { display: flex; gap: .8rem; flex-wrap: wrap; margin: 2rem 0 3rem; }
 .hero-facts { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; max-width: 680px; }
 .hero-facts li { border-top: 2px solid var(--gold); padding-top: .8rem; }
-.hero-facts strong { display: block; font-family: var(--serif); font-size: 1.3rem; color: var(--wine); }
+.hero-facts strong { display: block; font-family: var(--display); font-size: 1.15rem; font-weight: 700; color: var(--wine); }
 .hero-facts span { font-size: .88rem; color: var(--muted); }
 @media (max-width: 600px) { .hero-facts { grid-template-columns: 1fr; } }
 
@@ -152,7 +152,7 @@ em { font-style: italic; }
   padding: clamp(2rem, 5vw, 3.5rem); box-shadow: var(--shadow); position: relative;
 }
 .quote-glyph { width: 48px; color: var(--gold); margin-bottom: 1rem; }
-.quote-card blockquote { margin: 0 0 1.5rem; font-family: var(--serif); font-size: clamp(1.5rem, 2.6vw, 2rem); line-height: 1.3; color: #fff; font-style: italic; }
+.quote-card blockquote { margin: 0 0 1.5rem; font-family: var(--display); font-size: clamp(1.25rem, 2.2vw, 1.65rem); line-height: 1.45; color: #fff; font-style: italic; font-weight: 500; }
 .quote-card figcaption { font-size: .8rem; letter-spacing: .18em; text-transform: uppercase; color: var(--gold); }
 
 /* Cards */
@@ -234,7 +234,7 @@ em { font-style: italic; }
 .contact-list { list-style: none; padding: 0; margin: 1.5rem 0 2rem; }
 .contact-list li { display: flex; flex-direction: column; padding: .8rem 0; border-bottom: 1px solid var(--line); }
 .contact-list span { font-size: .78rem; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); }
-.contact-list a { font-family: var(--serif); font-size: 1.45rem; text-decoration: none; font-weight: 600; }
+.contact-list a { font-family: var(--display); font-size: 1.2rem; text-decoration: none; font-weight: 600; }
 .contact-form { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: clamp(1.5rem, 4vw, 2.5rem); box-shadow: var(--shadow); display: grid; gap: 1rem; }
 .contact-form label { display: grid; gap: .35rem; font-size: .88rem; font-weight: 600; color: var(--ink); }
 .contact-form input, .contact-form select, .contact-form textarea {
