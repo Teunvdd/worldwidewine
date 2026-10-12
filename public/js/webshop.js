@@ -40,7 +40,7 @@ window.WWW.ready.then(function () {
   list("vintage", function (p) { return p.vintage ? String(p.vintage) : null; }, function (a, b) { return b - a; });
   list("size", function (p) { return p.size; }, function (a, b) { return sizeCl(a) - sizeCl(b) || a.localeCompare(b); });
 
-  // Maat sorteren op inhoud: "37,5 cl" < "75 cl" < "1,5 l".
+  // Inhoud sorteren: "37,5 cl" < "75 cl" < "1,5 l".
   function sizeCl(s) {
     var m = String(s).replace(",", ".").match(/([\d.]+)\s*(ml|cl|l)/i);
     if (!m) return 1e9;
@@ -172,7 +172,7 @@ window.WWW.ready.then(function () {
   function detail(p) {
     var rows = [
       ["Wijnhuis", p.producer], ["Soort", W.typeLabel(p.type)], ["Land", p.country], ["Regio", p.region],
-      ["Druivensoort", p.grape], ["Oogstjaar", p.vintage], ["Maat", p.size],
+      ["Druivensoort", p.grape], ["Oogstjaar", p.vintage], ["Inhoud", p.size],
       ["Alcohol", p.alcohol != null ? String(p.alcohol).replace(".", ",") + "% vol." : null]
     ].filter(function (r) { return r[1]; });
     return '<div class="pm-media">' + W.art(p, "lg") + W.badges(p) + "</div>" +

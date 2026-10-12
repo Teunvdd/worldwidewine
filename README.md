@@ -156,8 +156,8 @@ De pincode wordt versleuteld opgeslagen en is bedoeld om handelingen van medewer
 - **Bonprinter:** elke bonprinter van 80 mm die als printer in Windows of macOS is geïnstalleerd werkt. Kies bij het afdrukken die printer en zet de marges op "geen". In kioskmodus kun je Chrome starten met `--kiosk-printing`; dan wordt de bon zonder printvenster op de standaardprinter afgedrukt.
 - Voor de kassa is internet nodig. Valt het internet uit, gebruik dan tijdelijk de hotspot van je telefoon.
 
-### Wijngegevens en webshopfilters
-Per product vul je in de admin onder **Producten** het blok **Wijngegevens** in: **Land**, **Regio**, **Druivensoort**, **Oogstjaar**, **Maat** en **Alcohol volume (%)**. De **Soort** staat bovenaan het formulier en vul je vrij in, bijvoorbeeld *Oranje wijn* of *Port*. Typ je een vaste soort (Rood, Wit, Rosé, Mousserend, Likeur, Delicatessen, Water), dan wordt die herkend: die bepaalt ook de getekende fles en het automatische btw-tarief (9% voor delicatessen en water). Bij een andere soort is dat 21%, tenzij je bij Btw iets anders kiest.
+### Producteigenschappen en webshopfilters
+Per product vul je in de admin onder **Producten** bij **Eigenschappen** in: **Soort**, **Land**, **Regio**, **Druivensoort**, **Oogstjaar**, **Inhoud** en **Alcohol volume (%)**. Alles is vrij in te vullen, bijvoorbeeld Soort *Oranje wijn* of *Port*. Typ je een vaste soort (Rood, Wit, Rosé, Mousserend, Likeur, Delicatessen, Water), dan wordt die herkend: die bepaalt ook de getekende fles en het automatische btw-tarief (9% voor delicatessen en water). Bij een andere soort is dat 21%, tenzij je bij Btw iets anders kiest.
 - Deze gegevens staan in de webshop bij het product en zijn daar filters (links). Een filter verschijnt pas als minstens één product die gegevens heeft.
 - Meerdere druiven scheid je met een komma, bijvoorbeeld *Sangiovese, Merlot*: het product verschijnt dan bij beide druiven.
 - Tijdens het typen stelt het formulier bestaande waarden voor. Zo blijft de schrijfwijze gelijk en krijg je geen dubbele filters (*Italië* en *Italie*).
