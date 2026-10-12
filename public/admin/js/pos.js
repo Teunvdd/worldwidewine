@@ -5,6 +5,14 @@
 (function () {
   var e = A.esc, eu = A.euro;
   var round = function (n) { return Math.round(n * 100) / 100; };
+  // Eenvoudige lijnicoontjes (kleuren mee met de tekst), net zo strak als ＋ % €.
+  function svg(d) { return "<svg viewBox='0 0 24 24' width='1em' height='1em' fill='none' stroke='currentColor' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'>" + d + "</svg>"; }
+  var ICON = {
+    trash: svg("<path d='M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3'/>"),
+    tag: svg("<path d='M3 12V4h8l10 10-8 8z'/><circle cx='7.5' cy='8.5' r='1.3'/>"),
+    receipt: svg("<path d='M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6'/>"),
+    user: svg("<circle cx='12' cy='8' r='4'/><path d='M4 21c1-4.5 4.5-6.5 8-6.5s7 2 8 6.5'/>")
+  };
   var METHODS = [
     { key: "pin", label: "Pin", icon: "▭" },
     { key: "contant", label: "Contant", icon: "€" },
@@ -277,12 +285,11 @@
   function productScreen() {
     var chips = filters();
     if (S.type && !chips.some(function (c) { return c.key === S.type; })) S.type = "";
-    var keys = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ",", "0", "back"];
     var tools = [
       { key: "qty", icon: "＋", label: "Aantal" },
       { key: "disc", icon: "%", label: "Korting", off: S.settings.allowDiscount === false },
       { key: "price", icon: "€", label: "Prijs", off: S.settings.allowPriceChange === false },
-      { key: "C", icon: "🗑", label: "Verwijder", cls: " po-tool-del" }
+      { key: "C", icon: ICON.trash, label: "Verwijder", cls: " po-tool-del" }
     ];
     return "<div class='pos-main'>" +
       "<section class='pos-products'>" +
@@ -300,15 +307,12 @@
           "<nav class='po-tools'>" + tools.map(function (t) {
             return "<button class='po-tool" + (t.key !== "C" ? " np-mode" : "") + (t.cls || "") + "' data-key='" + t.key + "'" + (t.off ? " disabled title='Uitgezet in Kassa-instellingen'" : "") + ">" +
               "<span class='po-tool-icon'>" + t.icon + "</span>" + t.label + "</button>";
-          }).join("") + "</nav>" +
+          }).join("") +
+            "<button class='po-tool po-tool-sep' data-act='ticket-discount' id='po-tdisc'" + (S.settings.allowDiscount === false ? " disabled" : "") + "><span class='po-tool-icon'>" + ICON.tag + "</span>Bonkorting</button>" +
+            "<button class='po-tool' data-act='clear'><span class='po-tool-icon'>" + ICON.receipt + "</span>Nieuwe bon</button>" +
+          "</nav>" +
         "</div>" +
-        "<div class='po-pad'>" +
-          "<div class='pad-keys'>" + keys.map(function (k) { return "<button class='pad-key" + (k === "back" ? " pad-back" : "") + "' data-key='" + k + "'>" + (k === "back" ? "⌫" : k) + "</button>"; }).join("") + "</div>" +
-          "<div class='pad-acts'>" +
-            "<button class='pad-act' data-act='ticket-discount' id='po-tdisc'" + (S.settings.allowDiscount === false ? " disabled" : "") + "><span>🏷</span>Bonkorting</button>" +
-            "<button class='pad-act' data-act='clear'><span>🧾</span>Nieuwe bon</button>" +
-          "</div>" +
-        "</div>" +
+        "<div class='po-numpad' id='po-numpad' hidden></div>" +
         "<footer class='po-bar'>" +
           "<button class='po-bar-btn' data-act='customer' id='po-customer'></button>" +
           "<button class='po-pay' data-act='pay' id='po-pay'><span class='po-pay-label'>Betalen ›</span><strong id='po-pay-total'></strong></button>" +
@@ -362,7 +366,7 @@
             (it.discount ? " · <span class='po-disc'>−" + String(it.discount).replace(".", ",") + "% korting</span>" : "");
           return "<div class='po-line" + (sel ? " selected" : "") + "' data-line='" + e(it.id) + "'>" +
             "<div class='po-line-main'><span class='po-name'>" + e(A.productName(p)) + "</span><strong>" + (l ? eu(l.total) : "—") + "</strong></div>" +
-            "<div class='po-line-sub'>" + detail + (sel && modeHint ? " <span class='po-mode-hint'>" + modeHint + "</span>" : "") + "</div></div>";
+            "<div class='po-line-sub'>" + detail + (sel && modeHint && S.pad.open ? " <span class='po-mode-hint'>" + modeHint + "</span>" : "") + "</div></div>";
         }).join("") +
         "<div class='po-sum'>" +
           (t.errors.length ? "<p class='po-warn'>" + t.errors.map(e).join("<br>") + "</p>" : "") +
@@ -378,10 +382,60 @@
     root.querySelector("#po-pay-total").textContent = eu(t.total);
     root.querySelector("#po-pay").disabled = !t.lines.length || t.errors.length > 0;
     var c = S.ticket.customer;
-    root.querySelector("#po-customer").innerHTML = "<span class='po-bar-icon'>👤</span><span class='po-bar-label'>" + (c ? e(c.name || c.email) : "Klant") + "</span>";
+    root.querySelector("#po-customer").innerHTML = "<span class='po-bar-icon'>" + ICON.user + "</span><span class='po-bar-label'>" + (c ? e(c.name || c.email) : "Klant") + "</span>";
     root.querySelector("#po-customer").classList.toggle("active", !!c);
     root.querySelector("#po-tdisc").classList.toggle("active", !!S.ticket.discount);
-    root.querySelectorAll(".np-mode").forEach(function (b) { b.classList.toggle("active", b.dataset.key === S.pad.mode); });
+    root.querySelectorAll(".np-mode").forEach(function (b) { b.classList.toggle("active", !!S.pad.open && b.dataset.key === S.pad.mode); });
+    drawPad();
+  }
+
+  // Toetsenblok als pop-up naast de bon: verschijnt pas als je op een regel (of Aantal/Korting/Prijs) tikt.
+  var PAD_MODES = [
+    { key: "qty", label: "Aantal" },
+    { key: "disc", label: "Korting", off: function () { return S.settings.allowDiscount === false; } },
+    { key: "price", label: "Prijs", off: function () { return S.settings.allowPriceChange === false; } }
+  ];
+
+  function openPad(mode) {
+    if (!line(S.ticket.selected)) return;
+    S.pad.open = true; S.pad.buffer = "";
+    if (mode) S.pad.mode = mode;
+    drawTicket();
+  }
+
+  function closePad() {
+    if (!S.pad.open) return;
+    S.pad.open = false; S.pad.buffer = ""; S.pad.mode = "qty";
+    drawTicket();
+  }
+
+  function drawPad() {
+    var box = root.querySelector("#po-numpad");
+    if (!box) return;
+    var it = line(S.ticket.selected), p = it && byId(it.id);
+    if (!S.pad.open || !p) { S.pad.open = false; box.hidden = true; box.innerHTML = ""; return; }
+    var cur = S.pad.mode === "qty" ? String(it.qty)
+      : S.pad.mode === "disc" ? (it.discount ? String(it.discount).replace(".", ",") : "0")
+      : it.price != null ? String(it.price).replace(".", ",") : p.price != null ? String(p.price).replace(".", ",") : "";
+    var unit = { qty: "", disc: " %", price: "" }[S.pad.mode];
+    var pre = S.pad.mode === "price" ? "€ " : "";
+    var key = function (k, label, cls) { return "<button class='nk" + (cls || "") + "' data-key='" + k + "'>" + label + "</button>"; };
+    box.hidden = false;
+    box.innerHTML =
+      "<div class='nk-head'>" +
+        "<div class='nk-modes'>" + PAD_MODES.map(function (m) {
+          var off = m.off && m.off();
+          return "<button class='nk-mode" + (S.pad.mode === m.key ? " active" : "") + "' data-key='" + m.key + "'" + (off ? " disabled" : "") + ">" + m.label + "</button>";
+        }).join("") + "</div>" +
+        "<div class='nk-name'>" + e(A.productName(p)) + "</div>" +
+        "<div class='nk-value" + (S.pad.buffer ? "" : " is-current") + "'>" + pre + e(S.pad.buffer || cur) + unit + "</div>" +
+      "</div>" +
+      "<div class='nk-keys'>" +
+        key("1", "1") + key("2", "2") + key("3", "3") + key("back", "⌫", " nk-back") +
+        key("4", "4") + key("5", "5") + key("6", "6") + key(",", ",", S.pad.mode === "qty" ? " nk-off" : "") +
+        key("7", "7") + key("8", "8") + key("9", "9") + "<button class='nk nk-ok' data-act='pad-ok'>OK</button>" +
+        key("clr", "Wis", " nk-clr") + key("0", "0") + key("00", "00") +
+      "</div>";
   }
 
   function addProduct(id) {
@@ -392,7 +446,7 @@
     S.ticket.selected = id;
     S.pad.buffer = "";
     S.pad.mode = p.price == null && it.price == null ? "price" : "qty";
-    if (S.pad.mode === "price") A.toast("Voer de prijs in met het toetsenblok.");
+    S.pad.open = S.pad.mode === "price"; // zonder prijs meteen het toetsenblok tonen
     save(); drawTicket();
     var card = root.querySelector("[data-add='" + CSS.escape(id) + "']");
     if (card) { card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash"); }
@@ -431,7 +485,7 @@
     return unlock("deleteLine").then(function (ok) {
       if (!ok) return;
       S.ticket.items = S.ticket.items.filter(function (x) { return x.id !== S.ticket.selected; });
-      S.ticket.selected = null; S.pad.buffer = ""; S.pad.mode = "qty";
+      S.ticket.selected = null; S.pad.buffer = ""; S.pad.mode = "qty"; S.pad.open = false;
       save(); drawTicket();
     });
   }
@@ -443,11 +497,14 @@
       if (k === "price" && S.settings.allowPriceChange === false) return A.toast("Prijs wijzigen staat uit in de Kassa-instellingen.", "error");
       if (k === "disc" && S.settings.allowDiscount === false) return A.toast("Korting geven staat uit in de Kassa-instellingen.", "error");
       var action = k === "price" ? "priceChange" : k === "disc" ? "discount" : null;
-      if (!action) { S.pad.mode = k; S.pad.buffer = ""; drawTicket(); return; }
-      return unlock(action).then(function (ok) { if (ok) { S.pad.mode = k; S.pad.buffer = ""; drawTicket(); } });
+      if (!line(S.ticket.selected)) return A.toast("Kies eerst een regel op de bon.");
+      if (!action) return openPad(k);
+      return unlock(action).then(function (ok) { if (ok) openPad(k); });
     }
     if (!line(S.ticket.selected)) return;
     if (k === "C") return removeSelected();
+    if (k === "clr") { S.pad.buffer = ""; return drawPad(); }
+    if (k === "00") { padKey("0"); return padKey("0"); }
     if (k === "back") {
       if (!S.pad.buffer) { // lege invoer: terug naar standaard / regel weg
         S.pad.buffer = "";
@@ -469,7 +526,7 @@
   function goPay() {
     var t = totals();
     if (!t.lines.length || t.errors.length) return;
-    S.screen = "payment";
+    S.screen = "payment"; S.pad.open = false;
     S.pay = { lines: [], selected: -1, buffer: "" };
     draw();
   }
@@ -676,11 +733,13 @@
   // ---------------------------------------------------------------- Invoer
 
   function onClick(ev) {
+    // Tik buiten het toetsenblok: toetsenblok dicht.
+    if (S.pad && S.pad.open && !ev.target.closest(".po-numpad, .po-line, .np-mode")) closePad();
     var t = ev.target.closest("[data-act],[data-key],[data-add],[data-line],[data-type],[data-method],[data-pline],[data-pdel]");
     if (!t) return;
     if (t.dataset.add) return addProduct(t.dataset.add);
     if (t.dataset.key) return padKey(t.dataset.key);
-    if (t.dataset.line) { S.ticket.selected = t.dataset.line; S.pad.buffer = ""; S.pad.mode = "qty"; return drawTicket(); }
+    if (t.dataset.line) { S.ticket.selected = t.dataset.line; return openPad("qty"); }
     if (t.dataset.type !== undefined && t.classList.contains("chip")) {
       S.type = t.dataset.type;
       root.querySelectorAll("#pos-types .chip").forEach(function (c) { c.classList.toggle("active", c === t); });
@@ -706,6 +765,7 @@
           });
         });
       case "open-session": return doOpenSession(t);
+      case "pad-ok": return closePad();
       case "pay": return goPay();
       case "back": S.screen = "products"; return draw();
       case "validate": return validate(t);
@@ -769,7 +829,8 @@
         return;
       }
       ev.preventDefault();
-      if (S.screen === "products") goPay();
+      if (S.screen === "products" && S.pad.open) closePad();
+      else if (S.screen === "products") goPay();
       else if (S.screen === "payment") { var b = root.querySelector("#pay-validate"); if (b && !b.disabled) validate(b); }
       else if (S.screen === "receipt") { S.screen = "products"; draw(); }
       else if (S.screen === "open") { var o = root.querySelector("[data-act=open-session]"); if (o) doOpenSession(o); }
@@ -778,13 +839,14 @@
     if (ev.key === "Backspace") { ev.preventDefault(); return padKey("back"); }
     if (ev.key === "," || ev.key === ".") { ev.preventDefault(); return padKey(","); }
     if (ev.key === "Delete") { ev.preventDefault(); return padKey("C"); }
+    if (ev.key === "Escape" && S.pad.open) return closePad();
     if (ev.key === "Escape" && S.screen === "payment") { S.screen = "products"; return draw(); }
     if (ev.key === "ArrowUp" || ev.key === "ArrowDown") {
       if (S.screen !== "products" || !S.ticket.items.length) return;
       ev.preventDefault();
       var i = S.ticket.items.findIndex(function (x) { return x.id === S.ticket.selected; });
       i = Math.max(0, Math.min(S.ticket.items.length - 1, i + (ev.key === "ArrowUp" ? -1 : 1)));
-      S.ticket.selected = S.ticket.items[i].id; S.pad.buffer = ""; S.pad.mode = "qty"; drawTicket();
+      S.ticket.selected = S.ticket.items[i].id; S.pad.buffer = ""; if (!S.pad.open) S.pad.mode = "qty"; drawTicket();
     }
   }
 

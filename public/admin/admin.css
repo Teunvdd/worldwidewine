@@ -236,7 +236,7 @@ body.pos-mode .main { padding: 0 !important; height: 100vh; }
 /* Producten links, de bon rechts (in de stijl van de kassa op de foto). */
 .pos-main { display: grid; grid-template-columns: 1fr minmax(400px, 34%); height: 100%; }
 .pos-order { display: flex; flex-direction: column; background: #e9e5e1; border-left: 1px solid #d6cfc8; min-height: 0; }
-.po-body { flex: 1; display: grid; grid-template-columns: 1fr 96px; min-height: 0; }
+.po-body { flex: 1; display: grid; grid-template-columns: 1fr 78px; min-height: 0; }
 .po-ticket { overflow-y: auto; min-height: 0; background: #faf9f8; border-right: 1px solid #ddd6cf; border-bottom: 1px solid #ddd6cf; }
 .po-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); gap: .5rem; text-align: center; padding: 1rem; }
 .po-empty span { font-size: 2.6rem; opacity: .5; }
@@ -256,31 +256,40 @@ body.pos-mode .main { padding: 0 !important; height: 100vh; }
 .po-sum-row { font-size: 1rem; color: #4a423d; }
 .po-warn { color: var(--warn); font-size: .85rem; margin: 0 0 .5rem; text-align: right; }
 
-.po-tools { display: flex; flex-direction: column; background: #e9e5e1; }
-.po-tool { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .35rem; min-height: 92px; border: 0; border-bottom: 1px solid #d6cfc8; background: #fff; font: inherit; font-size: .95rem; color: #3a3430; cursor: pointer; }
-.po-tool-icon { font-size: 1.45rem; font-weight: 700; line-height: 1; }
+.po-tools { display: flex; flex-direction: column; background: #e9e5e1; overflow-y: auto; }
+.po-tool { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25rem; min-height: 68px; padding: .4rem .2rem; border: 0; border-bottom: 1px solid #d6cfc8; background: #fff; font: inherit; font-size: .8rem; line-height: 1.15; text-align: center; color: #3a3430; cursor: pointer; }
+.po-tool-icon { display: grid; place-items: center; height: 1.2rem; font-size: 1.2rem; font-weight: 700; line-height: 1; }
 .po-tool:hover { background: #f4f1ee; }
 .po-tool.active { background: var(--brand); color: #fff; }
 .po-tool:disabled { color: #bdb4ad; cursor: not-allowed; background: #f6f3f0; }
 .po-tool-del { color: var(--bad); }
+.po-tool-sep { margin-top: auto; border-top: 1px solid #d6cfc8; }
 
-.po-pad { display: grid; grid-template-columns: 3fr 1.15fr; gap: 8px; padding: 10px 12px; flex: none; }
-.pad-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.pad-acts { display: grid; grid-template-rows: 1fr 1fr; gap: 8px; }
-.pad-key, .pad-act { border: 1px solid #d3cbc4; border-radius: 6px; background: #fff; font: inherit; color: #3a3430; cursor: pointer; box-shadow: 0 1px 0 rgba(0,0,0,.04); }
-.pad-key { min-height: 50px; font-size: 1.35rem; font-weight: 600; }
-.pad-key:active, .pad-act:active { background: #f3dccd; }
-.pad-back { font-size: 1.4rem; }
-.pad-act { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .3rem; font-size: .95rem; font-weight: 500; }
-.pad-act span { font-size: 1.35rem; }
-.pad-act.active { border-color: var(--brand); color: var(--wine); background: #fdf0e8; }
-.pad-act:disabled { opacity: .45; cursor: not-allowed; }
+/* Toetsenblok als pop-up links naast de bon. */
+.pos-order { position: relative; }
+.po-numpad { position: absolute; top: 12px; right: calc(100% + 12px); z-index: 20; width: 360px; background: #f4f2f0; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.28); padding: 12px; }
+.po-numpad::after { content: ""; position: absolute; top: 34px; right: -9px; border: 9px solid transparent; border-right: 0; border-left-color: #f4f2f0; }
+.nk-head { margin-bottom: 10px; }
+.nk-modes { display: flex; gap: 6px; }
+.nk-mode { flex: 1; border: 0; border-radius: 6px; background: #e3ded9; color: #3a3430; font: inherit; font-weight: 600; padding: .55rem .4rem; cursor: pointer; }
+.nk-mode.active { background: var(--brand); color: #fff; }
+.nk-mode:disabled { opacity: .45; cursor: not-allowed; }
+.nk-name { margin-top: .55rem; font-size: .85rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nk-value { font-size: 2rem; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; color: #3a3430; padding: .1rem .2rem; min-height: 2.6rem; }
+.nk-value.is-current { color: #a39a93; }
+.nk-keys { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 58px; gap: 6px; }
+.nk { border: 0; border-radius: 6px; background: #fff; font: inherit; font-size: 1.45rem; font-weight: 600; color: #2a2522; cursor: pointer; }
+.nk:active { background: #f3dccd; }
+.nk-off { color: #c9c1bb; }
+.nk-clr { font-size: 1rem; color: var(--muted); }
+.nk-ok { grid-row: span 2; background: var(--brand); color: #fff; font-size: 1.3rem; }
+.nk-ok:active { background: var(--wine); }
 
 .po-bar { display: grid; grid-template-columns: 1fr 1.25fr; background: #3a3a3a; flex: none; min-height: 92px; }
 .po-bar-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .35rem; border: 0; background: transparent; color: #fff; font: inherit; font-size: 1.05rem; font-weight: 600; cursor: pointer; min-width: 0; padding: .5rem; }
 .po-bar-btn:hover { background: #474747; }
 .po-bar-btn.active { color: var(--peach); }
-.po-bar-icon { font-size: 1.5rem; line-height: 1; }
+.po-bar-icon { font-size: 1.4rem; line-height: 1; display: grid; place-items: center; }
 .po-bar-label { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .po-pay { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem; border: 0; background: var(--brand); color: #fff; font: inherit; cursor: pointer; padding: .5rem; }
 .po-pay-label { font-size: 1.15rem; font-weight: 600; }
@@ -373,6 +382,8 @@ body.pos-mode .main { padding: 0 !important; height: 100vh; }
   .po-ticket { max-height: 50vh; }
   .pp-grid { max-height: 60vh; }
   .pos-session { display: none; }
+  .po-numpad { position: fixed; top: 50%; left: 50%; right: auto; transform: translate(-50%, -50%); width: min(360px, calc(100vw - 32px)); }
+  .po-numpad::after { display: none; }
 }
 
 /* Kassabon */
