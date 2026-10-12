@@ -417,3 +417,15 @@ test("site-adres: SITE_URL, anders het productie-adres van Vercel", () => {
   delete process.env.SITE_URL; delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
   assert.strictEqual(siteUrl({ headers: { "x-forwarded-proto": "https", host: "a.b" } }), "https://a.b");
 });
+
+test("duidelijke foutmeldingen bij verkeerde Supabase-instellingen", async () => {
+  const { explain } = require("../lib/db");
+  assert.match(explain({ code: "42501", message: "permission denied for table products" }), /secret key/);
+  assert.match(explain({ code: "PGRST205", message: "Could not find the table 'public.pos_sessions' in the schema cache" }), /setup\.sql/);
+  assert.match(explain({ code: "PGRST301", message: "JWSError" }), /sleutel is ongeldig/);
+  assert.match(explain({ code: "", message: "TypeError: fetch failed" }), /SUPABASE_URL/);
+  // Echte fout met de publieke (anon) sleutel tegen de lokale database
+  const { createClient } = require("@supabase/supabase-js");
+  const { error } = await createClient(stack.url, stack.anonKey, { auth: { persistSession: false } }).from("products").select("id").limit(1);
+  assert.match(explain(error), /niet de anon\/publishable key/);
+});
