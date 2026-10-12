@@ -48,9 +48,10 @@ var A = (function () {
   // Gedeelde gegevens, met eenvoudige cache per sessie.
   function load(name, force) {
     if (!force && cache[name]) return Promise.resolve(cache[name]);
-    var path = { products: "products", customers: "customers", orders: "orders?months=3" }[name];
+    var path = { products: "products", categories: "categories", customers: "customers", orders: "orders?months=3" }[name];
     return api("GET", path).then(function (j) { cache[name] = j[name]; return cache[name]; });
   }
+  function cacheOf(name) { return cache[name]; }
   function invalidate() { Array.prototype.forEach.call(arguments, function (n) { delete cache[n]; }); }
 
   // ---- Meldingen en vensters ----
@@ -244,7 +245,7 @@ var A = (function () {
 
   return {
     $: $, $$: $$, esc: esc, euro: euro, date: date, parseNum: parseNum,
-    api: api, load: load, invalidate: invalidate, toast: toast, modal: modal, closeModal: closeModal, closeModalSilently: closeModalSilently,
+    api: api, load: load, cacheOf: cacheOf, invalidate: invalidate, toast: toast, modal: modal, closeModal: closeModal, closeModalSilently: closeModalSilently,
     confirm: confirmBox, formData: formData, busy: busy, register: register, route: route, start: start,
     enterFullscreen: enterFullscreen, exitFullscreen: exitFullscreen, isFullscreen: isFullscreen, openPos: openPos, printHtml: printHtml,
     refreshBadges: refreshBadges, statusBadge: statusBadge, stockBadge: stockBadge, productName: productName, productArt: productArt,

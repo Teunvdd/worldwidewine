@@ -167,7 +167,9 @@
     document.body.classList.add("pos-mode");
     S = { settings: {}, pin: "", screen: "products", products: [], session: null, lastClosingCash: 0, type: "", q: "",
       ticket: restore(), pad: { mode: "qty", buffer: "" }, pay: { lines: [], selected: -1, buffer: "" }, lastOrder: null, scan: "", scanAt: 0, scanTimer: null };
-    return Promise.all([A.api("GET", "pos/session"), A.load("products", true)]).then(function (res) {
+    var cats = A.load("categories", true).catch(function () { return []; }); // tabel ontbreekt nog: indelen op soort
+    return Promise.all([A.api("GET", "pos/session"), A.load("products", true), cats]).then(function (res) {
+      S.categories = res[2] || [];
       S.session = res[0].session; S.lastClosingCash = res[0].suggestedOpeningCash != null ? res[0].suggestedOpeningCash : (res[0].lastClosingCash || 0); S.products = res[1];
       S.settings = res[0].settings || {};
       A.posSettings = S.settings;
@@ -256,42 +258,71 @@
 
   // ---------------------------------------------------------------- Productscherm
 
+  // Knoppen boven de producten: de categorieën uit Producten → Categorieën. Zijn er nog geen
+  // categorieën, dan delen we in op soort (Rood, Wit, …).
+  function filters() {
+    var live = S.products.filter(sellable);
+    if (S.categories && S.categories.length) {
+      var list = S.categories.filter(function (c) { return live.some(function (p) { return p.categoryId === c.id; }); })
+        .map(function (c) { return { key: "c" + c.id, label: c.name, color: c.color, test: function (p) { return p.categoryId === c.id; } }; });
+      var known = {};
+      S.categories.forEach(function (c) { known[c.id] = true; });
+      if (live.some(function (p) { return !known[p.categoryId]; })) list.push({ key: "none", label: "Overig", test: function (p) { return !known[p.categoryId]; } });
+      return list;
+    }
+    return Object.keys(A.TYPES).filter(function (t) { return live.some(function (p) { return p.type === t; }); })
+      .map(function (t) { return { key: "t" + t, label: A.TYPES[t], test: function (p) { return p.type === t; } }; });
+  }
+
   function productScreen() {
-    var types = Object.keys(A.TYPES).filter(function (t) { return S.products.some(function (p) { return p.type === t && sellable(p); }); });
-    var pad = [["1", "2", "3", "qty"], ["4", "5", "6", "disc"], ["7", "8", "9", "price"], ["C", "0", ",", "back"]];
-    var labels = { qty: "Aantal", disc: "% Korting", price: "Prijs", back: "⌫", C: "Wis regel" };
+    var chips = filters();
+    if (S.type && !chips.some(function (c) { return c.key === S.type; })) S.type = "";
+    var keys = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ",", "0", "back"];
+    var tools = [
+      { key: "qty", icon: "＋", label: "Aantal" },
+      { key: "disc", icon: "%", label: "Korting", off: S.settings.allowDiscount === false },
+      { key: "price", icon: "€", label: "Prijs", off: S.settings.allowPriceChange === false },
+      { key: "C", icon: "🗑", label: "Verwijder", cls: " po-tool-del" }
+    ];
     return "<div class='pos-main'>" +
-      "<section class='pos-order'>" +
-        "<div class='po-lines' id='po-lines'></div>" +
-        "<div class='po-totals' id='po-totals'></div>" +
-        "<div class='po-actions'>" +
-          "<button class='po-btn' data-act='customer' id='po-customer'>👤 Klant</button>" +
-          "<button class='po-btn' data-act='ticket-discount' id='po-tdisc'" + (S.settings.allowDiscount === false ? " disabled" : "") + ">Bonkorting</button>" +
-          "<button class='po-btn' data-act='clear'>Nieuwe bon</button>" +
-        "</div>" +
-        "<div class='numpad'>" + pad.map(function (row) {
-          return row.map(function (k) {
-            var isMode = k === "qty" || k === "disc" || k === "price";
-            var off = (k === "price" && S.settings.allowPriceChange === false) || (k === "disc" && S.settings.allowDiscount === false);
-            return "<button class='np-key" + (isMode ? " np-mode" : "") + (k === "back" ? " np-back" : "") + (k === "C" ? " np-clear" : "") + "' data-key='" + k + "'" + (off ? " disabled title='Uitgezet in Kassa-instellingen'" : "") + ">" + (labels[k] || k) + "</button>";
-          }).join("");
-        }).join("") + "</div>" +
-        "<button class='po-pay' data-act='pay' id='po-pay'><span>Betalen</span><strong id='po-pay-total'></strong></button>" +
-      "</section>" +
       "<section class='pos-products'>" +
         "<div class='chips' id='pos-types'><button class='chip" + (!S.type ? " active" : "") + "' data-type=''>Alles</button>" +
-          types.map(function (t) { return "<button class='chip" + (S.type === t ? " active" : "") + "' data-type='" + t + "'>" + A.TYPES[t] + "</button>"; }).join("") +
+          chips.map(function (c) {
+            return "<button class='chip" + (S.type === c.key ? " active" : "") + "' data-type='" + e(c.key) + "'" + (c.color ? " style='--cc:" + c.color + "'" : "") + ">" +
+              (c.color ? "<i class='chip-dot'></i>" : "") + e(c.label) + "</button>";
+          }).join("") +
         "</div>" +
         "<div class='pp-grid size-" + (S.settings.cardSize || "normaal") + (S.settings.showImages === false ? " no-images" : "") + "' id='pp-grid'></div>" +
+      "</section>" +
+      "<section class='pos-order'>" +
+        "<div class='po-body'>" +
+          "<div class='po-ticket' id='po-lines'></div>" +
+          "<nav class='po-tools'>" + tools.map(function (t) {
+            return "<button class='po-tool" + (t.key !== "C" ? " np-mode" : "") + (t.cls || "") + "' data-key='" + t.key + "'" + (t.off ? " disabled title='Uitgezet in Kassa-instellingen'" : "") + ">" +
+              "<span class='po-tool-icon'>" + t.icon + "</span>" + t.label + "</button>";
+          }).join("") + "</nav>" +
+        "</div>" +
+        "<div class='po-pad'>" +
+          "<div class='pad-keys'>" + keys.map(function (k) { return "<button class='pad-key" + (k === "back" ? " pad-back" : "") + "' data-key='" + k + "'>" + (k === "back" ? "⌫" : k) + "</button>"; }).join("") + "</div>" +
+          "<div class='pad-acts'>" +
+            "<button class='pad-act' data-act='ticket-discount' id='po-tdisc'" + (S.settings.allowDiscount === false ? " disabled" : "") + "><span>🏷</span>Bonkorting</button>" +
+            "<button class='pad-act' data-act='clear'><span>🧾</span>Nieuwe bon</button>" +
+          "</div>" +
+        "</div>" +
+        "<footer class='po-bar'>" +
+          "<button class='po-bar-btn' data-act='customer' id='po-customer'></button>" +
+          "<button class='po-pay' data-act='pay' id='po-pay'><span class='po-pay-label'>Betalen ›</span><strong id='po-pay-total'></strong></button>" +
+        "</footer>" +
       "</section>" +
     "</div>";
   }
 
   function visible() {
     var q = S.q.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+    var chip = S.type && filters().find(function (c) { return c.key === S.type; });
     return S.products.filter(function (p) {
       if (!sellable(p)) return false;
-      if (S.type && p.type !== S.type) return false;
+      if (chip && !chip.test(p)) return false;
       if (!q) return true;
       var hay = [p.name, p.producer, p.region, p.country, p.grape, p.ean, p.vintage].join(" ").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
       return q.split(/\s+/).every(function (w) { return hay.indexOf(w) >= 0; });
@@ -319,31 +350,36 @@
     if (S.ticket.selected && !line(S.ticket.selected)) S.ticket.selected = S.ticket.items.length ? S.ticket.items[S.ticket.items.length - 1].id : null;
     var byLine = {};
     t.lines.forEach(function (l) { byLine[l.id] = l; });
-    box.innerHTML = S.ticket.items.length ? S.ticket.items.map(function (it) {
-      var p = byId(it.id), l = byLine[it.id];
-      if (!p) return "";
-      var sel = it.id === S.ticket.selected;
-      var detail = it.qty + " × " + (l ? eu(l.price) : "<em>prijs invoeren</em>") +
-        (l && l.listPrice != null ? " <s>" + eu(l.listPrice) + "</s>" : "") +
-        (it.discount ? " · <span class='po-disc'>−" + String(it.discount).replace(".", ",") + "%</span>" : "");
-      return "<div class='po-line" + (sel ? " selected" : "") + "' data-line='" + e(it.id) + "'>" +
-        "<div class='po-line-main'><span class='po-name'>" + e(A.productName(p)) + "</span><strong>" + (l ? eu(l.total) : "—") + "</strong></div>" +
-        "<div class='po-line-sub'>" + detail + "</div></div>";
-    }).join("") : "<div class='po-empty'><span>🛒</span>Tik op een product of scan een barcode</div>";
+    var vat = t.vat.reduce(function (s, v) { return s + v.vat; }, 0);
+    var modeHint = { disc: "typ korting", price: "typ prijs" }[S.pad.mode];
+    box.innerHTML = S.ticket.items.length
+      ? S.ticket.items.map(function (it) {
+          var p = byId(it.id), l = byLine[it.id];
+          if (!p) return "";
+          var sel = it.id === S.ticket.selected;
+          var detail = "<b>" + it.qty + "</b> " + e(p.unit || "stuk") + " à " + (l ? eu(l.price) : "<em>prijs invoeren</em>") +
+            (l && l.listPrice != null ? " <s>" + eu(l.listPrice) + "</s>" : "") +
+            (it.discount ? " · <span class='po-disc'>−" + String(it.discount).replace(".", ",") + "% korting</span>" : "");
+          return "<div class='po-line" + (sel ? " selected" : "") + "' data-line='" + e(it.id) + "'>" +
+            "<div class='po-line-main'><span class='po-name'>" + e(A.productName(p)) + "</span><strong>" + (l ? eu(l.total) : "—") + "</strong></div>" +
+            "<div class='po-line-sub'>" + detail + (sel && modeHint ? " <span class='po-mode-hint'>" + modeHint + "</span>" : "") + "</div></div>";
+        }).join("") +
+        "<div class='po-sum'>" +
+          (t.errors.length ? "<p class='po-warn'>" + t.errors.map(e).join("<br>") + "</p>" : "") +
+          (t.warnings.length ? "<p class='po-warn'>⚠ " + t.warnings.map(e).join("<br>⚠ ") + "</p>" : "") +
+          (t.discount ? "<div class='po-sum-row'>Bonkorting" + (S.ticket.discount.type === "percent" ? " " + S.ticket.discount.value + "%" : "") + ": − " + eu(t.discount) + "</div>" : "") +
+          "<div class='po-sum-total'>Totaal: " + eu(t.total) + "</div>" +
+          "<div class='po-sum-row'>Btw: " + eu(vat) + "</div>" +
+        "</div>"
+      : "<div class='po-empty'><span>🛒</span>Tik op een product of scan een barcode</div>";
     var sel = box.querySelector(".selected");
     if (sel) sel.scrollIntoView({ block: "nearest" });
 
-    var vat = t.vat.reduce(function (s, v) { return s + v.vat; }, 0);
-    root.querySelector("#po-totals").innerHTML =
-      (t.errors.length && S.ticket.items.length ? "<p class='po-warn'>" + t.errors.map(e).join("<br>") + "</p>" : "") +
-      (t.warnings.length ? "<p class='po-warn'>⚠ " + t.warnings.map(e).join("<br>⚠ ") + "</p>" : "") +
-      (t.discount ? "<div class='row'><span>Bonkorting" + (S.ticket.discount.type === "percent" ? " " + S.ticket.discount.value + "%" : "") + "</span><span>− " + eu(t.discount) + "</span></div>" : "") +
-      "<div class='row row-total'><span>Totaal</span><span>" + eu(t.total) + "</span></div>" +
-      "<div class='row small muted'><span>waarvan btw</span><span>" + eu(vat) + "</span></div>";
     root.querySelector("#po-pay-total").textContent = eu(t.total);
     root.querySelector("#po-pay").disabled = !t.lines.length || t.errors.length > 0;
-    root.querySelector("#po-customer").innerHTML = S.ticket.customer ? "👤 " + e(S.ticket.customer.name || S.ticket.customer.email) : "👤 Klant";
-    root.querySelector("#po-customer").classList.toggle("active", !!S.ticket.customer);
+    var c = S.ticket.customer;
+    root.querySelector("#po-customer").innerHTML = "<span class='po-bar-icon'>👤</span><span class='po-bar-label'>" + (c ? e(c.name || c.email) : "Klant") + "</span>";
+    root.querySelector("#po-customer").classList.toggle("active", !!c);
     root.querySelector("#po-tdisc").classList.toggle("active", !!S.ticket.discount);
     root.querySelectorAll(".np-mode").forEach(function (b) { b.classList.toggle("active", b.dataset.key === S.pad.mode); });
   }

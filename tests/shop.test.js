@@ -189,7 +189,7 @@ test("online betalen via Mollie: betaling starten en webhook verwerken", async (
 test("publieke sleutel (anon) kan niets lezen of wijzigen", async () => {
   const { createClient } = require("@supabase/supabase-js");
   const anon = createClient(stack.url, stack.anonKey, { auth: { persistSession: false } });
-  for (const table of ["products", "customers", "orders", "order_lines", "stock_movements", "pos_sessions", "settings"]) {
+  for (const table of ["products", "customers", "orders", "order_lines", "stock_movements", "pos_sessions", "settings", "categories"]) {
     const { data, error } = await anon.from(table).select("*").limit(1);
     assert.ok(error || (data && data.length === 0), table + " is leesbaar met de anon-sleutel");
     assert.ok(error, table + " zou een permissiefout moeten geven");
@@ -232,6 +232,39 @@ test("product bewerken: velden leegmaken werkt", async () => {
   assert.strictEqual(p.oldPrice, undefined);
   assert.deepStrictEqual(p.tags, []);
   assert.strictEqual(p.price, 11.9);
+});
+
+test("categorieën: aanmaken, volgorde, toewijzen aan product en verwijderen", async () => {
+  const a = await shop.saveCategory({ name: "Italië", color: "#CE542B" });
+  const b = await shop.saveCategory({ name: "Bubbels" });
+  assert.strictEqual(a.color, "#ce542b");
+  await assert.rejects(shop.saveCategory({ name: "italië" }), /bestaat al/);
+  await assert.rejects(shop.saveCategory({ name: "  " }), /naam/);
+  let list = await shop.orderCategories([b.id, a.id]);
+  assert.deepStrictEqual(list.map((c) => c.name), ["Bubbels", "Italië"]);
+
+  await shop.saveProduct({ originalId: "rainoldi-zapel-bianco", categoryId: a.id });
+  let p = (await shop.getProducts()).find((x) => x.id === "rainoldi-zapel-bianco");
+  assert.strictEqual(p.categoryId, a.id);
+  await assert.rejects(shop.saveProduct({ originalId: "rainoldi-zapel-bianco", categoryId: 999999 }), /bestaat niet/);
+
+  // Een product bewerken zonder categorieveld laat de categorie staan.
+  await shop.saveProduct({ originalId: "rainoldi-zapel-bianco", name: p.name });
+  p = (await shop.getProducts()).find((x) => x.id === "rainoldi-zapel-bianco");
+  assert.strictEqual(p.categoryId, a.id);
+
+  await shop.deleteCategory(a.id);
+  p = (await shop.getProducts()).find((x) => x.id === "rainoldi-zapel-bianco");
+  assert.strictEqual(p.categoryId, undefined);
+  await shop.deleteCategory(b.id);
+
+  // Op basis van soort: elke soort een categorie, producten worden ingedeeld.
+  list = await shop.categoriesFromTypes({ rood: "Rood", wit: "Wit", rose: "Rosé", mousserend: "Mousserend" });
+  assert.ok(list.some((c) => c.name === "Rood"));
+  const rood = list.find((c) => c.name === "Rood");
+  const all = await shop.getProducts();
+  assert.ok(all.filter((x) => x.type === "rood").every((x) => x.categoryId === rood.id));
+  for (const c of list) await shop.deleteCategory(c.id);
 });
 
 test("kassa: gesplitst betalen, regelkorting en aangepaste prijs", async () => {

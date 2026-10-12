@@ -97,8 +97,9 @@ Bij het eerste bezoek wordt de database automatisch gevuld met het startassortim
 ### Dagelijks gebruik
 1. **Openen:** in de admin klik je op **Kassa openen** (op het overzicht of onder *Kassa*). Tel het wisselgeld in de la en vul het beginsaldo in. De kassa gaat daarna op volledig scherm.
 2. **Verkopen:**
+   - De producten staan links, de bon rechts. Met de knoppen boven de producten kies je een **categorie** (zie hieronder).
    - Producten toevoeg je door op een productkaart te tikken, de barcode te scannen of te zoeken.
-   - Met het **toetsenblok** pas je de geselecteerde regel aan: **Aantal**, **% Korting** of **Prijs**. ⌫ wist een cijfer; "Wis regel" haalt de regel weg.
+   - Kies naast de bon **Aantal**, **Korting** of **Prijs** en typ met het **toetsenblok** de nieuwe waarde voor de geselecteerde regel. ⌫ wist een cijfer; **Verwijder** haalt de regel weg.
    - **Bonkorting** geeft korting op de hele bon, **Klant** koppelt een klant aan de verkoop.
 3. **Betalen:** op het betaalscherm kies je **Pin**, **Contant** of **Tikkie**.
    - Gesplitst betalen kan ook, bijvoorbeeld € 50 pin en de rest contant.
@@ -112,6 +113,13 @@ Bij het eerste bezoek wordt de database automatisch gevuld met het startassortim
 - Enter gaat naar betalen of valideert de betaling.
 - Esc gaat terug van het betaalscherm.
 - Een barcodescanner wordt automatisch herkend, ook zonder op het zoekveld te klikken.
+
+### Categorieën
+In de admin onder **Producten → Categorieën** maak je categorieën aan, bijvoorbeeld *Rood*, *Italië* of *Cadeaus*. Je kunt ze hernoemen, een kleur geven, verwijderen en de volgorde bepalen. Die volgorde zie je terug in de kassa.
+- Per product kies je de categorie bij het product zelf (veld **Categorie (kassa)**).
+- Nog geen categorieën? Met één klik maak je ze aan op basis van soort (Rood, Wit, Rosé, …); alle producten worden dan meteen ingedeeld.
+- Producten zonder categorie staan in de kassa onder **Overig**. Zolang er geen categorieën zijn, deelt de kassa in op soort.
+- Bij een bestaande database: voer na deze update **`supabase/setup.sql`** nog één keer uit in Supabase → SQL Editor.
 
 ### Kassa-instellingen
 In de admin onder **Kassa-instellingen** bepaal je hoe de kassa werkt. De server controleert deze instellingen ook; ze zijn dus niet te omzeilen via het kassascherm.
