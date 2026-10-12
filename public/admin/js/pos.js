@@ -13,9 +13,9 @@
     user: svg("<circle cx='12' cy='8' r='4'/><path d='M4 21c1-4.5 4.5-6.5 8-6.5s7 2 8 6.5'/>")
   };
   var METHODS = [
-    { key: "pin", label: "Pin", icon: "▭" },
-    { key: "contant", label: "Contant", icon: "€" },
-    { key: "tikkie", label: "Tikkie", icon: "↗" }
+    { key: "pin", label: "Pin" },
+    { key: "contant", label: "Contant" },
+    { key: "tikkie", label: "Tikkie" }
   ];
 
   // ================================================================ Kassabeheer (#kassa)
@@ -346,6 +346,7 @@
   }
 
   function drawTicket() {
+    if (S.screen === "payment") return drawPayment();
     var box = root.querySelector("#po-lines");
     if (!box) return;
     var t = totals();
@@ -532,38 +533,35 @@
     draw();
   }
 
+  // Afrekenen: bovenin het bedrag, onderin links de betaalwijzen. De betaalregels (met toetsenblok)
+  // verschijnen in het midden zodra er een betaalwijze gekozen is.
   function paymentScreen() {
     var t = totals();
-    return "<div class='pay2'>" +
-      "<section class='pay-methods'>" +
-        "<h2>Betaalwijze</h2>" +
-        methods().map(function (m) { return "<button class='pm-btn pm-" + m.key + "' data-method='" + m.key + "'><span>" + m.icon + "</span>" + e(m.label) + "</button>"; }).join("") +
-        "<div class='pay-lines' id='pay-lines'></div>" +
-      "</section>" +
-      "<section class='pay-center'>" +
-        "<div class='pay-due'><span>Te betalen</span><strong>" + eu(t.total) + "</strong></div>" +
+    return "<div class='pay3'>" +
+      "<header class='pay-head'>" +
+        "<button class='pay-nav' data-act='back'>« Terug</button>" +
+        "<h1>Betaling</h1>" +
+        "<button class='pay-nav pay-validate' data-act='validate' id='pay-validate'>Bevestig »</button>" +
+      "</header>" +
+      "<section class='pay-card'>" +
+        "<strong class='pay-amount'>" + eu(t.total) + "</strong>" +
         "<div class='pay-status' id='pay-status'></div>" +
-        "<div class='quick-pay'>" +
-          "<button class='qp-btn' data-key='exact'>Gepast</button>" +
-          (S.settings.methods && S.settings.methods.contant === false ? "" : (S.settings.quickCash || [10, 20, 50]).map(function (v) { return "<button class='qp-btn' data-key='+" + v + "'>€ " + String(v).replace(".", ",") + "</button>"; }).join("")) +
-        "</div>" +
-        "<div class='numpad numpad-pay'>" +
-          ["1", "2", "3", "back", "4", "5", "6", "C", "7", "8", "9", "00", "0", ","].map(function (k) {
-            return "<button class='np-key" + (k === "back" ? " np-back" : "") + (k === "0" || k === "," ? " np-wide" : "") + "' data-key='" + k + "'>" + (k === "back" ? "⌫" : k === "C" ? "Wis" : k) + "</button>";
-          }).join("") +
-        "</div>" +
-        "<div class='pay-actions'>" +
-          "<button class='btn btn-lg' data-act='back'>← Terug</button>" +
-          "<button class='btn btn-primary btn-lg pay-validate' data-act='validate' id='pay-validate'>Valideren</button>" +
-        "</div>" +
-        "<p class='muted small center'>" + (S.ticket.customer ? "Klant: " + e(S.ticket.customer.name || S.ticket.customer.email) : "Geen klant gekoppeld") + "</p>" +
       "</section>" +
+      "<section class='pay-mid' id='pay-mid'></section>" +
+      "<footer class='pay-foot'>" +
+        "<div class='pay-methods'>" + methods().map(function (m) {
+          return "<button class='pm-btn' data-method='" + m.key + "'>" + e(m.label) + "</button>";
+        }).join("") + "</div>" +
+        "<div class='pay-extra'>" +
+          "<button class='pm-extra' data-act='customer' id='pay-customer'></button>" +
+        "</div>" +
+      "</footer>" +
     "</div>";
   }
 
   function methods() {
     var on = S.settings.methods || { pin: true, contant: true, tikkie: true };
-    return METHODS.concat([{ key: "overig", label: S.settings.otherLabel || "Anders", icon: "★" }])
+    return METHODS.concat([{ key: "overig", label: S.settings.otherLabel || "Anders" }])
       .filter(function (m) { return on[m.key]; })
       .map(function (m) { return m.key === "overig" ? m : Object.assign({}, m, { label: A.PAYMENT[m.key] || m.label }); });
   }
@@ -588,17 +586,37 @@
 
   function drawPayment() {
     var st = payState();
-    root.querySelector("#pay-lines").innerHTML = S.pay.lines.map(function (l, i) {
-      return "<div class='pay-line" + (i === S.pay.selected ? " selected" : "") + "' data-pline='" + i + "'>" +
-        "<span>" + e(A.PAYMENT[l.method]) + "</span><strong>" + eu(l.amount || 0) + "</strong>" +
-        "<button class='pl-del' data-pdel='" + i + "' aria-label='Verwijderen'>×</button></div>";
-    }).join("") || "<p class='muted small'>Kies hierboven hoe de klant betaalt. Gesplitst betalen kan ook.</p>";
-    root.querySelector("#pay-status").innerHTML =
-      (st.rounding ? "<div class='ps-row muted'><span>Afronding contant</span><span>" + (st.rounding > 0 ? "+ " : "− ") + eu(Math.abs(st.rounding)) + "</span></div>" : "") +
-      "<div class='ps-row'><span>Betaald</span><strong>" + eu(st.paid) + "</strong></div>" +
-      (st.remaining > 0.004 ? "<div class='ps-row ps-remaining'><span>Nog te betalen</span><strong>" + eu(st.remaining) + "</strong></div>" : "") +
-      (st.change > 0.004 ? "<div class='ps-row ps-change'><span>" + (st.tooMuchCard ? "Te veel (alleen contant kan wisselgeld)" : "Wisselgeld") + "</span><strong>" + eu(st.change) + "</strong></div>" : "");
+    var quick = S.settings.methods && S.settings.methods.contant === false ? [] : (S.settings.quickCash || [10, 20, 50]);
+    var key = function (k, label, cls) { return "<button class='nk" + (cls || "") + "' data-key='" + k + "'>" + label + "</button>"; };
+    root.querySelector("#pay-mid").innerHTML = S.pay.lines.length
+      ? "<div class='pay-lines'>" + S.pay.lines.map(function (l, i) {
+          return "<div class='pay-line" + (i === S.pay.selected ? " selected" : "") + "' data-pline='" + i + "'>" +
+            "<span>" + e(A.PAYMENT[l.method]) + "</span><strong>" + eu(l.amount || 0) + "</strong>" +
+            "<button class='pl-del' data-pdel='" + i + "' aria-label='Verwijderen'>×</button></div>";
+        }).join("") + "</div>" +
+        (S.pay.lines[S.pay.selected]
+          ? "<div class='pay-pad'>" +
+              "<div class='pay-quick'>" + key("exact", "Gepast", " nk-q") + quick.map(function (v) { return key("+" + v, "€ " + String(v).replace(".", ","), " nk-q"); }).join("") + "</div>" +
+              "<div class='nk-keys'>" +
+                key("1", "1") + key("2", "2") + key("3", "3") + key("back", "⌫", " nk-back") +
+                key("4", "4") + key("5", "5") + key("6", "6") + key(",", ",") +
+                key("7", "7") + key("8", "8") + key("9", "9") + key("C", "Wis", " nk-clr") +
+                key("00", "00") + key("0", "0", " nk-wide") +
+              "</div>" +
+            "</div>"
+          : "")
+      : "";
+    root.querySelector("#pay-status").innerHTML = !S.pay.lines.length
+      ? "<p>Selecteer een betaalmethode aub.</p>"
+      : (st.rounding ? "<p class='muted'>Afronding contant " + (st.rounding > 0 ? "+ " : "− ") + eu(Math.abs(st.rounding)) + "</p>" : "") +
+        (st.remaining > 0.004 ? "<p class='ps-remaining'>Nog te betalen " + eu(st.remaining) + "</p>"
+          : st.change > 0.004 ? "<p class='ps-change'>" + (st.tooMuchCard ? "Te veel (alleen contant kan wisselgeld) " : "Wisselgeld ") + eu(st.change) + "</p>"
+          : "<p class='ps-ok'>Betaald ✓</p>");
     root.querySelector("#pay-validate").disabled = !st.ok;
+    var c = S.ticket.customer;
+    var btn = root.querySelector("#pay-customer");
+    btn.innerHTML = "<span class='pm-extra-icon'>" + ICON.user + "</span><span class='pm-extra-label'>" + (c ? e(c.name || c.email) : "Klant") + "</span>";
+    btn.classList.toggle("active", !!c);
   }
 
   function addPayment(method) {
