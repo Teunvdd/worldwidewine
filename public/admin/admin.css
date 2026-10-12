@@ -275,7 +275,7 @@ body.pos-mode .main { padding: 0 !important; height: 100vh; }
 .pos-search input { width: 100%; min-height: 44px; border-radius: 10px; border: 0; padding: .6rem 1rem; font-size: 1rem; background: #fff; }
 .pos-session { font-size: .88rem; white-space: nowrap; margin-left: auto; display: flex; align-items: center; }
 .pos-menu { position: relative; flex: none; }
-.pos-gear { width: 44px; padding: 0; display: grid; place-items: center; }
+.top-btn.pos-gear { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; }
 .pos-gear svg { width: 22px; height: 22px; }
 .pos-menu-list { position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; min-width: 240px; background: #fff; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.28); padding: 6px; display: grid; }
 .pos-menu-list[hidden] { display: none; }
@@ -291,9 +291,18 @@ body.pos-mode .main { padding: 0 !important; height: 100vh; }
 .pos-main { display: grid; grid-template-columns: 1fr minmax(400px, 34%); height: 100%; }
 .pos-order { display: flex; flex-direction: column; background: #e9e5e1; border-left: 1px solid #d6cfc8; min-height: 0; }
 .po-body { flex: 1; display: grid; grid-template-columns: 1fr 78px; min-height: 0; }
-.po-ticket { overflow-y: auto; min-height: 0; background: #faf9f8; border-right: 1px solid #ddd6cf; border-bottom: 1px solid #ddd6cf; }
+.po-left { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.po-ticket { flex: 1; overflow-y: auto; min-height: 0; background: #faf9f8; border-right: 1px solid #ddd6cf; border-bottom: 1px solid #ddd6cf; }
+/* Knoppen onder de bon (Orders, Bonkorting) */
+.po-actions { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px 12px; }
+.po-act { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .3rem; min-height: 64px; border: 1px solid #d3cbc4; border-radius: 8px; background: #fff; font: inherit; font-size: .95rem; font-weight: 500; color: #3a3430; cursor: pointer; box-shadow: 0 1px 0 rgba(0,0,0,.04); }
+.po-act:hover { background: #faf6f3; }
+.po-act:active { background: #f3dccd; }
+.po-act.active { border-color: var(--brand); color: var(--wine); background: #fdf0e8; }
+.po-act:disabled { opacity: .45; cursor: not-allowed; }
+.po-act-icon { display: grid; place-items: center; font-size: 1.3rem; }
 .po-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); gap: .5rem; text-align: center; padding: 1rem; }
-.po-empty span { font-size: 2.6rem; opacity: .5; }
+.po-empty-icon { display: grid; place-items: center; font-size: 3.4rem; color: #cfc7c0; }
 .po-line { padding: .85rem 1.1rem; cursor: pointer; border-bottom: 1px solid #efebe7; }
 .po-line:hover { background: #f4f1ee; }
 .po-line.selected { background: #ebe7e3; box-shadow: inset 4px 0 0 var(--brand); }
@@ -317,7 +326,6 @@ body.pos-mode .main { padding: 0 !important; height: 100vh; }
 .po-tool.active { background: var(--brand); color: #fff; }
 .po-tool:disabled { color: #bdb4ad; cursor: not-allowed; background: #f6f3f0; }
 .po-tool-del { color: var(--bad); }
-.po-tool-sep { margin-top: auto; border-top: 1px solid #d6cfc8; }
 
 /* Toetsenblok als pop-up links naast de bon. */
 .pos-order { position: relative; }

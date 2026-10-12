@@ -21,6 +21,8 @@
     other: svg("<path d='M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6-5.3-3-5.3 3 1.2-6-4.5-4.1 6-.7z'/>"),
     box: svg("<path d='M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z'/><path d='M3 7.5 12 12l9-4.5M12 12v9'/>"),
     bottle: svg("<path d='M10 2h4v4l1.5 3v12a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V9L10 6z'/><path d='M8.5 13h7'/>"),
+    cart: svg("<circle cx='9' cy='20' r='1.4'/><circle cx='18' cy='20' r='1.4'/><path d='M2.5 3.5h2.6l2.4 11.2a1.6 1.6 0 0 0 1.6 1.3h8.6a1.6 1.6 0 0 0 1.6-1.2l1.7-7.3H6.2'/>"),
+    list: svg("<path d='M6 2h12v20l-3-2-3 2-3-2-3 2z'/><path d='M9 7h6M9 11h6M9 15h4'/>"),
     user: svg("<circle cx='12' cy='8' r='4'/><path d='M4 21c1-4.5 4.5-6.5 8-6.5s7 2 8 6.5'/>")
   };
   var METHODS = [
@@ -330,12 +332,18 @@
       "</section>" +
       "<section class='pos-order'>" +
         "<div class='po-body'>" +
-          "<div class='po-ticket' id='po-lines'></div>" +
+          "<div class='po-left'>" +
+            "<div class='po-ticket' id='po-lines'></div>" +
+            // Onder de bon: kassaorders van deze dienst en korting op de hele bon.
+            "<div class='po-actions'>" +
+              "<button class='po-act' data-act='orders'><span class='po-act-icon'>" + ICON.list + "</span>Orders</button>" +
+              "<button class='po-act' data-act='ticket-discount' id='po-tdisc'" + (S.settings.allowDiscount === false ? " disabled" : "") + "><span class='po-act-icon'>" + ICON.tag + "</span>Bonkorting</button>" +
+            "</div>" +
+          "</div>" +
           "<nav class='po-tools'>" + tools.map(function (t) {
             return "<button class='po-tool" + (t.key !== "C" ? " np-mode" : "") + (t.cls || "") + "' data-key='" + t.key + "'" + (t.off ? " disabled title='Uitgezet in Kassa-instellingen'" : "") + ">" +
               "<span class='po-tool-icon'>" + t.icon + "</span>" + t.label + "</button>";
           }).join("") +
-            "<button class='po-tool po-tool-sep' data-act='ticket-discount' id='po-tdisc'" + (S.settings.allowDiscount === false ? " disabled" : "") + "><span class='po-tool-icon'>" + ICON.tag + "</span>Bonkorting</button>" +
           "</nav>" +
         "</div>" +
         "<div class='po-numpad' id='po-numpad' hidden></div>" +
@@ -404,7 +412,7 @@
           "<div class='po-sum-total'>Totaal: " + eu(t.total) + "</div>" +
           "<div class='po-sum-row'>Btw: " + eu(vat) + "</div>" +
         "</div>"
-      : "<div class='po-empty'><span>🛒</span>Tik op een product of scan een barcode</div>";
+      : "<div class='po-empty'><span class='po-empty-icon'>" + ICON.cart + "</span>Tik op een product of scan een barcode</div>";
     var sel = box.querySelector(".selected");
     if (sel) sel.scrollIntoView({ block: "nearest" });
 
@@ -796,6 +804,40 @@
     });
   }
 
+  // Kassaorders van de huidige dienst: lijst, bon bekijken en opnieuw afdrukken.
+  function ordersDialog() {
+    var body = A.modal("Kassaorders" + (S.session ? " — dienst #" + S.session.id : ""), "<div class='loading'><span class='spinner'></span>Laden…</div>", { wide: true });
+    A.api("GET", "orders?months=1").then(function (r) {
+      var list = (r.orders || []).filter(function (o) { return o.channel === "winkel" && (!S.session || o.posSessionId === S.session.id); })
+        .sort(function (a, b) { return b.createdAt.localeCompare(a.createdAt); });
+      function showList() {
+        var total = list.filter(function (o) { return o.status !== "geannuleerd"; }).reduce(function (t, o) { return t + o.total; }, 0);
+        body.innerHTML = list.length
+          ? "<p class='muted'>" + list.length + (list.length === 1 ? " bon" : " bonnen") + " in deze dienst · totaal " + eu(total) + "</p>" +
+            "<div class='table-wrap'><table class='table table-hover'><thead><tr><th>Bon</th><th>Tijd</th><th>Artikelen</th><th>Betaling</th><th class='num'>Totaal</th></tr></thead><tbody>" +
+            list.map(function (o) {
+              var n = o.lines.reduce(function (t, l) { return t + l.qty; }, 0);
+              var pay = (o.payments || []).map(function (pm) { return A.PAYMENT[pm.method] || pm.method; }).join(" + ") || A.PAYMENT[o.paymentMethod] || "";
+              return "<tr class='clickable' data-order='" + e(o.number) + "'><td><strong>" + e(o.number) + "</strong>" + (o.status === "geannuleerd" ? " <span class='status status-geannuleerd'>Geannuleerd</span>" : "") + "</td>" +
+                "<td>" + new Date(o.createdAt).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }) + "</td>" +
+                "<td>" + n + "</td><td>" + e(pay) + "</td><td class='num'>" + eu(o.total) + "</td></tr>";
+            }).join("") + "</tbody></table></div>"
+          : "<div class='empty-inline'>Nog geen verkopen in deze dienst.</div>";
+      }
+      function showOrder(o) {
+        body.innerHTML = "<div class='receipt-preview'>" + A.receiptHtml(o) + "</div>" +
+          "<div class='actions'><button class='btn' data-back>← Alle orders</button><span class='spacer'></span><button class='btn btn-primary' data-print>Bon afdrukken</button></div>";
+        body.querySelector("[data-back]").addEventListener("click", showList);
+        body.querySelector("[data-print]").addEventListener("click", function () { A.printReceipt(o); });
+      }
+      body.addEventListener("click", function (ev) {
+        var tr = ev.target.closest("[data-order]");
+        if (tr) showOrder(list.find(function (o) { return o.number === tr.dataset.order; }));
+      });
+      showList();
+    }).catch(function (err) { body.innerHTML = "<p class='error'>" + e(err.message) + "</p>"; });
+  }
+
   function ticketDiscountDialog() {
     if (S.settings.allowDiscount === false) return A.toast("Korting geven staat uit in de Kassa-instellingen.", "error");
     unlock("discount").then(function (ok) { if (ok) ticketDiscountForm(); });
@@ -883,6 +925,7 @@
       case "new": S.screen = "products"; S.q = ""; root.querySelector("#pos-q").value = ""; return draw();
       case "customer": return customerDialog();
       case "ticket-discount": return ticketDiscountDialog();
+      case "orders": return ordersDialog();
     }
   }
 

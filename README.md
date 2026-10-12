@@ -100,7 +100,7 @@ Bij het eerste bezoek wordt de database automatisch gevuld met het startassortim
    - De producten staan links, de bon rechts. Met de knoppen boven de producten kies je een **categorie** (zie hieronder).
    - Producten toevoeg je door op een productkaart te tikken, de barcode te scannen of te zoeken.
    - Kies naast de bon **Aantal**, **Korting** of **Prijs** en typ met het **toetsenblok** de nieuwe waarde voor de geselecteerde regel. ⌫ wist een cijfer; **Verwijder** haalt de regel weg.
-   - **Bonkorting** geeft korting op de hele bon, **Klant** koppelt een klant aan de verkoop.
+   - Onder de bon staan **Orders** (de bonnen van deze dienst bekijken en opnieuw afdrukken) en **Bonkorting** (korting op de hele bon). **Klant** koppelt een klant aan de verkoop.
 3. **Betalen:** op het betaalscherm kies je **Pin**, **Contant** of **Tikkie**.
    - Gesplitst betalen kan ook, bijvoorbeeld € 50 pin en de rest contant.
    - Bij contant typ je het ontvangen bedrag, of tik je op +10, +20 of +50 voor een briefje. Het wisselgeld wordt meteen getoond.
@@ -162,6 +162,7 @@ Per product vul je in de admin onder **Producten** bij **Eigenschappen** in: **S
 - Meerdere druiven scheid je met een komma, bijvoorbeeld *Sangiovese, Merlot*: het product verschijnt dan bij beide druiven.
 - Tijdens het typen stelt het formulier bestaande waarden voor. Zo blijft de schrijfwijze gelijk en krijg je geen dubbele filters (*Italië* en *Italie*).
 - **Prijs** en **Alcohol volume** filter je met een schuifje met twee handvatten.
+- Alle filtergroepen staan eerst dichtgeklapt; tik op de naam om ze open te klappen. Bij een dichte groep laat een bolletje zien hoeveel filters er aan staan.
 - Bij een bestaande database: voer na deze update **`supabase/setup.sql`** nog één keer uit (of alleen `supabase/migrations/20261017000000_alcohol.sql` en `20261018000000_soort_vrij.sql`).
 
 ### Producten in één keer aanpassen
