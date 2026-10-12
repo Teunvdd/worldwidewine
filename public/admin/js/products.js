@@ -15,7 +15,8 @@
       var products = res[0];
       el.innerHTML =
         "<header class='page-head'><div><h1>Producten</h1><p class='muted'>" + products.length + " producten · wijzigingen zijn direct zichtbaar in de webshop en de kassa</p></div>" +
-        "<div class='actions'><button class='btn btn-primary' id='p-new'>+ Nieuw product</button></div></header>" +
+        "<div class='actions'><button class='btn' id='p-import'>" + ICON_UP + "Importeren</button><button class='btn' id='p-export'>" + ICON_DOWN + "Exporteren</button>" +
+          "<button class='btn btn-primary' id='p-new'>+ Nieuw product</button><input type='file' id='p-import-file' accept='.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' hidden></div></header>" +
         (cats === null ? "<p class='notice notice-warn'>Categorieën zijn nog niet beschikbaar: voer <strong>supabase/setup.sql</strong> opnieuw uit in Supabase → SQL Editor.</p>" : "") +
         "<div class='toolbar'>" +
           "<input type='search' id='p-q' placeholder='Zoek op naam, wijnhuis, barcode…' value='" + e(filters.q) + "'>" +
@@ -98,6 +99,10 @@
       var pc = el.querySelector("#p-cat");
       if (pc) pc.addEventListener("change", function () { filters.cat = this.value; draw(); });
       el.querySelector("#p-new").addEventListener("click", function () { edit(null); });
+      el.querySelector("#p-export").addEventListener("click", function () { exportExcel(products); });
+      var importFile = el.querySelector("#p-import-file");
+      el.querySelector("#p-import").addEventListener("click", function () { importFile.value = ""; importFile.click(); });
+      importFile.addEventListener("change", function () { if (this.files[0]) importExcel(this.files[0], products); });
       el.querySelector("#p-rows").addEventListener("click", function (ev) {
         var tr = ev.target.closest("[data-id]");
         if (ev.target.closest(".sel-col")) {
@@ -279,6 +284,130 @@
   function catTag(p) {
     var c = p.categoryId && catById(p.categoryId);
     return c ? "<span class='cat-tag'><i style='background:" + (c.color || "#cbbcb0") + "'></i>" + e(c.name) + "</span> " : "";
+  }
+
+  // ---- Import en export via Excel ----
+  var ICON_UP = "<svg viewBox='0 0 24 24' width='1em' height='1em' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><path d='M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4'/></svg>";
+  var ICON_DOWN = "<svg viewBox='0 0 24 24' width='1em' height='1em' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><path d='M12 3v12M7 10l5 5 5-5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4'/></svg>";
+  var yesNo = function (v) { return v === false ? "nee" : "ja"; };
+  // Kolommen in het Excel-bestand: kop, veld, soort (tekst, getal, ja/nee), breedte.
+  var COLS = [
+    ["Code", "id", "text", 26], ["Wijnhuis", "producer", "text", 24], ["Naam", "name", "text", 30], ["Soort", "type", "text", 14],
+    ["Land", "country", "text", 14], ["Regio", "region", "text", 16], ["Druivensoort", "grape", "text", 22], ["Oogstjaar", "vintage", "num", 10],
+    ["Inhoud", "size", "text", 10], ["Alcohol (%)", "alcohol", "num", 11], ["Eenheid", "unit", "text", 12],
+    ["Prijs", "price", "num", 10], ["Oude prijs", "oldPrice", "num", 11], ["Inkoopprijs", "cost", "num", 11], ["Btw (%)", "vat", "num", 9],
+    ["Flessen per doos", "caseSize", "num", 15], ["Doosprijs", "casePrice", "num", 11],
+    ["Voorraad", "stock", "num", 10], ["Melding bij voorraad", "minStock", "num", 18], ["Barcode", "ean", "text", 16],
+    ["Aantal flessen (PostNL)", "bottles", "num", 20], ["Categorie (kassa)", "category", "text", 18],
+    ["Webshop", "webshop", "bool", 10], ["Actief", "active", "bool", 9], ["Alleen afhalen", "pickupOnly", "bool", 14],
+    ["Kenmerken", "tags", "text", 22], ["Omschrijving", "description", "text", 50], ["Interne notitie", "note", "text", 30]
+  ];
+
+  function exportExcel(products) {
+    var catName = {};
+    (cats || []).forEach(function (c) { catName[c.id] = c.name; });
+    var rows = [COLS.map(function (c) { return c[0]; })].concat(products.slice()
+      .sort(function (a, b) { return (a.producer + a.name).localeCompare(b.producer + b.name, "nl"); })
+      .map(function (p) {
+        return COLS.map(function (c) {
+          var k = c[1], v = p[k];
+          if (k === "type") return A.typeLabel(v);
+          if (k === "category") return catName[p.categoryId] || "";
+          if (k === "tags") return (p.tags || []).join(", ");
+          if (c[2] === "bool") return k === "pickupOnly" ? (p.pickupOnly ? "ja" : "nee") : yesNo(v);
+          if (k === "ean") return v ? String(v) : "";
+          return v == null ? "" : v;
+        });
+      }));
+    var blob = A.xlsx.write(rows, { sheet: "Producten", widths: COLS.map(function (c) { return c[3]; }) });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "producten-" + new Date().toISOString().slice(0, 10) + ".xlsx";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    A.toast(products.length + " producten geëxporteerd");
+  }
+
+  // Kopnaam → kolom (hoofdletters, spaties en tekens maken niet uit; de veldnaam mag ook).
+  function headerKey(h) {
+    var n = String(h == null ? "" : h).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+    var alias = { streek: "region", druif: "grape", jaargang: "vintage", maat: "size", alcohol: "alcohol", alcoholvolume: "alcohol", btw: "vat", categorie: "category", omschrijving: "description", notitie: "note" };
+    var hit = COLS.find(function (c) { return c[0].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "") === n || c[1].toLowerCase() === n; });
+    return hit ? hit[1] : alias[n] || null;
+  }
+  function cellValue(kind, v) {
+    if (v == null || (typeof v === "string" && !v.trim())) return kind === "bool" ? undefined : "";
+    if (kind === "num") {
+      if (typeof v === "number") return v;
+      var n = Number(String(v).replace(/[€%\s]/g, "").replace(",", "."));
+      return isNaN(n) ? String(v) : n;
+    }
+    if (kind === "bool") {
+      if (typeof v === "boolean") return v;
+      var t = String(v).trim().toLowerCase();
+      return ["ja", "j", "yes", "y", "1", "x", "waar", "true"].indexOf(t) >= 0 ? true : ["nee", "n", "no", "0", "onwaar", "false"].indexOf(t) >= 0 ? false : undefined;
+    }
+    return typeof v === "number" ? String(v) : String(v).trim();
+  }
+
+  function importExcel(file, products) {
+    var body = A.modal("Producten importeren", "<div class='loading'><span class='spinner'></span>Bestand lezen…</div>", { wide: true });
+    A.xlsx.read(file).then(function (sheet) {
+      var head = (sheet[0] || []).map(headerKey);
+      var kinds = {};
+      COLS.forEach(function (c) { kinds[c[1]] = c[2]; });
+      if (!head.some(Boolean)) throw new Error("De eerste rij moet de kolomnamen bevatten (bijv. Code, Wijnhuis, Naam, Prijs). Exporteer eerst om een voorbeeld te krijgen.");
+      var known = {};
+      products.forEach(function (p) { known[p.id] = true; });
+      var rows = [], problems = [];
+      sheet.slice(1).forEach(function (r, i) {
+        if (!r || !r.some(function (v) { return v != null && String(v).trim() !== ""; })) return;
+        var row = { _row: i + 2 };
+        head.forEach(function (k, c) {
+          if (!k) return;
+          var v = cellValue(kinds[k], r[c]);
+          if (v === undefined) return;
+          // Verplichte velden en de code: een lege cel betekent "niet wijzigen".
+          if (v === "" && ["id", "producer", "name", "type"].indexOf(k) >= 0) return;
+          if (k === "tags") v = String(v).split(/\s*[,;]\s*/).map(function (t) { return t.toLowerCase(); }).filter(Boolean);
+          row[k] = v;
+        });
+        var code = row.id ? String(row.id).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") : "";
+        row._update = !!(code && known[code]);
+        if (!row._update && (!row.name || !row.producer)) problems.push("Rij " + row._row + ": voor een nieuw product zijn Wijnhuis en Naam nodig.");
+        else rows.push(row);
+      });
+      var upd = rows.filter(function (r) { return r._update; }).length;
+      var cols = head.filter(Boolean).map(function (k) { return COLS.find(function (c) { return c[1] === k; })[0]; });
+      body.innerHTML =
+        "<p><strong>" + rows.length + "</strong> " + (rows.length === 1 ? "rij" : "rijen") + " gevonden: <strong>" + (rows.length - upd) + "</strong> nieuw, <strong>" + upd + "</strong> bijwerken (op Code).</p>" +
+        "<p class='muted small'>Kolommen die worden overgenomen: " + e(cols.join(", ")) + ". Andere velden blijven zoals ze zijn. Een lege cel maakt het veld leeg (behalve bij Code, Wijnhuis, Naam en Soort). " +
+          "Een andere voorraad wordt als voorraadmutatie (‘Import uit Excel’) opgeslagen.</p>" +
+        (problems.length ? "<div class='notice notice-warn'>" + problems.slice(0, 8).map(e).join("<br>") + (problems.length > 8 ? "<br>… en nog " + (problems.length - 8) : "") + "<br>Deze rijen worden overgeslagen.</div>" : "") +
+        "<div class='actions'><button class='btn' data-modal-close>Annuleren</button><span class='spacer'></span><button class='btn btn-primary' id='imp-go'" + (rows.length ? "" : " disabled") + ">" + rows.length + " producten importeren</button></div>";
+      body.querySelector("#imp-go").addEventListener("click", function () {
+        var btn = this, total = { created: 0, updated: 0, stock: 0, errors: [] };
+        A.busy(btn, true, "Importeren…");
+        // In porties van 50, zodat een groot bestand niet in één keer naar de server gaat.
+        var chunks = [];
+        for (var i = 0; i < rows.length; i += 50) chunks.push(rows.slice(i, i + 50));
+        chunks.reduce(function (prev, chunk, n) {
+          return prev.then(function () {
+            btn.lastChild.textContent = "Importeren… " + Math.min(rows.length, (n + 1) * 50) + " / " + rows.length;
+            return A.api("POST", "products/import", { rows: chunk.map(function (r) { var o = Object.assign({}, r); delete o._update; return o; }) })
+              .then(function (res) { ["created", "updated", "stock"].forEach(function (k) { total[k] += res[k]; }); total.errors = total.errors.concat(res.errors); });
+          });
+        }, Promise.resolve()).then(function () {
+          body.innerHTML = "<p><strong>Klaar.</strong> " + total.created + " nieuw, " + total.updated + " bijgewerkt" + (total.stock ? ", voorraad van " + total.stock + " aangepast" : "") + ".</p>" +
+            (total.errors.length ? "<div class='notice notice-warn'><strong>" + total.errors.length + " rij(en) niet geïmporteerd:</strong><br>" +
+              total.errors.slice(0, 20).map(function (x) { return "Rij " + x.row + ": " + e(x.message); }).join("<br>") + "</div>" : "") +
+            "<div class='actions'><span class='spacer'></span><button class='btn btn-primary' data-modal-close>Sluiten</button></div>";
+          A.invalidate("products", "categories"); A.route();
+        }).catch(function (err) { A.busy(btn, false); A.toast(err.message, "error"); });
+      });
+    }).catch(function (err) {
+      body.innerHTML = "<p class='notice notice-warn'>" + e(err.message) + "</p><div class='actions'><span class='spacer'></span><button class='btn' data-modal-close>Sluiten</button></div>";
+    });
   }
 
   // ---- Kassacategorieën (de knoppen boven de producten in de kassa): eigen pagina ----
