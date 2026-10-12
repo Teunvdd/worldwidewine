@@ -618,3 +618,9 @@ input[type=radio], input[type=checkbox] { min-height: 0; padding: 0; width: auto
 .cat-add { display: flex; gap: .6rem; padding: .9rem; margin-bottom: 1rem; }
 .cat-add input { flex: 1; }
 
+
+/* Nieuws */
+.news-thumb { width: 72px; height: 48px; }
+.news-thumb img.p-img { object-fit: cover; }
+.news-img-edit .thumb { width: 168px; height: 105px; }
+.news-img-edit .thumb:empty::after { content: "Geen foto"; display: grid; place-items: center; height: 100%; font-size: .8rem; color: var(--muted); }

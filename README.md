@@ -181,6 +181,14 @@ In de admin onder **Producten** staan de knoppen **Exporteren** en **Importeren*
   - Rijen met een fout worden overgeslagen; je ziet per rij wat er mis is.
 - Tip: exporteer eerst, pas het bestand aan in Excel en importeer het weer.
 
+### Nieuws
+Op de website staat een pagina **Nieuws** (`nieuws.html`, ook in het menu en de footer). Berichten plaats je in de admin onder **Nieuws**.
+- **+ Nieuw bericht**: titel, foto (slepen of kiezen; liggend formaat werkt het mooist), tekst en datum.
+- Tekst: een lege regel begint een nieuwe alinea, `**zo**` wordt vet en links (https://…) worden klikbaar.
+- **Op de website zetten** uit = concept (alleen in de admin zichtbaar). Een datum in de toekomst verschijnt pas op die dag.
+- Het nieuwste bericht staat groot bovenaan; met *Lees verder* open je het hele bericht. Elk bericht heeft een eigen link (`nieuws.html#titel-van-bericht`) die gelijk blijft als je de titel later aanpast.
+- Bij een bestaande database: voer na deze update **`supabase/setup.sql`** nog één keer uit (of alleen `supabase/migrations/20261019000000_nieuws.sql`).
+
 ### Productfoto's
 - Foto's voeg je toe in de admin: *Producten → product*. Sleep een foto op het fotovak of klik op *Foto kiezen…*.
 - De foto wordt automatisch verkleind en opgeslagen in Supabase Storage (map `product-images`).
