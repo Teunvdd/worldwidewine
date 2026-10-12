@@ -258,7 +258,7 @@
 A.receiptHtml = function (o) {
   var e = A.esc, eu = A.euro;
   return "<div class='receipt'>" +
-    "<p class='r-center r-shop'>WorldWideWine.nl</p>" +
+    "<p class='r-center r-shop'>worldwidewine.nl</p><p class='r-center r-tag'>DRANKEN EN CULINAIRE PROJECTEN</p>" +
     "<p class='r-center'>Westzijde 358, 1506 GK Zaandam<br>06 83 17 27 04 · info@worldwidewine.nl<br>KvK 32134785</p>" +
     "<p class='r-center'>" + A.date(o.createdAt, true) + "<br>Bon " + e(o.number) + "</p><hr>" +
     o.lines.map(function (l) {
