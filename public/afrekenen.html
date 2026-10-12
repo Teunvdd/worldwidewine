@@ -58,12 +58,7 @@
           <div class="fields" id="pickup-fields" hidden>
             <label class="field">Dag van afhalen<select name="afhaaldag" data-pickup></select></label>
             <label class="field">Tijd<select name="afhaaltijd" data-pickup></select></label>
-            <p class="field-wide pickup-note">Je kunt een moment kiezen binnen onze openingstijden. Op dagen dat we op afspraak open zijn, staan we op het gekozen tijdstip voor je klaar. Je krijgt een bevestiging per e-mail.</p>
-          </div>
-          <div class="fields" id="slot-fields" hidden>
-            <label class="field">Bezorgdag<select name="bezorgdag" data-slot></select></label>
-            <label class="field">Tijdvak<select name="bezorgtijd" data-slot></select></label>
-            <p class="field-wide pickup-note">We bezorgen zelf binnen het gekozen tijdvak. Bij levering vragen we om legitimatie (18+).</p>
+            <p class="field-wide pickup-note">We staan op het gekozen tijdstip voor je klaar in de winkel. Je krijgt een bevestiging per e-mail.</p>
           </div>
           <label class="field field-wide"><span>Opmerkingen <span class="optional">(optioneel)</span></span>
             <textarea name="opmerkingen" rows="3" placeholder="Bijv. cadeauverpakking, of bezorgen bij de buren"></textarea>
@@ -77,6 +72,7 @@
 
         <section class="step step-confirm">
           <label class="check"><input type="checkbox" name="leeftijd" value="ja" required> <span>Ik ben 18 jaar of ouder. Ik begrijp dat bij afhalen of aflevering om legitimatie kan worden gevraagd.</span></label>
+          <label class="check"><input type="checkbox" name="nieuwsbrief" value="ja"> <span>Houd me op de hoogte van nieuwe wijnen, acties en proeverijen (nieuwsbrief, af en toe). Afmelden kan altijd via <a href="account.html">Mijn account</a>.</span></label>
           <label class="check"><input type="checkbox" name="voorwaarden" value="ja" required> <span>Ik ga akkoord met de <a href="voorwaarden.html" target="_blank">voorwaarden en het privacybeleid</a>.</span></label>
           <p class="form-error" id="form-error" role="alert" hidden></p>
           <button class="btn btn-block btn-large" type="submit" id="submit">Bestelling plaatsen</button>

@@ -27,8 +27,6 @@ test.after(async () => { if (stack) await stack.stop(); });
 const customer = { name: "Test Klant", email: "Test@Example.com", phone: "0612345678", address: "Dorpsstraat 1", postcode: "1234 AB", city: "Utrecht" };
 let seq = 0;
 const nr = () => "WWW-261012-T" + String(++seq).padStart(3, "0");
-// Eerste beschikbare bezorgmoment (eigen bezorging vraagt een dag en tijdvak).
-const drop = () => { const d = require("../public/data/order.js").deliveryDays(require("../public/data/config.js"))[0]; return { deliveryDate: d.date, deliveryWindow: d.windows[0] }; };
 // Eerste beschikbare afhaalmoment (afhalen vraagt een dag en tijd).
 const slot = () => { const d = require("../public/data/order.js").pickupDays(require("../public/data/config.js"))[0]; return { pickupDate: d.date, pickupTime: d.times[0] }; };
 
@@ -193,7 +191,7 @@ test("online betalen via Mollie: betaling starten en webhook verwerken", async (
 test("publieke sleutel (anon) kan niets lezen of wijzigen", async () => {
   const { createClient } = require("@supabase/supabase-js");
   const anon = createClient(stack.url, stack.anonKey, { auth: { persistSession: false } });
-  for (const table of ["products", "customers", "orders", "order_lines", "stock_movements", "pos_sessions", "settings", "categories", "news"]) {
+  for (const table of ["products", "customers", "orders", "order_lines", "stock_movements", "pos_sessions", "settings", "categories", "news", "customer_logins"]) {
     const { data, error } = await anon.from(table).select("*").limit(1);
     assert.ok(error || (data && data.length === 0), table + " is leesbaar met de anon-sleutel");
     assert.ok(error, table + " zou een permissiefout moeten geven");
@@ -443,15 +441,13 @@ test("afrekenen: afhaalmoment verplicht en geldig, bezorgen alleen binnen het po
   // Utrecht (1234 AB is buiten het gebied) → geweigerd; Amsterdam → goed.
   await assert.rejects(shop.createWebOrder({ orderNumber: nr(), items, delivery: "bezorgen-regio", payment: "betaalverzoek", customer }), /bezorgen we helaas niet/);
   const amsCustomer = Object.assign({}, customer, { postcode: "1012 AB", city: "Amsterdam" });
-  await assert.rejects(shop.createWebOrder({ orderNumber: nr(), items, delivery: "bezorgen-regio", payment: "betaalverzoek", customer: amsCustomer }), /dag en tijdvak/);
-  const d = drop();
-  const ams = await shop.createWebOrder({ orderNumber: nr(), items, delivery: "bezorgen-regio", ...d, payment: "betaalverzoek", customer: amsCustomer });
+  const ams = await shop.createWebOrder({ orderNumber: nr(), items, delivery: "bezorgen-regio", payment: "betaalverzoek", customer: amsCustomer });
   assert.strictEqual(ams.delivery, "bezorgen-regio");
-  assert.match(ams.pickupMoment, new RegExp(" tussen " + d.deliveryWindow.replace("-", " en ") + " uur$"));
+  assert.strictEqual(ams.pickupMoment, null);
   await shop.setOrderStatus(ams.number, "geannuleerd");
 });
 
-test("winkel: openingstijden per week, bezorgtijden en bezorggebied uit de admin", async () => {
+test("winkel: openingstijden, afhaaltijden per week en bezorggebied uit de admin", async () => {
   const shopinfo = require("../lib/shopinfo");
   const ORDER = require("../public/data/order.js");
   const items = [{ id: "montemercurio-messaggero", qty: 1 }];
@@ -462,32 +458,37 @@ test("winkel: openingstijden per week, bezorgtijden en bezorggebied uit de admin
   // Ongeldige invoer wordt geweigerd.
   await assert.rejects(shopinfo.saveShopSettings({ hours: { week: { 1: { s: "open", from: "18:00", to: "10:00" } } } }), /maandag/);
   await assert.rejects(shopinfo.saveShopSettings({ area: { postcodes: [[1100, 1000, "x"]], price: 5 } }), /klopt niet/);
-  await assert.rejects(shopinfo.saveShopSettings({ deliveryTimes: { week: {}, leadDays: 30, daysAhead: 10 } }), /Vroegst bezorgen/);
+  await assert.rejects(shopinfo.saveShopSettings({ pickup: { week: {}, leadMinutes: 60, daysAhead: 500 } }), /Vooruit plannen/);
+  await assert.rejects(shopinfo.saveShopSettings({ pickup: { week: { 2: [["12:00", "11:00"]] }, leadMinutes: 60, daysAhead: 14 } }), /dinsdag/);
 
-  // Eerste afhaaldag dicht in die week → die dag verdwijnt uit de afhaalmomenten en wordt geweigerd.
+  // Openingstijden gaan over de website; een dag dicht zetten bewaart alleen die afwijking.
   const first = slot();
   await shopinfo.saveShopSettings({ hours: { week: s0.hours.week, dates: { [first.pickupDate]: { s: "dicht" }, "2020-01-01": { s: "dicht" } } } });
   const s1 = await shopinfo.getShopSettings();
   assert.deepStrictEqual(Object.keys(s1.hours.dates), [first.pickupDate]); // oude datums worden opgeruimd
-  await assert.rejects(shop.createWebOrder({ orderNumber: nr(), items, delivery: "afhalen-zaandam", ...first, payment: "bij-afhalen", customer }), /dag en tijd/);
   const info = await shopinfo.publicInfo();
-  assert.ok(info.pickupDays.every((d) => d.date !== first.pickupDate));
   assert.strictEqual(info.hours.thisWeek.length, 7);
 
-  // Bezorgtijden: alleen nog een tijdvak op zondag.
-  await shopinfo.saveShopSettings({ deliveryTimes: { week: { 0: [["12:00", "15:00"]] }, dates: {}, leadDays: 1, daysAhead: 14 } });
-  const days = (await shopinfo.publicInfo()).deliveryDays;
-  assert.ok(days.length >= 1 && days.every((d) => d.label.startsWith("zondag") && d.windows[0] === "12:00-15:00"));
+  // Afhaaltijden: die dag geen afhalen → verdwijnt uit de afhaalmomenten en wordt geweigerd.
+  await shopinfo.saveShopSettings({ pickup: Object.assign({}, s0.pickup, { dates: { [first.pickupDate]: [] } }) });
+  assert.ok((await shopinfo.publicInfo()).pickupDays.every((d) => d.date !== first.pickupDate));
+  await assert.rejects(shop.createWebOrder({ orderNumber: nr(), items, delivery: "afhalen-zaandam", ...first, payment: "bij-afhalen", customer }), /dag en tijd/);
+  // Alleen nog zondag 12:00–13:00, elk kwartier.
+  await shopinfo.saveShopSettings({ pickup: { week: { 0: [["12:00", "13:00"]] }, dates: {}, slotMinutes: 15, leadMinutes: 60, daysAhead: 14 } });
+  const days = (await shopinfo.publicInfo()).pickupDays;
+  assert.ok(days.length >= 1 && days.every((d) => d.label.startsWith("zondag")));
+  assert.deepStrictEqual(days[days.length - 1].times, ["12:00", "12:15", "12:30", "12:45"]);
+  const sun = await shop.createWebOrder({ orderNumber: nr(), items, delivery: "afhalen-zaandam", pickupDate: days[days.length - 1].date, pickupTime: "12:45", payment: "bij-afhalen", customer });
+  assert.match(sun.pickupMoment, /^zondag .* om 12:45 uur$/);
+  await shop.setOrderStatus(sun.number, "geannuleerd");
 
   // Bezorggebied: alleen Utrecht, andere prijs, altijd bezorgkosten.
   await shopinfo.saveShopSettings({ area: { postcodes: [[1234, 1234, "Testgebied"]], price: 4.5, freeFrom: "" } });
   const amsCustomer = Object.assign({}, customer, { postcode: "1012 AB", city: "Amsterdam" });
-  const slotDay = days[0];
-  const input = { items, delivery: "bezorgen-regio", deliveryDate: slotDay.date, deliveryWindow: slotDay.windows[0], payment: "betaalverzoek" };
+  const input = { items, delivery: "bezorgen-regio", payment: "betaalverzoek" };
   await assert.rejects(shop.createWebOrder(Object.assign({ orderNumber: nr(), customer: amsCustomer }, input)), /bezorgen we helaas niet/);
   const o = await shop.createWebOrder(Object.assign({ orderNumber: nr(), customer }, input));
   assert.strictEqual(o.shipping, 4.5);
-  assert.match(o.pickupMoment, /^zondag .* tussen 12:00 en 15:00 uur$/);
   await shop.setOrderStatus(o.number, "geannuleerd");
 
   // Via de admin-API en de publieke API.
@@ -498,12 +499,77 @@ test("winkel: openingstijden per week, bezorgtijden en bezorggebied uit de admin
   const pub = await require("../lib/handlers/shop-info").handler({ httpMethod: "GET", headers: {} });
   const body = JSON.parse(pub.body);
   assert.strictEqual(body.area.freeFrom, null);
-  assert.ok(Array.isArray(body.pickupDays) && Array.isArray(body.deliveryDays));
+  assert.ok(Array.isArray(body.pickupDays) && Array.isArray(body.tastingPhotos));
   assert.strictEqual(ORDER.deliversTo({ postcodes: body.area.postcodes }, "1234 AB"), true);
 
   // Terug naar de standaardwaarden voor de andere tests.
   const d = shopinfo.defaults();
   await shopinfo.saveShopSettings(d);
+});
+
+test("foto's proeverijen: toevoegen, volgorde, onderschrift en verwijderen", async () => {
+  const shopinfo = require("../lib/shopinfo");
+  const png = "data:image/png;base64," + Buffer.from("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a4c30000000049454e44ae426082", "hex").toString("base64");
+  process.env.WWW_LOCAL_UPLOADS = process.env.WWW_LOCAL_UPLOADS || require("path").join(require("os").tmpdir(), "www-test-uploads");
+  await assert.rejects(shopinfo.addTastingPhoto("data:text/plain;base64,aGFsbG8="), /JPG/);
+  await shopinfo.addTastingPhoto(png, "Proeverij in de winkel");
+  const list = await shopinfo.addTastingPhoto(png);
+  assert.strictEqual(list.length, 2);
+  // Volgorde omdraaien; onbekende adressen worden genegeerd.
+  const swapped = await shopinfo.saveTastingPhotos([{ url: list[1].url, caption: "Bij een klant thuis" }, list[0], { url: "https://evil.example/x.jpg" }]);
+  assert.deepStrictEqual(swapped.map((p) => p.caption), ["Bij een klant thuis", "Proeverij in de winkel"]);
+  assert.strictEqual((await shopinfo.publicInfo()).tastingPhotos.length, 2);
+  assert.deepStrictEqual(await shopinfo.saveTastingPhotos([]), []);
+});
+
+test("mijn account: inloggen met code, bestellingen met afhaalmoment, gegevens en nieuwsbrief", async () => {
+  const handler = require("../lib/handlers/account").handler;
+  const call = (method, body, cookie) => handler({ httpMethod: method, headers: Object.assign({ host: "localhost" }, cookie ? { cookie } : {}), body: body ? JSON.stringify(body) : undefined });
+  const mail = "Klant.Account@example.com";
+  // Bestelling met afhaalmoment en toestemming voor de nieuwsbrief.
+  const s = slot();
+  const order = await shop.createWebOrder({ orderNumber: nr(), items: [{ id: "montemercurio-messaggero", qty: 1 }], delivery: "afhalen-zaandam", ...s, payment: "bij-afhalen", newsletter: true, customer: Object.assign({}, customer, { email: mail }) });
+
+  // Zonder e-maildienst en zonder testmodus kan er niet worden ingelogd.
+  delete process.env.WWW_DEV_LOGIN;
+  assert.strictEqual((await call("POST", { action: "code", email: mail })).statusCode, 503);
+  process.env.WWW_DEV_LOGIN = "1";
+  assert.strictEqual(JSON.parse((await call("GET")).body).loggedIn, false);
+  assert.strictEqual((await call("POST", { action: "code", email: "geen-adres" })).statusCode, 400);
+  const sent = JSON.parse((await call("POST", { action: "code", email: mail })).body);
+  assert.match(sent.devCode, /^\d{6}$/);
+  const wrong = sent.devCode === "000000" ? "111111" : "000000";
+  const bad = await call("POST", { action: "login", email: mail, code: wrong });
+  assert.strictEqual(bad.statusCode, 400);
+  assert.match(JSON.parse(bad.body).error, /klopt niet/);
+  const ok = await call("POST", { action: "login", email: mail, code: sent.devCode });
+  assert.strictEqual(ok.statusCode, 200);
+  const cookie = ok.headers["Set-Cookie"].split(";")[0];
+  // De code werkt maar één keer.
+  assert.strictEqual((await call("POST", { action: "login", email: mail, code: sent.devCode })).statusCode, 400);
+
+  const me = JSON.parse((await call("GET", null, cookie)).body);
+  assert.strictEqual(me.loggedIn, true);
+  assert.strictEqual(me.profile.email, mail.toLowerCase());
+  assert.strictEqual(me.profile.newsletter, true);
+  const mine = me.orders.find((o) => o.number === order.number);
+  assert.ok(mine && mine.pickup && mine.pickupMoment === order.pickupMoment);
+  assert.strictEqual(mine.lines[0].qty, 1);
+  assert.strictEqual(mine.customer, undefined); // geen interne velden
+
+  // Afmelden voor de nieuwsbrief en gegevens wijzigen.
+  const saved = JSON.parse((await call("POST", { action: "profile", newsletter: false, phone: "0687654321" }, cookie)).body).profile;
+  assert.strictEqual(saved.newsletter, false);
+  assert.strictEqual(saved.phone, "0687654321");
+  // Zonder (of met een vervalste) sessie geen gegevens.
+  assert.strictEqual((await call("POST", { action: "profile", newsletter: true })).statusCode, 401);
+  assert.strictEqual(JSON.parse((await call("GET", null, cookie.replace(/.$/, "x"))).body).loggedIn, false);
+
+  // Na 5 foute pogingen is de code ongeldig.
+  const again = JSON.parse((await call("POST", { action: "code", email: mail })).body);
+  for (let i = 0; i < 5; i++) await call("POST", { action: "login", email: mail, code: again.devCode === "000000" ? "111111" : "000000" });
+  assert.strictEqual((await call("POST", { action: "login", email: mail, code: again.devCode })).statusCode, 400);
+  await shop.setOrderStatus(order.number, "geannuleerd");
 });
 
 test("kassa sluiten: verwacht kasgeld, telling en verschil", async () => {

@@ -76,6 +76,8 @@ const server = http.createServer(async (req, res) => {
     process.env.SUPABASE_URL = stack.url;
     process.env.SUPABASE_SERVICE_ROLE_KEY = stack.serviceKey;
     process.env.WWW_LOCAL_UPLOADS = process.env.WWW_LOCAL_UPLOADS || path.join(ROOT, ".data", "uploads");
+    // Zonder e-maildienst: de inlogcode voor Mijn account verschijnt dan op het scherm.
+    if (!process.env.RESEND_API_KEY) process.env.WWW_DEV_LOGIN = "1";
     console.log("Tijdelijke lokale database gestart.");
     const stop = () => stack.stop().then(() => process.exit(0));
     process.on("SIGINT", stop); process.on("SIGTERM", stop);

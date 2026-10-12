@@ -3,7 +3,7 @@
  * Zonder server blijven de standaardwaarden uit config.js staan. */
 (function () {
   var ORDER = window.WWW_ORDER, CONFIG = window.WWW_CONFIG || {};
-  if (!ORDER || !document.querySelector("[data-hours-table], [data-hours-line], [data-hours-short], [data-area-price], [data-area-free]")) return;
+  if (!ORDER || !document.querySelector("[data-hours-week], [data-hours-table], [data-hours-line], [data-hours-short], [data-area-price], [data-area-free]")) return;
   var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
   var cap = function (s) { return s.charAt(0).toUpperCase() + s.slice(1); };
   var euro = function (n) { return "€\u00a0" + (n % 1 ? n.toFixed(2).replace(".", ",") : String(n)); };
@@ -13,6 +13,17 @@
     var week = info.hours.thisWeek, today = info.today;
     var open = week.filter(function (d) { return d.s === "open"; });
     var byAppointment = week.some(function (d) { return d.s === "afspraak"; });
+
+    document.querySelectorAll("[data-hours-week]").forEach(function (box) {
+      box.innerHTML = "<p class='week-caption'>Deze week · " + esc(week[0].label.split(" ").slice(1).join(" ")) + " – " + esc(week[6].label.split(" ").slice(1).join(" ")) + "</p>" +
+        week.map(function (d) {
+          var parts = d.label.split(" ");
+          var v = d.s === "open" ? d.from + " – " + d.to : d.s === "afspraak" ? "op afspraak" : "gesloten";
+          return "<div class='wh-day" + (d.date === today ? " is-today" : "") + (d.s === "afspraak" ? " is-quiet" : "") + (d.s === "dicht" ? " is-quiet is-closed" : "") + "'>" +
+            "<span class='wh-name'>" + esc(cap(parts[0])) + "</span><span class='wh-date'>" + esc(parts.slice(1).join(" ")) + "</span>" +
+            (d.date === today ? "<span class='wh-today'>vandaag</span>" : "") + "<span class='wh-time'>" + esc(v) + "</span></div>";
+        }).join("");
+    });
 
     document.querySelectorAll("[data-hours-table]").forEach(function (t) {
       var days = week.slice(), cap0 = days[0].label.split(" ").slice(1).join(" "), capN = days[6].label.split(" ").slice(1).join(" ");

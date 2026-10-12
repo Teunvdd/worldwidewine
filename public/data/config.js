@@ -22,7 +22,7 @@
       "bezorgen-regio": {
         label: "Bezorgen in Amsterdam en omstreken",
         detail: "Wij bezorgen zelf in Amsterdam, Zaandam, Weesp en omgeving. Vul je postcode in om te zien of we bij je bezorgen. Bij levering vragen we om legitimatie (18+).",
-        price: 7.50, freeFrom: 100, pickup: false, scheduled: true,
+        price: 7.50, freeFrom: 100, pickup: false,
         // Postcodes waar we zelf bezorgen: [van, tot, omschrijving] (de vier cijfers).
         // Aan te passen in de admin onder Winkel → Bezorggebied.
         postcodes: [
@@ -45,6 +45,7 @@
     },
 
     // Standaard openingstijden (aan te passen in de admin onder Winkel → Openingstijden, ook per week).
+    // Deze tijden staan op de website; afhalen gaat volgens de afhaaltijden hieronder.
     // Dagen: 1 = maandag … 6 = zaterdag, 0 = zondag. s: "open", "afspraak" (op afspraak) of "dicht".
     hours: {
       week: {
@@ -56,19 +57,17 @@
       dates: {}             // afwijkende dagen, bijv. { "2026-12-25": { s: "dicht" } }
     },
 
-    // Afhalen: klanten kiezen een moment binnen de openingstijden (ook op dagen 'op afspraak').
+    // Afhaaltijden: wanneer klanten een afhaalmoment (afspraak) kunnen kiezen, los van de openingstijden.
+    // Aan te passen in de admin onder Winkel → Afhaaltijden, ook per week.
     pickup: {
+      week: {
+        1: [["10:00", "18:00"]], 2: [["10:00", "18:00"]], 3: [["10:00", "18:00"]], 4: [["10:00", "18:00"]],
+        5: [["09:00", "19:00"]], 6: [["10:00", "17:00"]]
+      },
+      dates: {},            // afwijkende dagen, bijv. { "2026-12-24": [["10:00", "13:00"]] } of [] = geen afhalen
       slotMinutes: 30,      // om het halfuur
-      leadMinutes: 120,     // vandaag pas vanaf twee uur na nu
+      leadMinutes: 120,     // vroegst twee uur na het bestellen
       daysAhead: 42         // tot zes weken vooruit
-    },
-
-    // Bezorgtijden van de eigen bezorging (aan te passen in de admin onder Winkel → Bezorgtijden).
-    deliveryTimes: {
-      week: { 3: [["17:00", "21:00"]], 5: [["17:00", "21:00"]], 6: [["10:00", "14:00"]] },
-      dates: {},            // afwijkende dagen, bijv. { "2026-12-24": [["10:00", "13:00"]] } of [] = niet bezorgen
-      leadDays: 1,          // vroegst de volgende dag
-      daysAhead: 21         // tot drie weken vooruit
     }
   };
 
