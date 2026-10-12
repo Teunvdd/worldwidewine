@@ -54,10 +54,7 @@ Alle onderdelen werken met één Supabase-database. Die heeft tabellen voor `pro
 ### 1. Database (Supabase)
 
 1. Maak een gratis account op [supabase.com](https://supabase.com) en een nieuw project. Kies als regio **EU (Frankfurt of Amsterdam)**, in verband met de AVG.
-2. Ga naar **SQL Editor** en voer de bestanden in `supabase/migrations/` **op volgorde** uit (plakken en **Run**):
-   - eerst `20261012000000_init.sql` (tabellen, functies en rechten);
-   - daarna `20261013000000_kassa.sql` (kassadiensten, gesplitst betalen en de opslagmap voor productfoto's);
-   - daarna `20261014000000_instellingen.sql` (kassa-instellingen).
+2. Ga naar **SQL Editor → New query**, plak de hele inhoud van **`supabase/setup.sql`** en klik op **Run**. Dit maakt alle tabellen, functies, rechten en de opslagmap voor productfoto's aan. Je kunt het bestand veilig opnieuw uitvoeren. Het zijn de bestanden uit `supabase/migrations/` achter elkaar; latere wijzigingen komen als nieuw bestand in die map.
 3. Noteer bij **Project Settings → API (Data API / API Keys)**:
    - de **Project URL**, bijvoorbeeld `https://abcdefgh.supabase.co`;
    - de **secret key** (`sb_secret_…`) of de oude **service_role**-sleutel. Deel deze sleutel nooit en zet hem niet in de website zelf.
