@@ -168,10 +168,8 @@ select option { color: var(--ink); background: #fff; }
 .about-quote cite { font-style: normal; font-size: .75rem; letter-spacing: .18em; text-transform: uppercase; color: var(--wine-3); font-weight: 600; }
 /* De foto's staan schuin onder elkaar; alleen de hoeken raken elkaar en daar zit de stempel. */
 .about-photos { position: relative; display: grid; grid-template-columns: 1fr 1fr; padding: .5rem 0 1rem; }
-.polaroid { position: relative; margin: 0; background: #fff; padding: 12px 12px 0; border-radius: 4px; box-shadow: 0 24px 50px -22px rgba(60, 35, 25, .55), 0 2px 6px rgba(60, 35, 25, .12); transition: transform .5s cubic-bezier(.2, .8, .2, 1), box-shadow .5s; }
+.polaroid { position: relative; margin: 0; background: #fff; padding: 12px 12px 42px; border-radius: 4px; box-shadow: 0 24px 50px -22px rgba(60, 35, 25, .55), 0 2px 6px rgba(60, 35, 25, .12); transition: transform .5s cubic-bezier(.2, .8, .2, 1), box-shadow .5s; }
 .polaroid img { display: block; width: 100%; height: auto; border-radius: 2px; }
-.polaroid figcaption { font-family: var(--display); font-style: italic; font-size: .95rem; color: var(--muted); text-align: center; padding: .7rem .4rem .85rem; }
-.polaroid-shop figcaption { text-align: left; padding-left: .3rem; }
 .polaroid-shop { grid-column: 1; grid-row: 1; width: 110%; transform: rotate(-3deg); z-index: 1; }
 .polaroid-visit { grid-column: 2; grid-row: 2; width: 110%; margin-left: -8%; margin-top: -6px; transform: rotate(3deg); z-index: 2; }
 .polaroid:hover { transform: rotate(0) scale(1.03); z-index: 3; box-shadow: 0 30px 60px -20px rgba(60, 35, 25, .6), 0 2px 6px rgba(60, 35, 25, .12); }
@@ -180,8 +178,7 @@ select option { color: var(--ink); background: #fff; }
   transform: rotate(-12deg); box-shadow: 0 0 0 5px var(--cream), 0 0 0 6px var(--gold), 0 12px 24px -10px rgba(60, 35, 25, .6); }
 @media (max-width: 860px) { .about-photos { margin-top: 1rem; } }
 @media (max-width: 560px) {
-  .polaroid { padding: 8px 8px 0; }
-  .polaroid figcaption { font-size: .8rem; padding: .5rem .2rem .6rem; }
+  .polaroid { padding: 8px 8px 26px; }
   .polaroid-visit { margin-top: -8px; }
   .about-stamp { width: 70px; height: 70px; font-size: .5rem; top: -34px; left: -34px; box-shadow: 0 0 0 3px var(--cream), 0 0 0 4px var(--gold), 0 8px 16px -8px rgba(60, 35, 25, .6); }
 }
