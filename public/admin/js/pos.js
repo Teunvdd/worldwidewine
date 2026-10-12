@@ -304,8 +304,8 @@
       if (live.some(function (p) { return !known[p.categoryId]; })) list.push({ key: "none", label: "Overig", test: function (p) { return !known[p.categoryId]; } });
       return list;
     }
-    return Object.keys(A.TYPES).filter(function (t) { return live.some(function (p) { return p.type === t; }); })
-      .map(function (t) { return { key: "t" + t, label: A.TYPES[t], test: function (p) { return p.type === t; } }; });
+    return A.typesIn(live)
+      .map(function (t) { return { key: "t" + t, label: A.typeLabel(t), test: function (p) { return p.type === t; } }; });
   }
 
   function productScreen() {

@@ -19,7 +19,7 @@
         (cats === null ? "<p class='notice notice-warn'>Categorieën zijn nog niet beschikbaar: voer <strong>supabase/setup.sql</strong> opnieuw uit in Supabase → SQL Editor.</p>" : "") +
         "<div class='toolbar'>" +
           "<input type='search' id='p-q' placeholder='Zoek op naam, wijnhuis, barcode…' value='" + e(filters.q) + "'>" +
-          "<select id='p-type'><option value=''>Alle soorten</option>" + Object.keys(A.TYPES).map(function (t) { return "<option value='" + t + "'" + (filters.type === t ? " selected" : "") + ">" + A.TYPES[t] + "</option>"; }).join("") + "</select>" +
+          "<select id='p-type'><option value=''>Alle soorten</option>" + A.typesIn(products).map(function (t) { return "<option value='" + e(t) + "'" + (filters.type === t ? " selected" : "") + ">" + e(A.typeLabel(t)) + "</option>"; }).join("") + "</select>" +
           (cats && cats.length ? "<select id='p-cat'><option value=''>Alle categorieën</option><option value='none'" + (filters.cat === "none" ? " selected" : "") + ">Zonder categorie</option>" +
             cats.map(function (c) { return "<option value='" + c.id + "'" + (String(filters.cat) === String(c.id) ? " selected" : "") + ">" + e(c.name) + "</option>"; }).join("") + "</select>" : "") +
           "<select id='p-show'>" + [["", "Alle producten"], ["webshop", "Online te koop"], ["winkel", "Alleen in de winkel"], ["inactief", "Niet actief"], ["actie", "In de actie"]]
@@ -42,7 +42,7 @@
         el.querySelector("#p-rows").innerHTML = list.map(function (p) {
           var vis = p.active === false ? "<span class='tag tag-off'>Niet actief</span>" : p.webshop === false ? "<span class='tag tag-winkel'>Alleen winkel</span>" : "<span class='tag tag-webshop'>Webshop + winkel</span>";
           return "<tr class='clickable' data-id='" + e(p.id) + "'><td><div class='p-cell'><span class='thumb'>" + A.productArt(p) + "</span><span><span class='muted small'>" + e(p.producer) + "</span><br><strong>" + e(p.name) + "</strong>" + (p.vintage ? " <span class='muted'>" + p.vintage + "</span>" : "") + "</span></div></td>" +
-            "<td>" + e(A.TYPES[p.type] || p.type) + "<br>" + catTag(p) + "<span class='muted small'>" + e(p.unit) + (p.caseSize ? " · ook per doos van " + p.caseSize : "") + "</span></td>" +
+            "<td>" + e(A.typeLabel(p.type)) + "<br>" + catTag(p) + "<span class='muted small'>" + e(p.unit) + (p.caseSize ? " · ook per doos van " + p.caseSize : "") + "</span></td>" +
             "<td class='num'>" + (p.price == null ? "<span class='muted'>op aanvraag</span>" : (p.oldPrice ? "<s class='muted small'>" + eu(p.oldPrice) + "</s> " : "") + eu(p.price)) + "</td>" +
             "<td class='num'>" + A.stockBadge(p) + "</td><td>" + vis + "</td></tr>";
         }).join("") || "<tr><td colspan='5' class='empty-inline'>Geen producten gevonden.</td></tr>";
@@ -91,7 +91,10 @@
       "<form id='p-form' class='form-grid'>" +
         field("Wijnhuis / merk", "producer", p.producer, "required autofocus") +
         field("Naam", "name", p.name, "required") +
-        "<label class='field'>Soort<select name='type'>" + Object.keys(A.TYPES).map(function (t) { return "<option value='" + t + "'" + (p.type === t ? " selected" : "") + ">" + A.TYPES[t] + "</option>"; }).join("") + "</select></label>" +
+        // Soort: vrij invullen, met de vaste en al gebruikte soorten als suggestie.
+        "<label class='field'>Soort<input name='type' value='" + e(A.typeLabel(p.type)) + "' list='dl-type' maxlength='40' required placeholder='bijv. Rood of Oranje wijn'>" +
+          "<datalist id='dl-type'>" + Object.keys(A.TYPES).concat(A.typesIn(A.cacheOf("products")).filter(function (t) { return !A.TYPES[t]; }))
+            .map(function (t) { return "<option value='" + e(A.typeLabel(t)) + "'>"; }).join("") + "</datalist></label>" +
         (cats ? "<label class='field'>Categorie (kassa)<select name='categoryId'><option value=''>— Geen categorie —</option>" +
           cats.map(function (c) { return "<option value='" + c.id + "'" + (p.categoryId === c.id ? " selected" : "") + ">" + e(c.name) + "</option>"; }).join("") +
           "</select></label>" : "") +

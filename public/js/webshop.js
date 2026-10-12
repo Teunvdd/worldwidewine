@@ -30,8 +30,10 @@ window.WWW.ready.then(function () {
   }
 
   var typeCounts = countBy(function (p) { return p.type; });
+  // Vaste soorten eerst (in vaste volgorde), daarna de zelf ingevulde soorten op alfabet.
   checkboxes("type", Object.keys(W.TYPES).filter(function (t) { return typeCounts[t]; })
-    .map(function (t) { return { value: t, label: W.TYPES[t], count: typeCounts[t] }; }));
+    .concat(Object.keys(typeCounts).filter(function (t) { return !W.TYPES[t]; }).sort(function (a, b) { return a.localeCompare(b, "nl"); }))
+    .map(function (t) { return { value: t, label: W.typeLabel(t), count: typeCounts[t] }; }));
   list("country", function (p) { return p.country; });
   list("region", function (p) { return p.region; });
   list("grape", grapes);
@@ -108,7 +110,7 @@ window.WWW.ready.then(function () {
       if (sale && !p.oldPrice) return false;
       if (cases && p.unit !== "doos van 6" && !W.caseSize(p)) return false;
       if (q) {
-        var hay = norm([p.name, p.producer, p.region, p.country, p.grape, W.TYPES[p.type], p.vintage, p.size].join(" "));
+        var hay = norm([p.name, p.producer, p.region, p.country, p.grape, W.typeLabel(p.type), p.vintage, p.size].join(" "));
         if (!q.split(/\s+/).every(function (w) { return hay.indexOf(w) >= 0; })) return false;
       }
       return true;
@@ -169,7 +171,7 @@ window.WWW.ready.then(function () {
 
   function detail(p) {
     var rows = [
-      ["Wijnhuis", p.producer], ["Soort", W.TYPES[p.type]], ["Land", p.country], ["Regio", p.region],
+      ["Wijnhuis", p.producer], ["Soort", W.typeLabel(p.type)], ["Land", p.country], ["Regio", p.region],
       ["Druivensoort", p.grape], ["Oogstjaar", p.vintage], ["Maat", p.size],
       ["Alcohol", p.alcohol != null ? String(p.alcohol).replace(".", ",") + "% vol." : null]
     ].filter(function (r) { return r[1]; });

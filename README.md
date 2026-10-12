@@ -157,12 +157,12 @@ De pincode wordt versleuteld opgeslagen en is bedoeld om handelingen van medewer
 - Voor de kassa is internet nodig. Valt het internet uit, gebruik dan tijdelijk de hotspot van je telefoon.
 
 ### Wijngegevens en webshopfilters
-Per product vul je in de admin onder **Producten** het blok **Wijngegevens** in: **Land**, **Regio**, **Druivensoort**, **Oogstjaar**, **Maat** en **Alcohol volume (%)**. De **Soort** (rood, wit, …) staat bovenaan het formulier.
+Per product vul je in de admin onder **Producten** het blok **Wijngegevens** in: **Land**, **Regio**, **Druivensoort**, **Oogstjaar**, **Maat** en **Alcohol volume (%)**. De **Soort** staat bovenaan het formulier en vul je vrij in, bijvoorbeeld *Oranje wijn* of *Port*. Typ je een vaste soort (Rood, Wit, Rosé, Mousserend, Likeur, Delicatessen, Water), dan wordt die herkend: die bepaalt ook de getekende fles en het automatische btw-tarief (9% voor delicatessen en water). Bij een andere soort is dat 21%, tenzij je bij Btw iets anders kiest.
 - Deze gegevens staan in de webshop bij het product en zijn daar filters (links). Een filter verschijnt pas als minstens één product die gegevens heeft.
 - Meerdere druiven scheid je met een komma, bijvoorbeeld *Sangiovese, Merlot*: het product verschijnt dan bij beide druiven.
 - Tijdens het typen stelt het formulier bestaande waarden voor. Zo blijft de schrijfwijze gelijk en krijg je geen dubbele filters (*Italië* en *Italie*).
 - **Prijs** en **Alcohol volume** filter je met een schuifje met twee handvatten.
-- Bij een bestaande database: voer na deze update **`supabase/setup.sql`** nog één keer uit (of alleen `supabase/migrations/20261017000000_alcohol.sql`).
+- Bij een bestaande database: voer na deze update **`supabase/setup.sql`** nog één keer uit (of alleen `supabase/migrations/20261017000000_alcohol.sql` en `20261018000000_soort_vrij.sql`).
 
 ### Productfoto's
 - Foto's voeg je toe in de admin: *Producten → product → Foto kiezen…*.

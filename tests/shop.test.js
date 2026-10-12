@@ -355,6 +355,18 @@ test("wijngegevens: alcoholpercentage opslaan, tonen in de webshop en leegmaken"
   assert.strictEqual(cleared.alcohol, undefined);
 });
 
+test("soort is vrij in te vullen; vaste soorten worden herkend", async () => {
+  const id = "koremans-limoncello";
+  const before = (await shop.getProducts()).find((x) => x.id === id).type;
+  const free = await shop.saveProduct({ originalId: id, type: "Oranje wijn" });
+  assert.strictEqual(free.type, "Oranje wijn");
+  assert.strictEqual((await shop.publicProducts()).find((x) => x.id === id).type, "Oranje wijn");
+  assert.strictEqual((await shop.saveProduct({ originalId: id, type: "Rosé" })).type, "rose");
+  assert.strictEqual((await shop.saveProduct({ originalId: id, type: "ROOD" })).type, "rood");
+  await assert.rejects(shop.saveProduct({ originalId: id, type: "  " }), /soort/);
+  await shop.saveProduct({ originalId: id, type: before });
+});
+
 test("kassa sluiten: verwacht kasgeld, telling en verschil", async () => {
   const { session } = await shop.currentSession();
   const expected = session.summary.expectedCash;
