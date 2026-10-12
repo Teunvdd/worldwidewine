@@ -100,7 +100,10 @@
         "<button class='btn btn-primary' data-modal-close>Sluiten</button></div>",
         { wide: true });
 
-      body.querySelector("#o-print").addEventListener("click", function () { A.printReceipt(o); });
+      body.querySelector("#o-print").addEventListener("click", function () {
+        (A.posSettings ? Promise.resolve() : A.api("GET", "pos/settings").then(function (r) { A.posSettings = r.settings; }).catch(function () {}))
+          .then(function () { A.printReceipt(o); });
+      });
       body.querySelectorAll("[data-status]").forEach(function (b) {
         b.addEventListener("click", function () {
           var s = b.dataset.status;

@@ -56,7 +56,8 @@ Alle onderdelen werken met één Supabase-database. Die heeft tabellen voor `pro
 1. Maak een gratis account op [supabase.com](https://supabase.com) en een nieuw project. Kies als regio **EU (Frankfurt of Amsterdam)**, in verband met de AVG.
 2. Ga naar **SQL Editor** en voer de bestanden in `supabase/migrations/` **op volgorde** uit (plakken en **Run**):
    - eerst `20261012000000_init.sql` (tabellen, functies en rechten);
-   - daarna `20261013000000_kassa.sql` (kassadiensten, gesplitst betalen en de opslagmap voor productfoto's).
+   - daarna `20261013000000_kassa.sql` (kassadiensten, gesplitst betalen en de opslagmap voor productfoto's);
+   - daarna `20261014000000_instellingen.sql` (kassa-instellingen).
 3. Noteer bij **Project Settings → API (Data API / API Keys)**:
    - de **Project URL**, bijvoorbeeld `https://abcdefgh.supabase.co`;
    - de **secret key** (`sb_secret_…`) of de oude **service_role**-sleutel. Deel deze sleutel nooit en zet hem niet in de website zelf.
@@ -100,6 +101,20 @@ Bij het eerste bezoek wordt de database automatisch gevuld met het startassortim
 - Enter gaat naar betalen of valideert de betaling.
 - Esc gaat terug van het betaalscherm.
 - Een barcodescanner wordt automatisch herkend, ook zonder op het zoekveld te klikken.
+
+### Kassa-instellingen
+In de admin onder **Kassa-instellingen** bepaal je hoe de kassa werkt. De server controleert deze instellingen ook; ze zijn dus niet te omzeilen via het kassascherm.
+
+| Onderdeel | Instellingen |
+|---|---|
+| Kassadienst | Kastelling aan/uit (uit: de kassa opent direct en sluit zonder telling), beginsaldo (laatst geteld of vast bedrag), waarschuwing bij kasverschil |
+| Betaalwijzen | Pin, contant, Tikkie en een eigen betaalwijze (bijv. cadeaubon) aan/uit, snelknoppen voor contant, contant afronden op 5 cent |
+| Verkopen | Prijs wijzigen toestaan, korting toestaan met een maximum in %, verkopen bij voorraad 0 |
+| Kassascherm | Productfoto's tonen, voorraad tonen, grootte van de productkaarten |
+| Kassabon | Automatisch afdrukken, btw-specificatie, klantnaam, eigen tekst boven- en onderaan (met voorbeeldbon) |
+| Beheerderspincode | Pincode van 4–8 cijfers. Kies voor welke handelingen die nodig is: prijs wijzigen, korting, regel verwijderen, kassa sluiten, kassa verlaten |
+
+De pincode wordt versleuteld opgeslagen en is bedoeld om handelingen van medewerkers in de kassa af te schermen. Wie het admin-wachtwoord heeft, kan de instellingen altijd wijzigen.
 
 ### De kassacomputer instellen
 - **Kioskmodus (aanbevolen):** maak een snelkoppeling naar Google Chrome met

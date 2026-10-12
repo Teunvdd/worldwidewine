@@ -17,7 +17,8 @@
     return Promise.all([A.api("GET", "pos/session"), A.api("GET", "pos/sessions")]).then(function (res) {
       var cur = res[0].session, sessions = res[1].sessions;
       el.innerHTML =
-        "<header class='page-head'><div><h1>Kassa</h1><p class='muted'>Open de kassa aan het begin van de dag en sluit hem af met een kastelling.</p></div></header>" +
+        "<header class='page-head'><div><h1>Kassa</h1><p class='muted'>Open de kassa aan het begin van de dag en sluit hem aan het eind van de dag af.</p></div>" +
+        "<a class='btn' href='#kassa-instellingen'>⚙ Kassa-instellingen</a></header>" +
         "<section class='card kassa-status " + (cur ? "is-open" : "is-closed") + "'>" +
           (cur
             ? "<div><span class='dot'></span><strong>De kassa is open</strong> sinds " + A.date(cur.openedAt, true) + "<br><span class='muted'>" +
@@ -55,43 +56,92 @@
     body.querySelector("#z-print").addEventListener("click", function () { A.printHtml(A.zReportHtml(s)); });
   }
 
-  // Kassa sluiten met kastelling. done() wordt aangeroepen na het sluiten.
-  function closeDialog(done) {
-    A.api("GET", "pos/session").then(function (res) {
-      var s = res.session;
-      if (!s) { A.toast("De kassa is al gesloten."); return done && done(); }
-      var sm = s.summary;
-      var body = A.modal("Kassa sluiten",
-        "<dl class='close-sum'>" +
-          "<dt>Geopend</dt><dd>" + A.date(s.openedAt, true) + "</dd>" +
-          "<dt>Aantal bonnen</dt><dd>" + sm.count + "</dd>" +
-          "<dt>Omzet</dt><dd><strong>" + eu(sm.total) + "</strong></dd>" +
-          Object.keys(sm.byMethod).map(function (m) { return "<dt>— " + e(A.PAYMENT[m] || m) + "</dt><dd>" + eu(sm.byMethod[m]) + "</dd>"; }).join("") +
-          "<dt>Beginsaldo kas</dt><dd>" + eu(s.openingCash) + "</dd>" +
-          "<dt>Verwacht in de la</dt><dd><strong>" + eu(sm.expectedCash) + "</strong></dd>" +
-        "</dl>" +
-        "<label class='field'>Geteld in de kassalade (€)<input id='cl-count' inputmode='decimal' autofocus placeholder='0,00'></label>" +
-        "<p class='change' id='cl-diff'></p>" +
-        "<label class='field'><span>Notitie <span class='muted'>(optioneel)</span></span><input id='cl-note' placeholder='Bijv. 20 euro afgeroomd'></label>" +
-        "<div class='actions'><button class='btn' data-modal-close>Annuleren</button><button class='btn btn-primary btn-lg' id='cl-ok' disabled>Kassa sluiten</button></div>",
-        { narrow: true });
-      var input = body.querySelector("#cl-count");
-      function upd() {
-        var v = A.parseNum(input.value);
-        var ok = v != null && v >= 0;
-        body.querySelector("#cl-ok").disabled = !ok;
-        if (!ok) { body.querySelector("#cl-diff").textContent = ""; return; }
-        var d = round(v - sm.expectedCash);
-        body.querySelector("#cl-diff").innerHTML = Math.abs(d) < 0.005 ? "<span class='num-up'>Kas klopt ✓</span>" :
-          "Verschil: <strong class='num-down'>" + (d > 0 ? "+" : "") + eu(d) + "</strong>";
+  // Beheerderspincode vragen (als die voor deze handeling is ingesteld).
+  // Geeft een Promise met de pincode, "" als er geen nodig is, of null bij annuleren.
+  var PIN_TEXT = { priceChange: "prijs wijzigen", discount: "korting geven", deleteLine: "regel verwijderen", closeSession: "kassa sluiten", exitPos: "kassa verlaten" };
+  A.askPin = function (settings, action, known) {
+    if (!settings || !settings.pinSet || !settings.pinFor || !settings.pinFor[action]) return Promise.resolve("");
+    if (known) return Promise.resolve(known);
+    return new Promise(function (resolve) {
+      var pin = "";
+      var keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "back"];
+      var body = A.modal("Beheerderspincode", "<p class='center muted'>Pincode nodig voor: <strong>" + e(PIN_TEXT[action] || action) + "</strong></p>" +
+        "<div class='pin-dots' id='pin-dots'></div><p class='center error-text' id='pin-err'></p>" +
+        "<div class='numpad numpad-pin'>" + keys.map(function (k) { return "<button class='np-key' data-pk='" + k + "'>" + (k === "back" ? "⌫" : k === "C" ? "Wis" : k) + "</button>"; }).join("") + "</div>" +
+        "<div class='actions'><button class='btn' data-modal-close>Annuleren</button><button class='btn btn-primary' id='pin-ok'>OK</button></div>",
+        { narrow: true, onClose: function () { document.removeEventListener("keydown", onKey, true); resolve(null); } });
+      function dots() { body.querySelector("#pin-dots").innerHTML = pin ? pin.split("").map(function () { return "<span>●</span>"; }).join("") : "<span class='muted'>····</span>"; }
+      function submit() {
+        if (!pin) return;
+        var btn = body.querySelector("#pin-ok"); A.busy(btn, true, "…");
+        A.api("POST", "pos/verify-pin", { pin: pin }).then(function () {
+          document.removeEventListener("keydown", onKey, true);
+          var p = pin; A.closeModalSilently(); resolve(p);
+        }).catch(function (err) { A.busy(btn, false); pin = ""; dots(); body.querySelector("#pin-err").textContent = err.message; });
       }
-      input.addEventListener("input", upd);
-      body.querySelector("#cl-ok").addEventListener("click", function () {
-        var btn = this;
-        A.busy(btn, true);
-        A.api("POST", "pos/session/close", { countedCash: A.parseNum(input.value), note: body.querySelector("#cl-note").value })
-          .then(function (r) { A.closeModal(); showZReport(r.session); A.toast("Kassa gesloten"); if (done) done(); })
-          .catch(function (err) { A.busy(btn, false); A.toast(err.message, "error"); });
+      function key(k) {
+        if (k === "back") pin = pin.slice(0, -1); else if (k === "C") pin = ""; else if (pin.length < 8) pin += k;
+        body.querySelector("#pin-err").textContent = ""; dots();
+      }
+      function onKey(ev) {
+        if (/^\d$/.test(ev.key)) { ev.preventDefault(); ev.stopPropagation(); key(ev.key); }
+        else if (ev.key === "Backspace") { ev.preventDefault(); ev.stopPropagation(); key("back"); }
+        else if (ev.key === "Enter") { ev.preventDefault(); ev.stopPropagation(); submit(); }
+      }
+      document.addEventListener("keydown", onKey, true);
+      body.addEventListener("click", function (ev) { var b = ev.target.closest("[data-pk]"); if (b) key(b.dataset.pk); });
+      body.querySelector("#pin-ok").addEventListener("click", submit);
+      dots();
+    });
+  };
+
+  // Kassa sluiten (met of zonder kastelling). done() wordt aangeroepen na het sluiten.
+  function closeDialog(done, knownPin) {
+    A.api("GET", "pos/session").then(function (res) {
+      var s = res.session, set = res.settings || {};
+      if (!s) { A.toast("De kassa is al gesloten."); return done && done(); }
+      return A.askPin(set, "closeSession", knownPin).then(function (pin) {
+        if (pin === null) return;
+        var sm = s.summary;
+        var count = set.cashControl !== false;
+        var body = A.modal("Kassa sluiten",
+          "<dl class='close-sum'>" +
+            "<dt>Geopend</dt><dd>" + A.date(s.openedAt, true) + "</dd>" +
+            "<dt>Aantal bonnen</dt><dd>" + sm.count + "</dd>" +
+            "<dt>Omzet</dt><dd><strong>" + eu(sm.total) + "</strong></dd>" +
+            Object.keys(sm.byMethod).map(function (m) { return "<dt>— " + e(A.PAYMENT[m] || m) + "</dt><dd>" + eu(sm.byMethod[m]) + "</dd>"; }).join("") +
+            (sm.rounding ? "<dt>— Afronding contant</dt><dd>" + eu(sm.rounding) + "</dd>" : "") +
+            "<dt>Beginsaldo kas</dt><dd>" + eu(s.openingCash) + "</dd>" +
+            "<dt>Verwacht in de la</dt><dd><strong>" + eu(sm.expectedCash) + "</strong></dd>" +
+          "</dl>" +
+          (count ? "<label class='field'>Geteld in de kassalade (€)<input id='cl-count' inputmode='decimal' autofocus placeholder='0,00'></label><p class='change' id='cl-diff'></p>"
+                 : "<p class='muted small'>Kastelling staat uit (Kassa-instellingen). De dienst wordt gesloten zonder telling.</p>") +
+          "<label class='field'><span>Notitie <span class='muted'>(optioneel)</span></span><input id='cl-note' placeholder='Bijv. 20 euro afgeroomd'></label>" +
+          "<div class='actions'><button class='btn' data-modal-close>Annuleren</button><button class='btn btn-primary btn-lg' id='cl-ok'" + (count ? " disabled" : "") + ">Kassa sluiten</button></div>",
+          { narrow: true });
+        var input = body.querySelector("#cl-count");
+        var bigDiff = false;
+        function upd() {
+          var v = A.parseNum(input.value);
+          var ok = v != null && v >= 0;
+          var btn = body.querySelector("#cl-ok");
+          btn.disabled = !ok;
+          if (!ok) { body.querySelector("#cl-diff").textContent = ""; return; }
+          var d = round(v - sm.expectedCash);
+          bigDiff = set.maxCashDifference != null && Math.abs(d) > set.maxCashDifference + 0.001;
+          btn.textContent = bigDiff ? "Toch sluiten" : "Kassa sluiten";
+          body.querySelector("#cl-diff").innerHTML = Math.abs(d) < 0.005 ? "<span class='num-up'>Kas klopt ✓</span>" :
+            "Verschil: <strong class='num-down'>" + (d > 0 ? "+" : "") + eu(d) + "</strong>" +
+            (bigDiff ? "<br><small class='warn'>Groter dan " + eu(set.maxCashDifference) + ". Tel nog eens na, of noteer de reden.</small>" : "");
+        }
+        if (input) input.addEventListener("input", upd);
+        body.querySelector("#cl-ok").addEventListener("click", function () {
+          var btn = this;
+          A.busy(btn, true);
+          A.api("POST", "pos/session/close", { countedCash: input ? A.parseNum(input.value) : null, note: body.querySelector("#cl-note").value, managerPin: pin })
+            .then(function (r) { A.closeModal(); showZReport(r.session); A.toast("Kassa gesloten"); if (done) done(); })
+            .catch(function (err) { A.busy(btn, false); A.toast(err.message, "error"); });
+        });
       });
     }).catch(function (err) { A.toast(err.message, "error"); });
   }
@@ -115,10 +165,13 @@
 
   function renderPos(el) {
     document.body.classList.add("pos-mode");
-    S = { screen: "products", products: [], session: null, lastClosingCash: 0, type: "", q: "",
+    S = { settings: {}, pin: "", screen: "products", products: [], session: null, lastClosingCash: 0, type: "", q: "",
       ticket: restore(), pad: { mode: "qty", buffer: "" }, pay: { lines: [], selected: -1, buffer: "" }, lastOrder: null, scan: "", scanAt: 0, scanTimer: null };
     return Promise.all([A.api("GET", "pos/session"), A.load("products", true)]).then(function (res) {
-      S.session = res[0].session; S.lastClosingCash = res[0].lastClosingCash || 0; S.products = res[1];
+      S.session = res[0].session; S.lastClosingCash = res[0].suggestedOpeningCash != null ? res[0].suggestedOpeningCash : (res[0].lastClosingCash || 0); S.products = res[1];
+      S.settings = res[0].settings || {};
+      A.posSettings = S.settings;
+      A.PAYMENT.overig = S.settings.otherLabel || "Anders";
       S.screen = S.session ? "products" : "open";
       el.innerHTML =
         "<div class='pos2'>" +
@@ -144,6 +197,8 @@
       document.addEventListener("fullscreenchange", fsHandler);
       fsHandler();
       draw();
+      // Zonder kastelling opent de kassa direct.
+      if (!S.session && S.settings.cashControl === false) autoOpen();
     });
   }
 
@@ -176,15 +231,23 @@
     return "<div class='pos-open'><div class='pos-open-card'>" +
       "<img src='/assets/logo.png' alt='worldwidewine.nl' class='pos-open-logo'>" +
       "<h1>Kassa openen</h1>" +
-      "<p class='muted'>Tel het wisselgeld in de kassalade en vul het beginsaldo in.</p>" +
-      "<label class='field'>Beginsaldo kassalade (€)<input id='open-cash' inputmode='decimal' value='" + String(S.lastClosingCash.toFixed(2)).replace(".", ",") + "' autofocus></label>" +
+      (S.settings.cashControl === false
+        ? "<p class='muted'>De kassa is gesloten.</p>"
+        : "<p class='muted'>Tel het wisselgeld in de kassalade en vul het beginsaldo in.</p>" +
+          "<label class='field'>Beginsaldo kassalade (€)<input id='open-cash' inputmode='decimal' value='" + String(Number(S.lastClosingCash || 0).toFixed(2)).replace(".", ",") + "' autofocus></label>") +
       "<button class='btn btn-primary btn-lg btn-block' data-act='open-session'>Kassa openen</button>" +
       "<button class='link' data-act='exit'>Terug naar de admin</button>" +
     "</div></div>";
   }
 
+  function autoOpen() {
+    A.api("POST", "pos/session/open", {}).then(function (r) { S.session = r.session; S.screen = "products"; draw(); })
+      .catch(function (err) { A.toast(err.message, "error"); });
+  }
+
   function doOpenSession(btn) {
-    var v = A.parseNum(root.querySelector("#open-cash").value) || 0;
+    var inp = root.querySelector("#open-cash");
+    var v = inp ? A.parseNum(inp.value) || 0 : 0;
     A.busy(btn, true);
     A.api("POST", "pos/session/open", { openingCash: v }).then(function (r) {
       S.session = r.session; S.screen = "products"; A.enterFullscreen(); draw(); A.toast("Kassa geopend");
@@ -203,13 +266,14 @@
         "<div class='po-totals' id='po-totals'></div>" +
         "<div class='po-actions'>" +
           "<button class='po-btn' data-act='customer' id='po-customer'>👤 Klant</button>" +
-          "<button class='po-btn' data-act='ticket-discount' id='po-tdisc'>Bonkorting</button>" +
+          "<button class='po-btn' data-act='ticket-discount' id='po-tdisc'" + (S.settings.allowDiscount === false ? " disabled" : "") + ">Bonkorting</button>" +
           "<button class='po-btn' data-act='clear'>Nieuwe bon</button>" +
         "</div>" +
         "<div class='numpad'>" + pad.map(function (row) {
           return row.map(function (k) {
             var isMode = k === "qty" || k === "disc" || k === "price";
-            return "<button class='np-key" + (isMode ? " np-mode" : "") + (k === "back" ? " np-back" : "") + (k === "C" ? " np-clear" : "") + "' data-key='" + k + "'>" + (labels[k] || k) + "</button>";
+            var off = (k === "price" && S.settings.allowPriceChange === false) || (k === "disc" && S.settings.allowDiscount === false);
+            return "<button class='np-key" + (isMode ? " np-mode" : "") + (k === "back" ? " np-back" : "") + (k === "C" ? " np-clear" : "") + "' data-key='" + k + "'" + (off ? " disabled title='Uitgezet in Kassa-instellingen'" : "") + ">" + (labels[k] || k) + "</button>";
           }).join("");
         }).join("") + "</div>" +
         "<button class='po-pay' data-act='pay' id='po-pay'><span>Betalen</span><strong id='po-pay-total'></strong></button>" +
@@ -218,7 +282,7 @@
         "<div class='chips' id='pos-types'><button class='chip" + (!S.type ? " active" : "") + "' data-type=''>Alles</button>" +
           types.map(function (t) { return "<button class='chip" + (S.type === t ? " active" : "") + "' data-type='" + t + "'>" + A.TYPES[t] + "</button>"; }).join("") +
         "</div>" +
-        "<div class='pp-grid' id='pp-grid'></div>" +
+        "<div class='pp-grid size-" + (S.settings.cardSize || "normaal") + (S.settings.showImages === false ? " no-images" : "") + "' id='pp-grid'></div>" +
       "</section>" +
     "</div>";
   }
@@ -239,9 +303,11 @@
     if (!grid) return;
     var list = visible();
     grid.innerHTML = list.length ? list.map(function (p) {
-      var stock = typeof p.stock === "number" ? "<span class='pp-stock " + (p.stock <= 0 ? "out" : p.stock <= (p.minStock == null ? 6 : p.minStock) ? "low" : "") + "'>" + p.stock + "</span>" : "";
+      var stock = S.settings.showStock !== false && typeof p.stock === "number" ? "<span class='pp-stock " + (p.stock <= 0 ? "out" : p.stock <= (p.minStock == null ? 6 : p.minStock) ? "low" : "") + "'>" + p.stock + "</span>" : "";
       return "<button class='pp-card' data-add='" + e(p.id) + "'>" +
-        "<span class='pp-img'>" + A.productArt(p) + "<span class='pp-price'>" + (p.price == null ? "prijs?" : eu(p.price)) + "</span>" + stock + "</span>" +
+        (S.settings.showImages === false
+          ? "<span class='pp-noimg'><span class='pp-price'>" + (p.price == null ? "prijs?" : eu(p.price)) + "</span>" + stock + "</span>"
+          : "<span class='pp-img'>" + A.productArt(p) + "<span class='pp-price'>" + (p.price == null ? "prijs?" : eu(p.price)) + "</span>" + stock + "</span>") +
         "<span class='pp-name'><small>" + e(p.producer) + "</small><span class='pp-title'>" + e(p.name) + "</span></span></button>";
     }).join("") : "<p class='empty-inline'>Geen producten gevonden.</p>";
   }
@@ -302,22 +368,50 @@
     var b = S.pad.buffer;
     var v = b === "" ? null : Number(b.replace(",", "."));
     if (S.pad.mode === "qty") {
-      if (v === null || v < 1) { S.ticket.items = S.ticket.items.filter(function (x) { return x !== it; }); S.ticket.selected = null; S.pad.buffer = ""; }
+      if (v === null || v < 1) { S.pad.buffer = ""; return removeSelected(); }
       else it.qty = Math.min(999, Math.floor(v));
     } else if (S.pad.mode === "disc") {
-      if (v === null || !v) delete it.discount; else it.discount = Math.min(100, v);
+      var max = S.settings.maxDiscount == null ? 100 : S.settings.maxDiscount;
+      if (v === null || !v) delete it.discount;
+      else if (v > max) { S.pad.buffer = S.pad.buffer.slice(0, -1); A.toast("Maximale korting is " + max + "%.", "error"); return; }
+      else it.discount = v;
     } else if (S.pad.mode === "price") {
       if (v === null) delete it.price; else it.price = v;
     }
     save(); drawTicket();
   }
 
+  // Handeling vrijgeven met de beheerderspincode (één keer per bon).
+  function unlock(action) {
+    if (S.unlocked && S.unlocked[action]) return Promise.resolve(true);
+    return A.askPin(S.settings, action, "").then(function (pin) {
+      if (pin === null) return false;
+      if (pin) { S.pin = pin; S.unlocked = S.unlocked || {}; S.unlocked[action] = true; }
+      return true;
+    });
+  }
+
+  function removeSelected() {
+    return unlock("deleteLine").then(function (ok) {
+      if (!ok) return;
+      S.ticket.items = S.ticket.items.filter(function (x) { return x.id !== S.ticket.selected; });
+      S.ticket.selected = null; S.pad.buffer = ""; S.pad.mode = "qty";
+      save(); drawTicket();
+    });
+  }
+
   function padKey(k) {
     if (S.screen === "payment") return payKey(k);
     if (S.screen !== "products") return;
-    if (k === "qty" || k === "disc" || k === "price") { S.pad.mode = k; S.pad.buffer = ""; drawTicket(); return; }
+    if (k === "qty" || k === "disc" || k === "price") {
+      if (k === "price" && S.settings.allowPriceChange === false) return A.toast("Prijs wijzigen staat uit in de Kassa-instellingen.", "error");
+      if (k === "disc" && S.settings.allowDiscount === false) return A.toast("Korting geven staat uit in de Kassa-instellingen.", "error");
+      var action = k === "price" ? "priceChange" : k === "disc" ? "discount" : null;
+      if (!action) { S.pad.mode = k; S.pad.buffer = ""; drawTicket(); return; }
+      return unlock(action).then(function (ok) { if (ok) { S.pad.mode = k; S.pad.buffer = ""; drawTicket(); } });
+    }
     if (!line(S.ticket.selected)) return;
-    if (k === "C") { S.ticket.items = S.ticket.items.filter(function (x) { return x.id !== S.ticket.selected; }); S.ticket.selected = null; S.pad.buffer = ""; save(); drawTicket(); return; }
+    if (k === "C") return removeSelected();
     if (k === "back") {
       if (!S.pad.buffer) { // lege invoer: terug naar standaard / regel weg
         S.pad.buffer = "";
@@ -349,15 +443,19 @@
     return "<div class='pay2'>" +
       "<section class='pay-methods'>" +
         "<h2>Betaalwijze</h2>" +
-        METHODS.map(function (m) { return "<button class='pm-btn pm-" + m.key + "' data-method='" + m.key + "'><span>" + m.icon + "</span>" + m.label + "</button>"; }).join("") +
+        methods().map(function (m) { return "<button class='pm-btn pm-" + m.key + "' data-method='" + m.key + "'><span>" + m.icon + "</span>" + e(m.label) + "</button>"; }).join("") +
         "<div class='pay-lines' id='pay-lines'></div>" +
       "</section>" +
       "<section class='pay-center'>" +
         "<div class='pay-due'><span>Te betalen</span><strong>" + eu(t.total) + "</strong></div>" +
         "<div class='pay-status' id='pay-status'></div>" +
+        "<div class='quick-pay'>" +
+          "<button class='qp-btn' data-key='exact'>Gepast</button>" +
+          (S.settings.methods && S.settings.methods.contant === false ? "" : (S.settings.quickCash || [10, 20, 50]).map(function (v) { return "<button class='qp-btn' data-key='+" + v + "'>€ " + String(v).replace(".", ",") + "</button>"; }).join("")) +
+        "</div>" +
         "<div class='numpad numpad-pay'>" +
-          ["1", "2", "3", "+10", "4", "5", "6", "+20", "7", "8", "9", "+50", "C", "0", ",", "back"].map(function (k) {
-            return "<button class='np-key" + (k.charAt(0) === "+" ? " np-mode" : "") + (k === "back" ? " np-back" : "") + "' data-key='" + k + "'>" + (k === "back" ? "⌫" : k === "C" ? "Wis" : k) + "</button>";
+          ["1", "2", "3", "back", "4", "5", "6", "C", "7", "8", "9", "00", "0", ","].map(function (k) {
+            return "<button class='np-key" + (k === "back" ? " np-back" : "") + (k === "0" || k === "," ? " np-wide" : "") + "' data-key='" + k + "'>" + (k === "back" ? "⌫" : k === "C" ? "Wis" : k) + "</button>";
           }).join("") +
         "</div>" +
         "<div class='pay-actions'>" +
@@ -369,15 +467,29 @@
     "</div>";
   }
 
+  function methods() {
+    var on = S.settings.methods || { pin: true, contant: true, tikkie: true };
+    return METHODS.concat([{ key: "overig", label: S.settings.otherLabel || "Anders", icon: "★" }])
+      .filter(function (m) { return on[m.key]; })
+      .map(function (m) { return m.key === "overig" ? m : Object.assign({}, m, { label: A.PAYMENT[m.key] || m.label }); });
+  }
+
+  // Zelfde berekening als op de server (incl. afronden van contant op 5 cent).
   function payState() {
     var t = totals();
-    var paid = round(S.pay.lines.reduce(function (s, l) { return s + (l.amount || 0); }, 0));
-    var nonCash = round(S.pay.lines.filter(function (l) { return l.method !== "contant"; }).reduce(function (s, l) { return s + (l.amount || 0); }, 0));
-    var remaining = round(t.total - paid);
-    var change = remaining < 0 ? -remaining : 0;
+    var sum = function (f) { return round(S.pay.lines.filter(f).reduce(function (s, l) { return s + (l.amount || 0); }, 0)); };
+    var nonCash = sum(function (l) { return l.method !== "contant"; });
+    var cashGiven = sum(function (l) { return l.method === "contant"; });
     var hasCash = S.pay.lines.some(function (l) { return l.method === "contant"; });
-    var ok = S.pay.lines.length > 0 && paid >= t.total - 0.001 && nonCash <= t.total + 0.001 && (change < 0.005 || hasCash);
-    return { total: t.total, paid: paid, remaining: remaining, change: change, ok: ok, tooMuchCard: nonCash > t.total + 0.001 || (change > 0.005 && !hasCash) };
+    var cashPart = round(t.total - nonCash);
+    var cashDue = S.settings.roundCash && hasCash ? round(Math.round(cashPart * 20) / 20) : cashPart;
+    var paid = round(nonCash + cashGiven);
+    var remaining = hasCash ? round(cashDue - cashGiven) : round(t.total - nonCash);
+    var change = hasCash && cashGiven > cashDue ? round(cashGiven - cashDue) : (!hasCash && nonCash > t.total ? round(nonCash - t.total) : 0);
+    var tooMuchCard = nonCash > t.total + 0.001;
+    var ok = S.pay.lines.length > 0 && remaining <= 0.001 && !tooMuchCard;
+    return { total: t.total, paid: paid, remaining: remaining, change: change, ok: ok, tooMuchCard: tooMuchCard,
+      rounding: hasCash ? round(cashDue - cashPart) : 0, cashDue: cashDue };
   }
 
   function drawPayment() {
@@ -388,6 +500,7 @@
         "<button class='pl-del' data-pdel='" + i + "' aria-label='Verwijderen'>×</button></div>";
     }).join("") || "<p class='muted small'>Kies hierboven hoe de klant betaalt. Gesplitst betalen kan ook.</p>";
     root.querySelector("#pay-status").innerHTML =
+      (st.rounding ? "<div class='ps-row muted'><span>Afronding contant</span><span>" + (st.rounding > 0 ? "+ " : "− ") + eu(Math.abs(st.rounding)) + "</span></div>" : "") +
       "<div class='ps-row'><span>Betaald</span><strong>" + eu(st.paid) + "</strong></div>" +
       (st.remaining > 0.004 ? "<div class='ps-row ps-remaining'><span>Nog te betalen</span><strong>" + eu(st.remaining) + "</strong></div>" : "") +
       (st.change > 0.004 ? "<div class='ps-row ps-change'><span>" + (st.tooMuchCard ? "Te veel (alleen contant kan wisselgeld)" : "Wisselgeld") + "</span><strong>" + eu(st.change) + "</strong></div>" : "");
@@ -397,6 +510,7 @@
   function addPayment(method) {
     var st = payState();
     var amount = st.remaining > 0 ? st.remaining : 0;
+    if (method === "contant" && S.settings.roundCash) amount = round(Math.round(amount * 20) / 20);
     var existing = S.pay.lines.findIndex(function (l) { return l.method === method; });
     if (existing >= 0) { S.pay.selected = existing; }
     else { S.pay.lines.push({ method: method, amount: amount }); S.pay.selected = S.pay.lines.length - 1; }
@@ -406,7 +520,18 @@
 
   function payKey(k) {
     var l = S.pay.lines[S.pay.selected];
-    if (!l) { if (/^\d$/.test(k)) { addPayment("contant"); l = S.pay.lines[S.pay.selected]; } else return; }
+    if (!l) {
+      var first = methods()[0];
+      if (!first) return;
+      if (/^\d$/.test(k) || k === "exact" || k.charAt(0) === "+") { addPayment(methods().some(function (m) { return m.key === "contant"; }) ? "contant" : first.key); l = S.pay.lines[S.pay.selected]; } else return;
+    }
+    if (k === "exact") {
+      // Gepast: precies het resterende bedrag op de geselecteerde betaalregel
+      var rest = round(payState().remaining + (l.amount || 0));
+      if (l.method === "contant" && S.settings.roundCash) rest = round(Math.round(rest * 20) / 20);
+      l.amount = Math.max(0, rest); S.pay.buffer = ""; return drawPayment();
+    }
+    if (k === "00") { if (!S.pay.buffer || S.pay.buffer.indexOf(",") >= 0) return; S.pay.buffer += "00"; l.amount = round(Number(S.pay.buffer)); return drawPayment(); }
     // +10/+20/+50: eerste druk = "klant geeft een briefje van …", daarna optellen
     if (k.charAt(0) === "+") { l.amount = round((S.pay.buffer ? l.amount : 0) + Number(k.slice(1))); S.pay.buffer = String(l.amount).replace(".", ","); return drawPayment(); }
     if (k === "C") { S.pay.buffer = ""; l.amount = 0; return drawPayment(); }
@@ -426,12 +551,14 @@
     if (!st.ok) return;
     A.busy(btn, true, "Bezig…");
     A.api("POST", "pos", {
-      items: S.ticket.items, discount: S.ticket.discount, customerId: S.ticket.customer && S.ticket.customer.id,
+      items: S.ticket.items, discount: S.ticket.discount, customerId: S.ticket.customer && S.ticket.customer.id, managerPin: S.pin || undefined,
       payments: S.pay.lines.map(function (l) { return { method: l.method, amount: l.amount }; })
     }).then(function (res) {
       S.lastOrder = res.order;
       S.ticket = freshTicket(); save();
+      S.unlocked = {}; S.pin = "";
       S.screen = "receipt"; draw();
+      if (S.settings.autoPrint) A.printReceipt(res.order);
       A.invalidate("products", "orders", "customers");
       A.load("products", true).then(function (list) { S.products = list; });
     }).catch(function (err) { A.busy(btn, false); A.toast(err.message, "error"); });
@@ -483,6 +610,11 @@
   }
 
   function ticketDiscountDialog() {
+    if (S.settings.allowDiscount === false) return A.toast("Korting geven staat uit in de Kassa-instellingen.", "error");
+    unlock("discount").then(function (ok) { if (ok) ticketDiscountForm(); });
+  }
+
+  function ticketDiscountForm() {
     var d = S.ticket.discount || { type: "percent", value: "" };
     var body = A.modal("Korting op de hele bon", "<form id='disc-form'>" +
       "<div class='seg'><label><input type='radio' name='type' value='percent'" + (d.type === "percent" ? " checked" : "") + "> Percentage</label>" +
@@ -496,6 +628,10 @@
     form.addEventListener("submit", function (ev) {
       ev.preventDefault();
       var v = A.parseNum(form.value.value);
+      var max = S.settings.maxDiscount == null ? 100 : S.settings.maxDiscount;
+      var t = totals();
+      var pct = form.type.value === "percent" ? v : (t.subtotal > 0 ? v / t.subtotal * 100 : 0);
+      if (v > 0 && pct > max + 0.001) return A.toast("Maximale korting is " + max + "%.", "error");
       S.ticket.discount = v > 0 ? { type: form.type.value, value: v } : null;
       save(); drawTicket(); A.closeModal();
     });
@@ -519,10 +655,20 @@
     if (t.dataset.pline) { S.pay.selected = Number(t.dataset.pline); S.pay.buffer = ""; return drawPayment(); }
     switch (t.dataset.act) {
       case "fullscreen": return A.isFullscreen() ? A.exitFullscreen() : A.enterFullscreen();
-      case "exit": A.exitFullscreen(); location.hash = "#kassa"; return;
+      case "exit":
+        return A.askPin(S.settings, "exitPos", "").then(function (pin) {
+          if (pin === null) return;
+          A.exitFullscreen(); location.hash = "#kassa";
+        });
       case "close-session":
         if (S.ticket.items.length) return A.toast("Reken eerst de open bon af of maak hem leeg.", "error");
-        return closeDialog(function () { S.session = null; S.screen = "open"; A.api("GET", "pos/session").then(function (r) { S.lastClosingCash = r.lastClosingCash || 0; draw(); }); });
+        return closeDialog(function () {
+          S.session = null; S.screen = "open";
+          A.api("GET", "pos/session").then(function (r) {
+            S.lastClosingCash = r.suggestedOpeningCash != null ? r.suggestedOpeningCash : (r.lastClosingCash || 0);
+            draw();
+          });
+        });
       case "open-session": return doOpenSession(t);
       case "pay": return goPay();
       case "back": S.screen = "products"; return draw();
@@ -611,15 +757,20 @@
 
 /* ---------------------------------------------------------------- Kassabon en kassarapport (gedeeld) */
 
-A.receiptHead = function () {
+A.receiptHead = function (set) {
+  var extra = set && set.receiptHeader ? "<p class='r-center r-pre'>" + A.esc(set.receiptHeader) + "</p>" : "";
   return "<p class='r-center r-shop'>worldwidewine.nl</p><p class='r-center r-tag'>DRANKEN EN CULINAIRE PROJECTEN</p>" +
-    "<p class='r-center'>Westzijde 358, 1506 GK Zaandam<br>06 83 17 27 04 · info@worldwidewine.nl<br>KvK 32134785</p>";
+    "<p class='r-center'>Westzijde 358, 1506 GK Zaandam<br>06 83 17 27 04 · info@worldwidewine.nl<br>KvK 32134785</p>" + extra;
 };
 
-A.receiptHtml = function (o) {
+// set: kassa-instellingen (kop/voettekst, btw en klant tonen). Zonder set: de laatst geladen instellingen.
+A.receiptHtml = function (o, set) {
+  set = set || A.posSettings || {};
   var e = A.esc, eu = A.euro;
+  var label = function (m) { return m === "overig" ? (set.otherLabel || A.PAYMENT.overig || "Anders") : (A.PAYMENT[m] || m); };
   var payments = o.payments && o.payments.length ? o.payments : [{ method: o.paymentMethod, amount: o.total }];
-  return "<div class='receipt'>" + A.receiptHead() +
+  var footer = set.receiptFooter != null ? set.receiptFooter : "Bedankt en proost!\nGeen 18, geen alcohol.";
+  return "<div class='receipt'>" + A.receiptHead(set) +
     "<p class='r-center'>" + A.date(o.createdAt, true) + "<br>Bon " + e(o.number) + "</p><hr>" +
     o.lines.map(function (l) {
       var gross = Math.round(l.price * l.qty * 100) / 100;
@@ -630,33 +781,38 @@ A.receiptHtml = function (o) {
     (o.discount ? "<div class='r-line'><span>Subtotaal</span><span>" + eu(o.subtotal) + "</span></div><div class='r-line'><span>Korting op bon</span><span>− " + eu(o.discount) + "</span></div>" : "") +
     (o.shipping ? "<div class='r-line'><span>Verzending</span><span>" + eu(o.shipping) + "</span></div>" : "") +
     "<div class='r-line r-total'><span>TOTAAL</span><span>" + eu(o.total) + "</span></div>" +
+    (o.cash && o.cash.rounding ? "<div class='r-line'><span>Afronding contant</span><span>" + eu(o.cash.rounding) + "</span></div>" : "") +
     payments.map(function (pm) {
       var shown = pm.method === "contant" && o.cash ? o.cash.received : pm.amount;
-      return "<div class='r-line'><span>" + e(A.PAYMENT[pm.method] || pm.method) + "</span><span>" + eu(shown) + "</span></div>";
+      return "<div class='r-line'><span>" + e(label(pm.method)) + "</span><span>" + eu(shown) + "</span></div>";
     }).join("") +
-    (o.cash && o.cash.change ? "<div class='r-line'><span>Wisselgeld</span><span>" + eu(o.cash.change) + "</span></div>" : "") + "<hr>" +
-    "<div class='r-line r-small'><span>Btw</span><span>over</span><span>btw</span></div>" +
-    (o.vat || []).map(function (v) { return "<div class='r-line r-small'><span>" + v.rate + "%</span><span>" + eu(v.gross - v.vat) + "</span><span>" + eu(v.vat) + "</span></div>"; }).join("") +
-    (o.customer && o.customer.name ? "<hr><p class='r-center'>Klant: " + e(o.customer.name) + "</p>" : "") +
-    "<hr><p class='r-center'>Bedankt en proost!<br>Geen 18, geen alcohol.</p></div>";
+    (o.cash && o.cash.change ? "<div class='r-line'><span>Wisselgeld</span><span>" + eu(o.cash.change) + "</span></div>" : "") +
+    (set.receiptShowVat !== false ? "<hr><div class='r-line r-small'><span>Btw</span><span>over</span><span>btw</span></div>" +
+      (o.vat || []).map(function (v) { return "<div class='r-line r-small'><span>" + v.rate + "%</span><span>" + eu(v.gross - v.vat) + "</span><span>" + eu(v.vat) + "</span></div>"; }).join("") : "") +
+    (set.receiptShowCustomer !== false && o.customer && o.customer.name ? "<hr><p class='r-center'>Klant: " + e(o.customer.name) + "</p>" : "") +
+    (footer ? "<hr><p class='r-center r-pre'>" + e(footer) + "</p>" : "") + "</div>";
 };
 
 A.zReportHtml = function (s) {
   var e = A.esc, eu = A.euro, sm = s.summary || {};
+  var set = A.posSettings || {};
+  var label = function (m) { return m === "overig" ? (set.otherLabel || "Anders") : (A.PAYMENT[m] || m); };
   var row = function (a, b, cls) { return "<div class='r-line" + (cls ? " " + cls : "") + "'><span>" + a + "</span><span>" + b + "</span></div>"; };
   return "<div class='receipt'>" + A.receiptHead() +
     "<p class='r-center r-shop'>KASSARAPPORT (Z)</p><p class='r-center'>Dienst #" + s.id + "</p><hr>" +
     row("Geopend", A.date(s.openedAt, true)) + row("Gesloten", s.closedAt ? A.date(s.closedAt, true) : "nog open") + "<hr>" +
     row("Aantal bonnen", sm.count || 0) +
     row("Omzet", eu(sm.total || 0), "r-total") +
-    Object.keys(sm.byMethod || {}).map(function (m) { return row("  " + e(A.PAYMENT[m] || m), eu(sm.byMethod[m])); }).join("") +
+    Object.keys(sm.byMethod || {}).map(function (m) { return row("  " + e(label(m)), eu(sm.byMethod[m])); }).join("") +
+    (sm.rounding ? row("  Afronding contant", eu(sm.rounding)) : "") +
     (sm.discount ? row("Gegeven korting", eu(sm.discount)) : "") + "<hr>" +
     "<div class='r-line r-small'><span>Btw</span><span>over</span><span>btw</span></div>" +
     (sm.vat || []).map(function (v) { return "<div class='r-line r-small'><span>" + v.rate + "%</span><span>" + eu(v.gross - v.vat) + "</span><span>" + eu(v.vat) + "</span></div>"; }).join("") + "<hr>" +
     row("Beginsaldo kas", eu(s.openingCash)) +
     row("Contante verkopen", eu((sm.byMethod && sm.byMethod.contant) || 0)) +
     row("Verwacht in de la", eu(s.expectedCash != null ? s.expectedCash : sm.expectedCash || 0)) +
-    (s.countedCash != null ? row("Geteld", eu(s.countedCash)) + row("Verschil", (s.difference > 0 ? "+" : "") + eu(s.difference), "r-total") : "") +
+    (s.countedCash != null ? row("Geteld", eu(s.countedCash)) + row("Verschil", (s.difference > 0 ? "+" : "") + eu(s.difference), "r-total")
+      : (s.status === "gesloten" ? row("Kastelling", "uit") : "")) +
     (s.note ? "<hr><p>" + e(s.note) + "</p>" : "") + "</div>";
 };
 

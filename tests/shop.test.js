@@ -189,7 +189,7 @@ test("online betalen via Mollie: betaling starten en webhook verwerken", async (
 test("publieke sleutel (anon) kan niets lezen of wijzigen", async () => {
   const { createClient } = require("@supabase/supabase-js");
   const anon = createClient(stack.url, stack.anonKey, { auth: { persistSession: false } });
-  for (const table of ["products", "customers", "orders", "order_lines", "stock_movements", "pos_sessions"]) {
+  for (const table of ["products", "customers", "orders", "order_lines", "stock_movements", "pos_sessions", "settings"]) {
     const { data, error } = await anon.from(table).select("*").limit(1);
     assert.ok(error || (data && data.length === 0), table + " is leesbaar met de anon-sleutel");
     assert.ok(error, table + " zou een permissiefout moeten geven");
@@ -282,4 +282,75 @@ test("productfoto uploaden", async () => {
   const cleared = await shop.setProductImage("wiston-estate-brut", null);
   assert.strictEqual(cleared.image, undefined);
   delete process.env.WWW_LOCAL_UPLOADS;
+});
+
+test("kassa-instellingen: standaardwaarden, opslaan en pincode wordt niet teruggegeven", async () => {
+  const s0 = await shop.getPosSettings();
+  assert.strictEqual(s0.cashControl, true);
+  assert.strictEqual(s0.pinSet, false);
+  await assert.rejects(shop.savePosSettings({ pinFor: { closeSession: true } }), /Stel eerst een beheerderspincode in/);
+  await assert.rejects(shop.savePosSettings({ pin: "12" }), /4 tot 8 cijfers/);
+  await assert.rejects(shop.savePosSettings({ methods: { pin: false, contant: false, tikkie: false, overig: false } }), /minstens één betaalwijze/);
+  const s = await shop.savePosSettings({ pin: "4321", quickCash: "5 10 20 50 100", otherLabel: "Cadeaubon", methods: { overig: true } });
+  assert.strictEqual(s.pinSet, true);
+  assert.strictEqual(s.pinHash, undefined);
+  assert.strictEqual(s.pinSalt, undefined);
+  assert.deepStrictEqual(s.quickCash, [5, 10, 20, 50]);
+  assert.strictEqual(s.methods.overig, true);
+  await assert.rejects(shop.verifyPin("0000"), /Onjuiste pincode/);
+  assert.strictEqual(await shop.verifyPin("4321"), true);
+});
+
+test("kassa-instellingen worden afgedwongen bij verkopen", async () => {
+  await shop.startSession({ openingCash: 100 });
+  const item = [{ id: "koremans-limoncello", qty: 1 }];
+  // betaalwijze uit
+  await shop.savePosSettings({ methods: { tikkie: false } });
+  await assert.rejects(shop.createPosSale({ items: item, payments: [{ method: "tikkie", amount: 22 }] }), /betaalwijze staat uit/);
+  // prijs wijzigen uit
+  await shop.savePosSettings({ allowPriceChange: false });
+  await assert.rejects(shop.createPosSale({ items: [{ id: "koremans-limoncello", qty: 1, price: 15 }], payment: "pin" }), /Prijzen wijzigen/);
+  // maximale korting
+  await shop.savePosSettings({ allowPriceChange: true, maxDiscount: 15 });
+  await assert.rejects(shop.createPosSale({ items: [{ id: "koremans-limoncello", qty: 1, discount: 20 }], payment: "pin" }), /maximum van 15%/);
+  await assert.rejects(shop.createPosSale({ items: item, payment: "pin", discount: { type: "amount", value: 10 } }), /maximum van 15%/);
+  // pincode voor korting
+  await shop.savePosSettings({ pinFor: { discount: true } });
+  await assert.rejects(shop.createPosSale({ items: [{ id: "koremans-limoncello", qty: 1, discount: 10 }], payment: "pin" }), /pincode/);
+  const ok = await shop.createPosSale({ items: [{ id: "koremans-limoncello", qty: 1, discount: 10 }], payment: "pin", managerPin: "4321" });
+  assert.strictEqual(ok.order.total, 19.8);
+  // geen verkoop boven voorraad
+  await shop.changeStock([{ id: "domaine-daridan-cheverny-blanc", set: 1 }], "Geteld");
+  await shop.savePosSettings({ allowNegativeStock: false, pinFor: { discount: false } });
+  await assert.rejects(shop.createPosSale({ items: [{ id: "domaine-daridan-cheverny-blanc", qty: 2 }], payment: "pin" }), /nog maar 1 op voorraad/);
+  await shop.savePosSettings({ allowNegativeStock: true, maxDiscount: 100, methods: { tikkie: true } });
+});
+
+test("contant afronden op 5 cent", async () => {
+  await shop.savePosSettings({ roundCash: true });
+  // 2 × Rosso Tedicciolo € 10 + Zapel € 11,90 = 31,90 → 10% korting = 28,71 → contant 28,70
+  const { order } = await shop.createPosSale({ items: [{ id: "montemercurio-tedicciolo", qty: 2 }, { id: "rainoldi-zapel-bianco", qty: 1 }], payment: "contant", cashReceived: 30, discount: { type: "percent", value: 10 } });
+  assert.strictEqual(order.total, 28.71);
+  assert.deepStrictEqual(order.payments, [{ method: "contant", amount: 28.7 }]);
+  assert.strictEqual(order.cash.change, 1.3);
+  assert.strictEqual(order.cash.rounding, -0.01);
+  // pin wordt niet afgerond
+  const pin = await shop.createPosSale({ items: [{ id: "montemercurio-tedicciolo", qty: 1 }, { id: "rainoldi-zapel-bianco", qty: 1 }], payment: "pin", discount: { type: "amount", value: 0.03 } });
+  assert.strictEqual(pin.order.payments[0].amount, 21.87);
+  await shop.savePosSettings({ roundCash: false });
+});
+
+test("kassa zonder kastelling en sluiten met pincode", async () => {
+  await shop.savePosSettings({ pinFor: { closeSession: true } });
+  await assert.rejects(shop.closeSession({ countedCash: 0 }), /pincode/);
+  await shop.savePosSettings({ cashControl: false });
+  const closed = await shop.closeSession({ managerPin: "4321" });
+  assert.strictEqual(closed.countedCash, null);
+  assert.strictEqual(closed.difference, null);
+  assert.ok(closed.expectedCash > 0);
+  // openen zonder kastelling: beginsaldo = verwacht bedrag van vorige dienst
+  const opened = await shop.startSession({ openingCash: 999 });
+  assert.strictEqual(opened.openingCash, closed.expectedCash);
+  await shop.savePosSettings({ cashControl: true, pinFor: { closeSession: false } });
+  await shop.closeSession({ countedCash: opened.openingCash });
 });

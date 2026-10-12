@@ -84,6 +84,7 @@ var A = (function () {
     if (cb) cb();
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
+  function closeModalSilently() { onClose = null; closeModal(); }
   function confirmBox(title, text, okLabel, danger) {
     return new Promise(function (resolve) {
       var body = modal(title, "<p>" + esc(text) + "</p><div class='actions'><button class='btn' data-modal-close>Annuleren</button>" +
@@ -243,7 +244,7 @@ var A = (function () {
 
   return {
     $: $, $$: $$, esc: esc, euro: euro, date: date, parseNum: parseNum,
-    api: api, load: load, invalidate: invalidate, toast: toast, modal: modal, closeModal: closeModal,
+    api: api, load: load, invalidate: invalidate, toast: toast, modal: modal, closeModal: closeModal, closeModalSilently: closeModalSilently,
     confirm: confirmBox, formData: formData, busy: busy, register: register, route: route, start: start,
     enterFullscreen: enterFullscreen, exitFullscreen: exitFullscreen, isFullscreen: isFullscreen, openPos: openPos, printHtml: printHtml,
     refreshBadges: refreshBadges, statusBadge: statusBadge, stockBadge: stockBadge, productName: productName, productArt: productArt,

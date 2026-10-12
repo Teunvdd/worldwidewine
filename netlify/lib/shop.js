@@ -1,5 +1,6 @@
 // Bedrijfslogica: assortiment, voorraad, bestellingen, kassa en klanten (Supabase).
 const { db, run, all } = require("./db");
+const crypto = require("crypto");
 const { HttpError, str } = require("./http");
 const SEED = require("../../data/products.js");
 const CONFIG = require("../../data/config.js");
@@ -332,6 +333,112 @@ async function nextReceiptNumber() {
   return "K-" + day + "-" + String(n).padStart(3, "0");
 }
 
+// ---------------- Kassa-instellingen ----------------
+
+const POS_DEFAULTS = {
+  cashControl: true,            // kastelling bij openen en sluiten
+  openingCashMode: "last",      // "last" = laatst getelde bedrag, "fixed" = vast bedrag
+  openingCashFixed: 150,
+  maxCashDifference: 5,         // waarschuwen bij een groter kasverschil (€)
+  methods: { pin: true, contant: true, tikkie: true, overig: false },
+  otherLabel: "Cadeaubon",
+  quickCash: [10, 20, 50],
+  roundCash: false,             // contant afronden op 5 cent
+  allowPriceChange: true,
+  allowDiscount: true,
+  maxDiscount: 100,             // maximale korting in %
+  allowNegativeStock: true,     // verkopen als de voorraad (volgens het systeem) op is
+  showStock: true,
+  showImages: true,
+  cardSize: "normaal",          // klein | normaal | groot
+  autoPrint: false,
+  receiptHeader: "",
+  receiptFooter: "Bedankt en proost!\nGeen 18, geen alcohol.",
+  receiptShowVat: true,
+  receiptShowCustomer: true,
+  pinFor: { priceChange: false, discount: false, deleteLine: false, closeSession: false, exitPos: false }
+};
+const PIN_ACTIONS = Object.keys(POS_DEFAULTS.pinFor);
+
+function mergeSettings(stored) {
+  const v = Object.assign({}, POS_DEFAULTS, stored || {});
+  v.methods = Object.assign({}, POS_DEFAULTS.methods, (stored && stored.methods) || {});
+  v.pinFor = Object.assign({}, POS_DEFAULTS.pinFor, (stored && stored.pinFor) || {});
+  return v;
+}
+
+async function loadPosSettingsRaw() {
+  const rows = await run(db().from("settings").select("value").eq("key", "pos"));
+  return mergeSettings(rows.length ? rows[0].value : null);
+}
+
+// Instellingen zonder geheime pincode (voor de kassa en de admin).
+function publicSettings(v) {
+  const out = Object.assign({}, v);
+  out.pinSet = !!v.pinHash;
+  delete out.pinHash; delete out.pinSalt;
+  return out;
+}
+
+async function getPosSettings() { return publicSettings(await loadPosSettingsRaw()); }
+
+async function savePosSettings(input) {
+  const cur = await loadPosSettingsRaw();
+  const v = Object.assign({}, cur);
+  const bool = (k) => { if (k in input) v[k] = !!input[k]; };
+  const money = (k, max) => { if (k in input) { const n = round(Number(input[k])); if (!(n >= 0) || n > max) throw new HttpError(400, "Ongeldig bedrag bij " + k + "."); v[k] = n; } };
+  ["cashControl", "roundCash", "allowPriceChange", "allowDiscount", "allowNegativeStock", "showStock", "showImages", "autoPrint", "receiptShowVat", "receiptShowCustomer"].forEach(bool);
+  money("openingCashFixed", 100000); money("maxCashDifference", 100000);
+  if ("openingCashMode" in input) v.openingCashMode = input.openingCashMode === "fixed" ? "fixed" : "last";
+  if ("cardSize" in input) v.cardSize = ["klein", "normaal", "groot"].indexOf(input.cardSize) >= 0 ? input.cardSize : "normaal";
+  if ("maxDiscount" in input) { const n = Number(input.maxDiscount); if (!(n >= 0 && n <= 100)) throw new HttpError(400, "Maximale korting moet tussen 0 en 100% liggen."); v.maxDiscount = round(n); }
+  if ("otherLabel" in input) v.otherLabel = str(input.otherLabel, 30) || "Anders";
+  if ("receiptHeader" in input) v.receiptHeader = str(input.receiptHeader, 300);
+  if ("receiptFooter" in input) v.receiptFooter = str(input.receiptFooter, 300);
+  if ("quickCash" in input) {
+    const list = (Array.isArray(input.quickCash) ? input.quickCash : String(input.quickCash).split(/[\s;]+/))
+      .map((x) => round(Number(String(x).replace(",", ".")))).filter((x) => x > 0 && x <= 10000).slice(0, 4);
+    v.quickCash = list.length ? list : POS_DEFAULTS.quickCash;
+  }
+  if (input.methods) POS_METHODS.forEach((m) => { if (m in input.methods) v.methods[m] = !!input.methods[m]; });
+  if (!POS_METHODS.some((m) => v.methods[m])) throw new HttpError(400, "Zet minstens één betaalwijze aan.");
+  if (input.pinFor) PIN_ACTIONS.forEach((a) => { if (a in input.pinFor) v.pinFor[a] = !!input.pinFor[a]; });
+  if ("pin" in input) {
+    const pin = String(input.pin || "");
+    if (!pin) { delete v.pinHash; delete v.pinSalt; }
+    else {
+      if (!/^\d{4,8}$/.test(pin)) throw new HttpError(400, "De pincode moet uit 4 tot 8 cijfers bestaan.");
+      v.pinSalt = crypto.randomBytes(16).toString("hex");
+      v.pinHash = crypto.scryptSync(pin, v.pinSalt, 32).toString("hex");
+    }
+  }
+  if (PIN_ACTIONS.some((a) => v.pinFor[a]) && !v.pinHash) throw new HttpError(400, "Stel eerst een beheerderspincode in.");
+  await run(db().from("settings").upsert({ key: "pos", value: v, updated_at: now() }, { onConflict: "key" }));
+  return publicSettings(v);
+}
+
+function pinOk(settings, pin) {
+  if (!settings.pinHash) return true;
+  if (!/^\d{4,8}$/.test(String(pin || ""))) return false;
+  const a = Buffer.from(crypto.scryptSync(String(pin), settings.pinSalt, 32).toString("hex"));
+  const b = Buffer.from(settings.pinHash);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+async function requirePin(settings, action, pin) {
+  if (!settings.pinFor[action] || !settings.pinHash) return;
+  if (!pinOk(settings, pin)) {
+    await new Promise((r) => setTimeout(r, 600));
+    throw new HttpError(403, "Onjuiste of ontbrekende beheerderspincode.");
+  }
+}
+
+async function verifyPin(pin) {
+  const settings = await loadPosSettingsRaw();
+  if (!pinOk(settings, pin)) { await new Promise((r) => setTimeout(r, 600)); throw new HttpError(403, "Onjuiste pincode."); }
+  return true;
+}
+
 // ---------------- Kassadiensten ----------------
 
 function fromSessionRow(r) {
@@ -362,23 +469,30 @@ async function sessionSummary(session) {
     discount: round(orders.reduce((t, o) => t + (o.discount || 0), 0) + orders.reduce((t, o) => t + o.lines.reduce((u, l) => u + (l.discount ? round(l.price * l.qty) - l.total : 0), 0), 0)),
     byMethod,
     vat: Object.values(vat).sort((a, b) => a.rate - b.rate),
+    rounding: round(orders.reduce((t, o) => t + ((o.cash && o.cash.rounding) || 0), 0)),
     expectedCash: round(session.openingCash + (byMethod.contant || 0))
   };
 }
 
 async function currentSession() {
-  const session = await openSession();
-  if (!session) return { session: null, lastClosingCash: await lastClosingCash() };
-  return { session: Object.assign(session, { summary: await sessionSummary(session) }) };
+  const [session, settings] = await Promise.all([openSession(), getPosSettings()]);
+  if (!session) {
+    const last = await lastClosingCash();
+    return { session: null, settings, lastClosingCash: last, suggestedOpeningCash: settings.openingCashMode === "fixed" ? settings.openingCashFixed : last };
+  }
+  return { session: Object.assign(session, { summary: await sessionSummary(session) }), settings };
 }
 
 async function lastClosingCash() {
-  const rows = await run(db().from("pos_sessions").select("counted_cash").eq("status", "gesloten").order("closed_at", { ascending: false }).limit(1));
-  return rows.length ? num(rows[0].counted_cash) : 0;
+  const rows = await run(db().from("pos_sessions").select("counted_cash, expected_cash").eq("status", "gesloten").order("closed_at", { ascending: false }).limit(1));
+  if (!rows.length) return 0;
+  return num(rows[0].counted_cash != null ? rows[0].counted_cash : rows[0].expected_cash) || 0;
 }
 
 async function startSession(input) {
-  const opening = round(Number(input.openingCash) || 0);
+  const settings = await loadPosSettingsRaw();
+  let opening = round(Number(input.openingCash) || 0);
+  if (!settings.cashControl) opening = settings.openingCashMode === "fixed" ? settings.openingCashFixed : await lastClosingCash();
   if (opening < 0) throw new HttpError(400, "Beginsaldo kan niet negatief zijn.");
   const rows = await run(db().from("pos_sessions").insert({ opening_cash: opening, note: str(input.note, 300) || null }).select(),
     { pos_sessions_one_open: "Er is al een kassadienst open." });
@@ -388,12 +502,15 @@ async function startSession(input) {
 async function closeSession(input) {
   const session = await openSession();
   if (!session) throw new HttpError(409, "Er is geen kassadienst open.");
-  const counted = input.countedCash === "" || input.countedCash == null ? null : round(Number(input.countedCash));
-  if (counted == null || !(counted >= 0)) throw new HttpError(400, "Vul het getelde bedrag in de kassalade in.");
+  const settings = await loadPosSettingsRaw();
+  await requirePin(settings, "closeSession", input.managerPin);
+  let counted = input.countedCash === "" || input.countedCash == null ? null : round(Number(input.countedCash));
+  if (settings.cashControl && (counted == null || !(counted >= 0))) throw new HttpError(400, "Vul het getelde bedrag in de kassalade in.");
+  if (!settings.cashControl) counted = null;
   const summary = await sessionSummary(session);
   const rows = await run(db().from("pos_sessions").update({
     status: "gesloten", closed_at: now(), expected_cash: summary.expectedCash, counted_cash: counted,
-    difference: round(counted - summary.expectedCash), summary, note: str(input.note, 500) || session.note
+    difference: counted == null ? null : round(counted - summary.expectedCash), summary, note: str(input.note, 500) || session.note
   }).eq("id", session.id).eq("status", "open").select());
   if (!rows.length) throw new HttpError(409, "Deze kassadienst is al gesloten.");
   return fromSessionRow(rows[0]);
@@ -412,9 +529,23 @@ async function createPosSale(input) {
   const discount = input.discount && Number(input.discount.value) > 0
     ? { type: input.discount.type === "percent" ? "percent" : "amount", value: Number(input.discount.value) } : null;
 
-  const products = await getProducts();
+  const [products, settings] = await Promise.all([getProducts(), loadPosSettingsRaw()]);
   const result = computeOrder((input.items || []).slice(0, 200), null, products, CONFIG, { pos: true, discount });
   if (result.errors.length) throw new HttpError(400, result.errors.join(" "));
+
+  // Prijs wijzigen en korting: toegestaan? maximum? pincode?
+  const priceChanged = result.lines.some((l) => l.listPrice != null);
+  const maxLineDisc = Math.max(0, ...result.lines.map((l) => l.discount || 0));
+  const ticketPct = discount ? (discount.type === "percent" ? discount.value : result.subtotal > 0 ? discount.value / result.subtotal * 100 : 0) : 0;
+  if (priceChanged) {
+    if (!settings.allowPriceChange) throw new HttpError(403, "Prijzen wijzigen in de kassa staat uit (Kassa-instellingen).");
+    await requirePin(settings, "priceChange", input.managerPin);
+  }
+  if (maxLineDisc > 0 || ticketPct > 0) {
+    if (!settings.allowDiscount) throw new HttpError(403, "Korting geven in de kassa staat uit (Kassa-instellingen).");
+    if (Math.max(maxLineDisc, ticketPct) > settings.maxDiscount + 0.001) throw new HttpError(403, "De korting is hoger dan het maximum van " + settings.maxDiscount + "%.");
+    await requirePin(settings, "discount", input.managerPin);
+  }
 
   // Betalingen (oude aanroep met één betaalwijze blijft werken)
   let given = Array.isArray(input.payments) ? input.payments
@@ -424,20 +555,24 @@ async function createPosSale(input) {
   if (!given.length || given.some((pm) => POS_METHODS.indexOf(pm.method) < 0 || !Number.isFinite(pm.amount))) {
     throw new HttpError(400, "Kies een betaalwijze.");
   }
+  if (given.some((pm) => !settings.methods[pm.method])) throw new HttpError(400, "Deze betaalwijze staat uit (Kassa-instellingen).");
   const nonCash = round(given.filter((pm) => pm.method !== "contant").reduce((t, pm) => t + pm.amount, 0));
   const cashGiven = round(given.filter((pm) => pm.method === "contant").reduce((t, pm) => t + pm.amount, 0));
   if (nonCash > result.total + 0.001) throw new HttpError(400, "Er is meer met pin/Tikkie betaald dan het totaal.");
-  if (round(nonCash + cashGiven) < result.total - 0.001) throw new HttpError(400, "Het betaalde bedrag is lager dan het totaal.");
   const cashPart = round(result.total - nonCash);
+  // Contant afronden op 5 cent (alleen het contante deel)
+  const cashDue = settings.roundCash && cashGiven > 0 ? round(Math.round(cashPart * 20) / 20) : cashPart;
+  if (cashGiven > 0 ? cashGiven < cashDue - 0.001 : nonCash < result.total - 0.001) throw new HttpError(400, "Het betaalde bedrag is lager dan het totaal.");
   const payments = [];
   given.forEach((pm) => {
     const amount = pm.method === "contant" ? 0 : pm.amount;
     const same = payments.find((x) => x.method === pm.method);
     if (pm.method !== "contant") { if (same) same.amount = round(same.amount + amount); else payments.push({ method: pm.method, amount }); }
   });
-  if (cashGiven > 0 && cashPart > 0) payments.push({ method: "contant", amount: cashPart });
+  if (cashGiven > 0 && cashDue > 0) payments.push({ method: "contant", amount: cashDue });
   if (!payments.length) payments.push({ method: given[0].method, amount: result.total });
-  const cash = cashGiven > 0 ? { received: cashGiven, change: round(cashGiven - cashPart) } : null;
+  const cash = cashGiven > 0 ? { received: cashGiven, change: round(cashGiven - cashDue) } : null;
+  if (cash && cashDue !== cashPart) cash.rounding = round(cashDue - cashPart);
   const method = payments.length > 1 ? "gemengd" : payments[0].method;
 
   let customer = null, customerId = null;
@@ -456,7 +591,8 @@ async function createPosSale(input) {
     notes: str(input.notes, 500), delivery: null, deliveryLabel: null, pickupMoment: null, molliePaymentId: null,
     history: [{ at: createdAt, status: "afgerond", note: "Kassaverkoop (" + payments.map((pm) => PAYMENT_LABELS[pm.method]).join(" + ") + ")" }]
   };
-  await saveNewOrder(order, false, "Verkoop winkel");
+  // Met "verkopen bij voorraad 0" uit weigert de database een te hoge verkoop.
+  await saveNewOrder(order, !settings.allowNegativeStock, "Verkoop winkel");
   return { order, warnings: result.warnings };
 }
 
@@ -528,5 +664,6 @@ module.exports = {
   getCustomers, saveCustomer, deleteCustomer,
   listOrders, getOrder, createWebOrder, createPosSale, setOrderStatus, setPaymentStatus,
   currentSession, startSession, closeSession, listSessions, setProductImage,
+  getPosSettings, savePosSettings, verifyPin, POS_DEFAULTS,
   dashboard
 };

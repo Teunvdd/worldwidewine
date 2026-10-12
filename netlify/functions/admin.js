@@ -95,6 +95,9 @@ async function handle(event) {
 
     case "pos":
       if (method === "GET" && id === "session") return json(200, await shop.currentSession());
+      if (method === "GET" && id === "settings") return json(200, { settings: await shop.getPosSettings(), defaults: shop.POS_DEFAULTS });
+      if (method === "POST" && id === "settings") return json(200, { settings: await shop.savePosSettings(body) });
+      if (method === "POST" && id === "verify-pin") { await shop.verifyPin(body.pin); return json(200, { ok: true }); }
       if (method === "GET" && id === "sessions") return json(200, { sessions: await shop.listSessions() });
       if (method === "POST" && id === "session" && action === "open") return json(200, { session: await shop.startSession(body) });
       if (method === "POST" && id === "session" && action === "close") return json(200, { session: await shop.closeSession(body) });

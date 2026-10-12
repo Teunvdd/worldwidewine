@@ -347,3 +347,64 @@ body.pos-mode .main { padding: 0 !important; height: 100vh; }
   body.printing-receipt .receipt-print { display: block; width: 72mm; margin: 0; }
   @page { margin: 4mm; }
 }
+
+/* ---------- Kassa-instellingen ---------- */
+.menu a.sub { padding-left: 1.6rem; font-size: .9rem; }
+.settings { display: grid; grid-template-columns: 1fr 340px; gap: 1.2rem; align-items: start; padding-bottom: 5rem; }
+.settings-side { position: sticky; top: 1rem; }
+@media (max-width: 1100px) { .settings { grid-template-columns: 1fr; } .settings-side { position: static; } }
+.set-card h2 { font-size: 1.05rem; margin-bottom: .6rem; }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .7rem 0; border-top: 1px solid var(--line-2); flex-wrap: wrap; }
+.set-card h2 + .set-row, .set-card h2 + p + .set-row { border-top: 0; }
+.set-col { flex-direction: column; align-items: stretch; }
+.set-col textarea { width: 100%; }
+.set-label { font-weight: 600; font-size: .92rem; display: flex; flex-direction: column; }
+.set-label small, .set-text small { font-weight: 400; color: var(--muted); font-size: .82rem; margin-top: .1rem; }
+.set-sub { margin-left: 3.4rem; transition: opacity .15s; }
+.set-sub.is-off { opacity: .4; }
+.set-sub .set-row:first-child { border-top: 1px dashed var(--line); }
+.in-money { width: 110px; text-align: right; }
+.in-prefix { display: inline-flex; align-items: center; gap: .4rem; }
+.pin-edit { display: flex; gap: .5rem; align-items: center; }
+.pin-edit input { width: 160px; letter-spacing: .3em; }
+.settings .seg { flex-wrap: wrap; align-items: center; margin: 0; }
+.switch { display: flex; align-items: flex-start; gap: .9rem; cursor: pointer; width: 100%; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch .slider { flex: none; position: relative; width: 44px; height: 26px; border-radius: 999px; background: #d9cdc4; transition: background .15s; margin-top: .05rem; }
+.switch .slider::after { content: ""; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s; }
+.switch input:checked + .slider { background: var(--ok); }
+.switch input:checked + .slider::after { transform: translateX(18px); }
+.switch input:focus-visible + .slider { outline: 3px solid var(--gold); outline-offset: 2px; }
+.switch input:disabled + .slider { opacity: .5; }
+.set-text { display: flex; flex-direction: column; font-size: .95rem; }
+.save-bar { position: fixed; left: 230px; right: 0; bottom: 0; z-index: 20; display: flex; justify-content: flex-end; align-items: center; gap: 1rem; padding: .8rem 2rem; background: rgba(255,255,255,.95); border-top: 1px solid var(--line); backdrop-filter: blur(6px); }
+@media (max-width: 900px) { .save-bar { left: 0; padding: .7rem 16px; } }
+.r-pre { white-space: pre-line; }
+
+/* Pincode */
+.pin-dots { display: flex; justify-content: center; gap: .6rem; font-size: 1.6rem; min-height: 2.2rem; letter-spacing: .1em; color: var(--ink); }
+.error-text { color: var(--bad); min-height: 1.2em; margin: .2rem 0 .6rem; font-size: .9rem; }
+.numpad-pin { grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.numpad-pin .np-key:nth-child(4n) { border-right: 1px solid var(--line); }
+.numpad-pin .np-key:nth-child(3n) { border-right: 0; }
+.np-key:disabled { color: #c9bcb2; background: #faf7f4; cursor: not-allowed; }
+
+/* Betaalscherm: snelknoppen en numpad */
+.quick-pay { display: flex; gap: .5rem; width: min(460px, 100%); flex-wrap: wrap; }
+.qp-btn { flex: 1; min-height: 52px; border: 1px solid var(--line); background: #fff; border-radius: 10px; font: inherit; font-weight: 700; font-size: 1.05rem; cursor: pointer; }
+.qp-btn:hover { background: var(--line-2); }
+.qp-btn:first-child { background: var(--dark); color: #fff; border-color: var(--dark); }
+.numpad-pay .np-wide { grid-column: span 2; }
+.numpad-pay .np-key:nth-child(4n) { border-right: 0; }
+
+/* Kaartgrootte en compacte kaarten */
+.pp-grid.size-klein { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+.pp-grid.size-groot { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.pp-grid.size-klein .pp-name { font-size: .8rem; }
+.pp-grid.no-images .pp-card { min-height: 0; }
+.pp-noimg { position: relative; display: block; height: 34px; background: var(--c, #f6ede5); }
+.pp-grid.no-images .pp-price { top: .4rem; left: .5rem; right: auto; background: transparent; color: var(--ink); padding: 0; font-size: .95rem; }
+.pp-grid.no-images .pp-stock { bottom: auto; top: .45rem; left: auto; right: .5rem; }
+.pm-overig span { background: #8a6d3b; }
+input[type=radio], input[type=checkbox] { min-height: 0; padding: 0; width: auto; accent-color: var(--wine); }
+.seg label { display: inline-flex; align-items: center; gap: .35rem; font-weight: 500; }
