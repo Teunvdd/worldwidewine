@@ -525,6 +525,7 @@
     });
   }
 
+  A.resizeImage = resizeImage; // ook gebruikt voor nieuwsfoto's
   A.register("producten", { render: render });
   A.register("kassa-categorieen", { render: renderCategories });
 })();

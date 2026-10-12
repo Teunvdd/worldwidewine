@@ -189,7 +189,7 @@ test("online betalen via Mollie: betaling starten en webhook verwerken", async (
 test("publieke sleutel (anon) kan niets lezen of wijzigen", async () => {
   const { createClient } = require("@supabase/supabase-js");
   const anon = createClient(stack.url, stack.anonKey, { auth: { persistSession: false } });
-  for (const table of ["products", "customers", "orders", "order_lines", "stock_movements", "pos_sessions", "settings", "categories"]) {
+  for (const table of ["products", "customers", "orders", "order_lines", "stock_movements", "pos_sessions", "settings", "categories", "news"]) {
     const { data, error } = await anon.from(table).select("*").limit(1);
     assert.ok(error || (data && data.length === 0), table + " is leesbaar met de anon-sleutel");
     assert.ok(error, table + " zou een permissiefout moeten geven");
@@ -397,6 +397,34 @@ test("import uit Excel: bijwerken op code, nieuw product, voorraad en fouten per
   await shop.deleteProduct("nieuw-import-product");
   await shop.saveProduct({ originalId: id, price: before.price, region: before.region || "", categoryId: null });
   await shop.deleteCategory(cat.id);
+});
+
+test("nieuws: plaatsen met foto, concept en gepland niet zichtbaar, bewerken en verwijderen", async () => {
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const news = require("../lib/news");
+  const newsApi = require("../lib/handlers/news");
+  process.env.WWW_LOCAL_UPLOADS = fs.mkdtempSync(path.join(os.tmpdir(), "www-news-"));
+  const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+  await assert.rejects(news.saveNews({ title: "  " }), /titel/);
+  const a = await news.saveNews({ title: "Nieuwe jaargang Brunello!", body: "Eerste alinea.\n\nTweede.", image: png });
+  assert.strictEqual(a.slug, "nieuwe-jaargang-brunello");
+  assert.match(a.image, /^\/uploads\/nieuws-nieuwe-jaargang-brunello-.*\.png$/);
+  const b = await news.saveNews({ title: "Nieuwe jaargang Brunello", body: "x" });
+  assert.strictEqual(b.slug, "nieuwe-jaargang-brunello-2");
+  const draft = await news.saveNews({ title: "Concept", body: "", published: false });
+  const later = await news.saveNews({ title: "Gepland", body: "", publishedAt: new Date(Date.now() + 86400000).toISOString() });
+  const res = await newsApi.handler({ httpMethod: "GET", headers: {} });
+  const pub = JSON.parse(res.body).news.map((n) => n.title);
+  assert.ok(pub.includes(a.title) && pub.includes(b.title));
+  assert.ok(!pub.includes("Concept") && !pub.includes("Gepland"));
+  // Bewerken: titel wijzigt, link blijft gelijk; foto weghalen.
+  const edited = await news.saveNews({ id: a.id, title: "Brunello 2019 is binnen", body: a.body, image: "" });
+  assert.strictEqual(edited.slug, a.slug);
+  assert.strictEqual(edited.image, null);
+  assert.strictEqual((await news.listNews()).length, 4);
+  for (const n of [a, b, draft, later]) await news.deleteNews(n.id);
+  await assert.rejects(news.deleteNews(a.id), /niet gevonden/);
+  delete process.env.WWW_LOCAL_UPLOADS;
 });
 
 test("kassa sluiten: verwacht kasgeld, telling en verschil", async () => {
