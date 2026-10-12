@@ -19,7 +19,7 @@
         (cats === null ? "<p class='notice notice-warn'>Categorieën zijn nog niet beschikbaar: voer <strong>supabase/setup.sql</strong> opnieuw uit in Supabase → SQL Editor.</p>" : "") +
         "<div class='toolbar'>" +
           "<input type='search' id='p-q' placeholder='Zoek op naam, wijnhuis, barcode…' value='" + e(filters.q) + "'>" +
-          "<select id='p-type'><option value=''>Alle soorten</option>" + Object.keys(A.TYPES).map(function (t) { return "<option value='" + t + "'" + (filters.type === t ? " selected" : "") + ">" + A.TYPES[t] + "</option>"; }).join("") + "</select>" +
+          "<select id='p-type'><option value=''>Alle soorten</option>" + A.typesIn(products).map(function (t) { return "<option value='" + e(t) + "'" + (filters.type === t ? " selected" : "") + ">" + e(A.typeLabel(t)) + "</option>"; }).join("") + "</select>" +
           (cats && cats.length ? "<select id='p-cat'><option value=''>Alle categorieën</option><option value='none'" + (filters.cat === "none" ? " selected" : "") + ">Zonder categorie</option>" +
             cats.map(function (c) { return "<option value='" + c.id + "'" + (String(filters.cat) === String(c.id) ? " selected" : "") + ">" + e(c.name) + "</option>"; }).join("") + "</select>" : "") +
           "<select id='p-show'>" + [["", "Alle producten"], ["webshop", "Online te koop"], ["winkel", "Alleen in de winkel"], ["inactief", "Niet actief"], ["actie", "In de actie"]]
@@ -42,7 +42,7 @@
         el.querySelector("#p-rows").innerHTML = list.map(function (p) {
           var vis = p.active === false ? "<span class='tag tag-off'>Niet actief</span>" : p.webshop === false ? "<span class='tag tag-winkel'>Alleen winkel</span>" : "<span class='tag tag-webshop'>Webshop + winkel</span>";
           return "<tr class='clickable' data-id='" + e(p.id) + "'><td><div class='p-cell'><span class='thumb'>" + A.productArt(p) + "</span><span><span class='muted small'>" + e(p.producer) + "</span><br><strong>" + e(p.name) + "</strong>" + (p.vintage ? " <span class='muted'>" + p.vintage + "</span>" : "") + "</span></div></td>" +
-            "<td>" + e(A.TYPES[p.type] || p.type) + "<br>" + catTag(p) + "<span class='muted small'>" + e(p.unit) + (p.caseSize ? " · ook per doos van " + p.caseSize : "") + "</span></td>" +
+            "<td>" + e(A.typeLabel(p.type)) + "<br>" + catTag(p) + "<span class='muted small'>" + e(p.unit) + (p.caseSize ? " · ook per doos van " + p.caseSize : "") + "</span></td>" +
             "<td class='num'>" + (p.price == null ? "<span class='muted'>op aanvraag</span>" : (p.oldPrice ? "<s class='muted small'>" + eu(p.oldPrice) + "</s> " : "") + eu(p.price)) + "</td>" +
             "<td class='num'>" + A.stockBadge(p) + "</td><td>" + vis + "</td></tr>";
         }).join("") || "<tr><td colspan='5' class='empty-inline'>Geen producten gevonden.</td></tr>";
@@ -73,6 +73,16 @@
     return "<label class='check'><input type='checkbox' name='" + name + "'" + (on ? " checked" : "") + "> " + label + "</label>";
   }
 
+  // Bestaande waarden als suggesties, zodat schrijfwijzen gelijk blijven (één filter per land, regio, …).
+  function datalists() {
+    var list = A.cacheOf("products") || [];
+    return ["country", "region", "grape", "size"].map(function (k) {
+      var vals = {};
+      list.forEach(function (x) { if (x[k]) String(x[k]).split(/\s*[,/&+]\s*/).forEach(function (v) { if (v) vals[v] = 1; }); });
+      return "<datalist id='dl-" + k + "'>" + Object.keys(vals).sort().map(function (v) { return "<option value='" + e(v) + "'>"; }).join("") + "</datalist>";
+    }).join("");
+  }
+
   function edit(p) {
     var isNew = !p;
     p = p || { type: "rood", unit: "fles", bottles: 1, active: true, webshop: true, minStock: 6, size: "75 cl" };
@@ -81,7 +91,10 @@
       "<form id='p-form' class='form-grid'>" +
         field("Wijnhuis / merk", "producer", p.producer, "required autofocus") +
         field("Naam", "name", p.name, "required") +
-        "<label class='field'>Soort<select name='type'>" + Object.keys(A.TYPES).map(function (t) { return "<option value='" + t + "'" + (p.type === t ? " selected" : "") + ">" + A.TYPES[t] + "</option>"; }).join("") + "</select></label>" +
+        // Soort: vrij invullen, met de vaste en al gebruikte soorten als suggestie.
+        "<label class='field'>Soort<input name='type' value='" + e(A.typeLabel(p.type)) + "' list='dl-type' maxlength='40' required placeholder='bijv. Rood of Oranje wijn'>" +
+          "<datalist id='dl-type'>" + Object.keys(A.TYPES).concat(A.typesIn(A.cacheOf("products")).filter(function (t) { return !A.TYPES[t]; }))
+            .map(function (t) { return "<option value='" + e(A.typeLabel(t)) + "'>"; }).join("") + "</datalist></label>" +
         (cats ? "<label class='field'>Categorie (kassa)<select name='categoryId'><option value=''>— Geen categorie —</option>" +
           cats.map(function (c) { return "<option value='" + c.id + "'" + (p.categoryId === c.id ? " selected" : "") + ">" + e(c.name) + "</option>"; }).join("") +
           "</select></label>" : "") +
@@ -90,9 +103,17 @@
         field("Oude prijs bij actie (€)", "oldPrice", p.oldPrice != null ? String(p.oldPrice).replace(".", ",") : "", "inputmode='decimal'") +
         field("Inkoopprijs (€, alleen intern)", "cost", p.cost != null ? String(p.cost).replace(".", ",") : "", "inputmode='decimal'") +
         "<label class='field'>Btw<select name='vat'><option value=''>Automatisch</option><option value='21'" + (p.vat === 21 ? " selected" : "") + ">21%</option><option value='9'" + (p.vat === 9 ? " selected" : "") + ">9%</option></select></label>" +
-        field("Land", "country", p.country) + field("Streek", "region", p.region) +
-        field("Druif", "grape", p.grape) + field("Jaargang", "vintage", p.vintage, "inputmode='numeric'") +
-        field("Inhoud", "size", p.size) + field("Aantal flessen (voor PostNL-limiet)", "bottles", p.bottles, "inputmode='numeric'") +
+        // Wijngegevens: staan in de webshop bij het product en zijn daar filters.
+        "<fieldset class='span-2 wine-box'><legend>Wijngegevens (webshopfilters)</legend><div class='form-grid'>" +
+          field("Land", "country", p.country, "list='dl-country' placeholder='bijv. Italië'") +
+          field("Regio", "region", p.region, "list='dl-region' placeholder='bijv. Toscane'") +
+          field("Druivensoort", "grape", p.grape, "list='dl-grape' placeholder='bijv. Sangiovese, Merlot'") +
+          field("Oogstjaar", "vintage", p.vintage, "inputmode='numeric' placeholder='bijv. 2021'") +
+          field("Maat", "size", p.size, "list='dl-size' placeholder='bijv. 75 cl'") +
+          field("Alcohol volume (%)", "alcohol", p.alcohol != null ? String(p.alcohol).replace(".", ",") : "", "inputmode='decimal' placeholder='bijv. 13,5'") +
+          datalists() +
+        "</div></fieldset>" +
+        field("Aantal flessen (voor PostNL-limiet)", "bottles", p.bottles, "inputmode='numeric'") +
         field("Barcode (EAN)", "ean", p.ean, "inputmode='numeric' placeholder='Scan of typ de barcode'") +
         (isNew ? field("Voorraad", "stock", "", "inputmode='numeric' placeholder='leeg = niet bijhouden'") : "<div class='field'>Voorraad<span class='static'>" + A.stockBadge(p) + " <a href='#voorraad'>wijzigen bij Voorraad</a></span></div>") +
         field("Melding bij voorraad ≤", "minStock", p.minStock, "inputmode='numeric'") +
@@ -166,6 +187,7 @@
         tags: ["uitgelicht", "actie", "nieuw", "bio"].filter(function (t) { return d["tag_" + t]; })
       };
       if (isNew) input.stock = d.stock;
+      if (d.alcohol || p.alcohol != null) input.alcohol = d.alcohol; // kolom bestaat pas na migratie 20261017
       // Alleen meesturen als het nodig is (de kolommen bestaan pas na migratie 20261016).
       if (d.caseOn || p.caseSize) {
         input.caseSize = d.caseOn ? d.caseSize : null;

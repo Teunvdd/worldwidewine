@@ -342,6 +342,31 @@ test("per doos: eigen aantal en prijs, voorraad in flessen, annuleren en kassa",
   assert.strictEqual(off.casePrice, undefined);
 });
 
+test("wijngegevens: alcoholpercentage opslaan, tonen in de webshop en leegmaken", async () => {
+  const id = "montemercurio-messaggero";
+  await assert.rejects(shop.saveProduct({ originalId: id, alcohol: "120" }), /tussen 0 en 100/);
+  const p = await shop.saveProduct({ originalId: id, alcohol: "13,5", grape: "Sangiovese, Merlot", vintage: "2021", size: "75 cl", region: "Toscane", country: "Italië" });
+  assert.strictEqual(p.alcohol, 13.5);
+  const pub = (await shop.publicProducts()).find((x) => x.id === id);
+  assert.strictEqual(pub.alcohol, 13.5);
+  assert.strictEqual(pub.vintage, 2021);
+  assert.strictEqual(pub.grape, "Sangiovese, Merlot");
+  const cleared = await shop.saveProduct({ originalId: id, alcohol: "" });
+  assert.strictEqual(cleared.alcohol, undefined);
+});
+
+test("soort is vrij in te vullen; vaste soorten worden herkend", async () => {
+  const id = "koremans-limoncello";
+  const before = (await shop.getProducts()).find((x) => x.id === id).type;
+  const free = await shop.saveProduct({ originalId: id, type: "Oranje wijn" });
+  assert.strictEqual(free.type, "Oranje wijn");
+  assert.strictEqual((await shop.publicProducts()).find((x) => x.id === id).type, "Oranje wijn");
+  assert.strictEqual((await shop.saveProduct({ originalId: id, type: "Rosé" })).type, "rose");
+  assert.strictEqual((await shop.saveProduct({ originalId: id, type: "ROOD" })).type, "rood");
+  await assert.rejects(shop.saveProduct({ originalId: id, type: "  " }), /soort/);
+  await shop.saveProduct({ originalId: id, type: before });
+});
+
 test("kassa sluiten: verwacht kasgeld, telling en verschil", async () => {
   const { session } = await shop.currentSession();
   const expected = session.summary.expectedCash;

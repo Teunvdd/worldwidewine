@@ -465,3 +465,30 @@ $$;
 
 -- PostgREST (de API van Supabase) direct de nieuwe kolommen laten zien.
 notify pgrst, 'reload schema';
+
+-- ================================================================
+-- 20261017000000_alcohol.sql
+-- ================================================================
+-- Alcoholpercentage per product (bijv. 13,5). Wordt getoond in de webshop en is een filter.
+-- Uitvoeren na de eerdere migraties: Supabase → SQL Editor → plakken → Run.
+
+alter table public.products add column if not exists alcohol numeric(4,1)
+  check (alcohol is null or (alcohol >= 0 and alcohol <= 100));
+
+-- PostgREST (de API van Supabase) direct de nieuwe kolom laten zien.
+notify pgrst, 'reload schema';
+
+-- ================================================================
+-- 20261018000000_soort_vrij.sql
+-- ================================================================
+-- Soort vrij in te vullen per product (bijv. "Oranje wijn" of "Port"). De vaste soorten
+-- (rood, wit, rose, mousserend, likeur, delicatessen, water) blijven werken zoals voorheen.
+-- Uitvoeren na de eerdere migraties: Supabase → SQL Editor → plakken → Run.
+
+alter table public.products drop constraint if exists products_type_check;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'products_type_len') then
+    alter table public.products add constraint products_type_len check (length(trim(type)) between 1 and 40);
+  end if;
+end $$;

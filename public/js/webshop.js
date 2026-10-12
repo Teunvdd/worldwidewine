@@ -4,37 +4,90 @@ window.WWW.ready.then(function () {
   var P = W.PRODUCTS;
   var $ = function (id) { return document.getElementById(id); };
 
-  var PRICES = [
-    { key: "tot15", label: "Tot € 15", test: function (p) { return p < 15; } },
-    { key: "15-25", label: "€ 15 – € 25", test: function (p) { return p >= 15 && p <= 25; } },
-    { key: "25-50", label: "€ 25 – € 50", test: function (p) { return p > 25 && p <= 50; } },
-    { key: "50plus", label: "Meer dan € 50", test: function (p) { return p > 50; } }
-  ];
-
   function countBy(fn) {
     var c = {};
-    P.forEach(function (p) { var k = fn(p); if (k) c[k] = (c[k] || 0) + 1; });
+    P.forEach(function (p) { [].concat(fn(p)).forEach(function (k) { if (k) c[k] = (c[k] || 0) + 1; }); });
     return c;
   }
 
-  function checkboxes(container, name, entries) {
-    container.innerHTML = entries.map(function (e) {
-      return '<label class="check"><input type="checkbox" name="' + name + '" value="' + W.esc(e.value) + '"> ' +
+  // Druiven: "Sangiovese, Merlot" telt voor beide druiven.
+  function grapes(p) { return p.grape ? String(p.grape).split(/\s*[,/&+]\s*|\s+en\s+/i).map(function (g) { return g.trim(); }).filter(Boolean) : []; }
+
+  var MORE = 6; // langere lijsten: eerst 6 tonen, de rest achter "Toon meer"
+  function checkboxes(name, entries) {
+    var container = $("f-" + name);
+    var box = container.closest("fieldset");
+    box.hidden = !entries.length;
+    container.innerHTML = entries.map(function (e, i) {
+      return '<label class="check' + (i >= MORE ? " more" : "") + '"><input type="checkbox" name="' + name + '" value="' + W.esc(e.value) + '"> ' +
         W.esc(e.label) + ' <span class="count">' + e.count + "</span></label>";
-    }).join("");
+    }).join("") + (entries.length > MORE ? '<button type="button" class="link-btn show-more" data-more>Toon alle ' + entries.length + "</button>" : "");
+  }
+  function list(name, fn, sort) {
+    var c = countBy(fn);
+    checkboxes(name, Object.keys(c).sort(sort || function (a, b) { return a.localeCompare(b, "nl"); })
+      .map(function (k) { return { value: k, label: k, count: c[k] }; }));
   }
 
   var typeCounts = countBy(function (p) { return p.type; });
-  checkboxes($("f-type"), "type", Object.keys(W.TYPES).filter(function (t) { return typeCounts[t]; })
-    .map(function (t) { return { value: t, label: W.TYPES[t], count: typeCounts[t] }; }));
+  // Vaste soorten eerst (in vaste volgorde), daarna de zelf ingevulde soorten op alfabet.
+  checkboxes("type", Object.keys(W.TYPES).filter(function (t) { return typeCounts[t]; })
+    .concat(Object.keys(typeCounts).filter(function (t) { return !W.TYPES[t]; }).sort(function (a, b) { return a.localeCompare(b, "nl"); }))
+    .map(function (t) { return { value: t, label: W.typeLabel(t), count: typeCounts[t] }; }));
+  list("country", function (p) { return p.country; });
+  list("region", function (p) { return p.region; });
+  list("grape", grapes);
+  list("vintage", function (p) { return p.vintage ? String(p.vintage) : null; }, function (a, b) { return b - a; });
+  list("size", function (p) { return p.size; }, function (a, b) { return sizeCl(a) - sizeCl(b) || a.localeCompare(b); });
 
-  var countryCounts = countBy(function (p) { return p.country; });
-  checkboxes($("f-country"), "country", Object.keys(countryCounts).sort()
-    .map(function (c) { return { value: c, label: c, count: countryCounts[c] }; }));
+  // Maat sorteren op inhoud: "37,5 cl" < "75 cl" < "1,5 l".
+  function sizeCl(s) {
+    var m = String(s).replace(",", ".").match(/([\d.]+)\s*(ml|cl|l)/i);
+    if (!m) return 1e9;
+    return Number(m[1]) * ({ ml: 0.1, cl: 1, l: 100 })[m[2].toLowerCase()];
+  }
 
-  checkboxes($("f-price"), "price", PRICES.map(function (r) {
-    return { value: r.key, label: r.label, count: P.filter(function (p) { return p.price != null && r.test(p.price); }).length };
-  }));
+  // ---- Schuifjes met twee handvatten (prijs en alcohol) ----
+  function slider(name, values, step, fmt) {
+    var el = $("f-" + name);
+    var box = el.closest("fieldset");
+    if (!values.length) { box.hidden = true; return null; }
+    var min = Math.floor(Math.min.apply(null, values) / step) * step;
+    var max = Math.ceil(Math.max.apply(null, values) / step) * step;
+    if (max <= min) max = min + step;
+    el.innerHTML =
+      '<div class="range-values"><span data-lo></span><span data-hi></span></div>' +
+      '<div class="range-track"><div class="range-fill"></div>' +
+        '<input type="range" min="' + min + '" max="' + max + '" step="' + step + '" value="' + min + '" aria-label="Minimum" data-r="lo">' +
+        '<input type="range" min="' + min + '" max="' + max + '" step="' + step + '" value="' + max + '" aria-label="Maximum" data-r="hi">' +
+      "</div>";
+    var lo = el.querySelector("[data-r=lo]"), hi = el.querySelector("[data-r=hi]"), fill = el.querySelector(".range-fill");
+    function draw(moved) {
+      var a = Number(lo.value), b = Number(hi.value);
+      if (a > b) { if (moved === lo) lo.value = a = b; else hi.value = b = a; }
+      fill.style.left = (a - min) / (max - min) * 100 + "%";
+      fill.style.right = (max - b) / (max - min) * 100 + "%";
+      el.querySelector("[data-lo]").textContent = fmt(a);
+      el.querySelector("[data-hi]").textContent = fmt(b);
+      // Het handvat dat bovenaan ligt moet bereikbaar blijven als ze elkaar raken.
+      lo.style.zIndex = a >= max - step ? 3 : 1;
+    }
+    [lo, hi].forEach(function (r) { r.addEventListener("input", function () { draw(r); }); });
+    draw();
+    return {
+      // Volle breedte = geen filter (dan blijven ook producten zonder waarde zichtbaar).
+      test: function (v) {
+        var a = Number(lo.value), b = Number(hi.value);
+        if (a <= min && b >= max) return true;
+        return v != null && v >= a && (b >= max || v <= b);
+      },
+      reset: function () { lo.value = min; hi.value = max; draw(); }
+    };
+  }
+  var euro0 = function (v) { return "€ " + v; };
+  var priceRange = slider("price", P.filter(function (p) { return p.price != null; }).map(function (p) { return p.price; }), 1, euro0);
+  var alcRange = slider("alcohol", P.filter(function (p) { return p.alcohol != null; }).map(function (p) { return p.alcohol; }), 0.5,
+    function (v) { return String(v).replace(".", ",") + "%"; });
 
   function checked(name) {
     return Array.prototype.map.call(document.querySelectorAll('input[name="' + name + '"]:checked'), function (i) { return i.value; });
@@ -44,17 +97,20 @@ window.WWW.ready.then(function () {
 
   function apply() {
     var q = norm($("q").value.trim());
-    var types = checked("type"), countries = checked("country"), prices = checked("price");
+    var f = {};
+    ["type", "country", "region", "grape", "vintage", "size"].forEach(function (n) { f[n] = checked(n); });
     var sale = $("f-sale").checked, cases = $("f-case").checked;
+    var any = function (sel, vals) { return !sel.length || [].concat(vals).some(function (v) { return v != null && sel.indexOf(String(v)) >= 0; }); };
 
     var list = P.filter(function (p) {
-      if (types.length && types.indexOf(p.type) < 0) return false;
-      if (countries.length && countries.indexOf(p.country) < 0) return false;
-      if (prices.length && !(p.price != null && PRICES.some(function (r) { return prices.indexOf(r.key) >= 0 && r.test(p.price); }))) return false;
+      if (!any(f.type, p.type) || !any(f.country, p.country) || !any(f.region, p.region)) return false;
+      if (!any(f.grape, grapes(p)) || !any(f.vintage, p.vintage) || !any(f.size, p.size)) return false;
+      if (priceRange && !priceRange.test(p.price)) return false;
+      if (alcRange && !alcRange.test(p.alcohol)) return false;
       if (sale && !p.oldPrice) return false;
       if (cases && p.unit !== "doos van 6" && !W.caseSize(p)) return false;
       if (q) {
-        var hay = norm([p.name, p.producer, p.region, p.country, p.grape, W.TYPES[p.type], p.vintage].join(" "));
+        var hay = norm([p.name, p.producer, p.region, p.country, p.grape, W.typeLabel(p.type), p.vintage, p.size].join(" "));
         if (!q.split(/\s+/).every(function (w) { return hay.indexOf(w) >= 0; })) return false;
       }
       return true;
@@ -77,6 +133,8 @@ window.WWW.ready.then(function () {
 
   function reset() {
     document.querySelectorAll(".filters input[type=checkbox]").forEach(function (i) { i.checked = false; });
+    if (priceRange) priceRange.reset();
+    if (alcRange) alcRange.reset();
     $("q").value = "";
     apply();
   }
@@ -85,6 +143,12 @@ window.WWW.ready.then(function () {
   $("sort").addEventListener("change", apply);
   $("filters-reset").addEventListener("click", reset);
   document.addEventListener("click", function (e) { if (e.target.closest("[data-reset]")) reset(); });
+  $("filters").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-more]");
+    if (!b) return;
+    var open = b.parentNode.classList.toggle("show-all");
+    b.textContent = open ? "Toon minder" : "Toon alle " + b.parentNode.querySelectorAll(".check").length;
+  });
 
   // Filters op mobiel als uitklapscherm
   $("filters-open").addEventListener("click", function () { document.body.classList.add("filters-shown", "no-scroll"); });
@@ -107,8 +171,9 @@ window.WWW.ready.then(function () {
 
   function detail(p) {
     var rows = [
-      ["Wijnhuis", p.producer], ["Soort", W.TYPES[p.type]], ["Land", p.country], ["Streek", p.region],
-      ["Druif", p.grape], ["Jaargang", p.vintage], ["Inhoud", p.size]
+      ["Wijnhuis", p.producer], ["Soort", W.typeLabel(p.type)], ["Land", p.country], ["Regio", p.region],
+      ["Druivensoort", p.grape], ["Oogstjaar", p.vintage], ["Maat", p.size],
+      ["Alcohol", p.alcohol != null ? String(p.alcohol).replace(".", ",") + "% vol." : null]
     ].filter(function (r) { return r[1]; });
     return '<div class="pm-media">' + W.art(p, "lg") + W.badges(p) + "</div>" +
       '<div class="pm-body">' +

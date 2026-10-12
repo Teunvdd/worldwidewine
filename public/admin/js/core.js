@@ -6,6 +6,15 @@ var A = (function () {
   var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
 
   var TYPES = { rood: "Rood", wit: "Wit", rose: "Rosé", mousserend: "Mousserend", likeur: "Likeur", delicatessen: "Delicatessen", water: "Water" };
+  // Soort is vrij in te vullen; de vaste soorten hebben een nette naam.
+  function typeLabel(t) { return TYPES[t] || t || ""; }
+  // Alle soorten die in gebruik zijn: vaste soorten eerst, daarna zelf ingevulde op alfabet.
+  function typesIn(products) {
+    var used = {};
+    (products || []).forEach(function (p) { if (p.type) used[p.type] = 1; });
+    return Object.keys(TYPES).filter(function (t) { return used[t]; })
+      .concat(Object.keys(used).filter(function (t) { return !TYPES[t]; }).sort(function (a, b) { return a.localeCompare(b, "nl"); }));
+  }
   var STATUS = {
     nieuw: "Nieuw", betaald: "Betaald", klaar: "Klaar", verzonden: "Verzonden", afgerond: "Afgerond", geannuleerd: "Geannuleerd"
   };
@@ -265,7 +274,7 @@ var A = (function () {
     confirm: confirmBox, formData: formData, busy: busy, register: register, route: route, start: start,
     enterFullscreen: enterFullscreen, exitFullscreen: exitFullscreen, isFullscreen: isFullscreen, openPos: openPos, printHtml: printHtml,
     refreshBadges: refreshBadges, statusBadge: statusBadge, stockBadge: stockBadge, productName: productName, productArt: productArt,
-    TYPES: TYPES, STATUS: STATUS, PAYMENT: PAYMENT,
+    TYPES: TYPES, typeLabel: typeLabel, typesIn: typesIn, STATUS: STATUS, PAYMENT: PAYMENT,
     computeOrder: window.WWW_ORDER.computeOrder, CONFIG: window.WWW_CONFIG
   };
 })();

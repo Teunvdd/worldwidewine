@@ -11,10 +11,11 @@
  *   producer   wijnhuis
  *   type       rood | wit | rose | mousserend | likeur | delicatessen | water
  *   country    land
- *   region     streek / appellation
- *   grape      druif (optioneel)
- *   vintage    jaargang (optioneel)
- *   size       inhoud, bijv. "75 cl"
+ *   region     regio / appellation
+ *   grape      druivensoort(en), bijv. "Sangiovese, Merlot" (optioneel)
+ *   vintage    oogstjaar (optioneel)
+ *   alcohol    alcoholpercentage, bijv. 13.5 (optioneel)
+ *   size       maat, bijv. "75 cl"
  *   unit       "fles", "doos van 6", "stuk" of "pallet"
  *   bottles    aantal flessen (telt mee voor de PostNL-limiet van 18 flessen)
  *   price      prijs in euro incl. btw. null = prijs op aanvraag (niet online te bestellen)

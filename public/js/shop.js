@@ -47,6 +47,8 @@
     rood: "Rood", wit: "Wit", rose: "Rosé", mousserend: "Mousserend",
     likeur: "Likeur", delicatessen: "Delicatessen", water: "Water"
   };
+  // Soort is vrij in te vullen; de vaste soorten hebben een nette naam.
+  function typeLabel(t) { return TYPES[t] || t || ""; }
 
   function euro(n) {
     return "€ " + Number(n).toFixed(2).replace(".", ",");
@@ -109,7 +111,7 @@
     var shape = p.type === "mousserend" ? "art-sparkling" :
       p.type === "likeur" ? "art-liqueur" :
       p.type === "delicatessen" ? "art-deli" :
-      p.type === "water" ? "art-water" : "art-wine art-" + p.type;
+      p.type === "water" ? "art-water" : "art-wine" + (TYPES[p.type] ? " art-" + p.type : "");
     var initials = (p.producer || "").replace(/^(Domaine|Château|Champagne|Weingut)\s+/i, "")
       .split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0); }).join("");
     var cases = p.unit === "doos van 6" ? '<span class="art-case">6×</span>' : "";
@@ -177,7 +179,7 @@
   }
 
   function card(p) {
-    var meta = [TYPES[p.type], p.country, p.region].filter(Boolean).join(" · ");
+    var meta = [typeLabel(p.type), p.country, p.region].filter(Boolean).join(" · ");
     return '<article class="product">' +
       '<a class="product-media" href="webshop.html#' + esc(p.id) + '" data-open="' + esc(p.id) + '">' + art(p) + badges(p) + "</a>" +
       '<div class="product-body">' +
@@ -316,7 +318,7 @@
   render();
 
   window.WWW = {
-    Cart: Cart, PRODUCTS: PRODUCTS, CONFIG: CONFIG, TYPES: TYPES, byId: byId, ready: ready, state: state, soldOut: soldOut,
+    Cart: Cart, PRODUCTS: PRODUCTS, CONFIG: CONFIG, TYPES: TYPES, typeLabel: typeLabel, byId: byId, ready: ready, state: state, soldOut: soldOut,
     euro: euro, esc: esc, art: art, card: card, priceHtml: priceHtml, badges: badges, buyButton: buyButton,
     caseSize: caseSize, casePrice: casePrice, BOX_ICON: BOX_ICON
   };

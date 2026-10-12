@@ -79,6 +79,8 @@ textarea { resize: vertical; }
 .checks { border: 1px solid var(--line); border-radius: var(--radius); padding: .8rem 1rem; display: flex; flex-wrap: wrap; gap: .6rem 1.4rem; margin: 0; }
 .checks legend { font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); padding: 0 .3rem; }
 .case-box { flex-direction: column; flex-wrap: nowrap; }
+.wine-box { border: 1px solid var(--line); border-radius: var(--radius); padding: .8rem 1rem 1rem; margin: 0; }
+.wine-box legend { font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); padding: 0 .3rem; }
 .case-fields { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
 .case-box.is-off .case-fields { opacity: .5; }
 .case-help { margin: 0; }
