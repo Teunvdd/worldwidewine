@@ -8,8 +8,8 @@
     email: "info@worldwidewine.nl",
     phone: "+31683172704",
 
-    // Online betalen via Mollie (iDEAL, creditcard, Bancontact).
-    // Zet op true zodra MOLLIE_API_KEY is ingesteld bij de hosting (zie README).
+    // Online betalen via Mollie wordt automatisch aangezet zodra MOLLIE_API_KEY is ingesteld
+    // bij de hosting (zie README). Deze waarde geldt alleen zonder server (bijv. lokaal geopend).
     onlinePayments: false,
 
     delivery: {

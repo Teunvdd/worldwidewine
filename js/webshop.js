@@ -1,5 +1,5 @@
 /* Catalogus: filteren, zoeken, sorteren en productdetail. */
-(function () {
+window.WWW.ready.then(function () {
   var W = window.WWW;
   var P = W.PRODUCTS;
   var $ = function (id) { return document.getElementById(id); };
@@ -155,4 +155,4 @@
     if (W.byId[id]) openProduct(id, false); else closeProduct(true);
   });
   if (location.hash && W.byId[location.hash.slice(1)]) openProduct(location.hash.slice(1), false);
-})();
+});

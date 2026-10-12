@@ -1,7 +1,11 @@
 /*
- * Assortiment van de webshop.
+ * Startassortiment van de webshop en de kassa.
  *
- * Een product toevoegen of aanpassen: kopieer een blok { ... } en pas de velden aan.
+ * Wanneer de site op Netlify draait, worden de producten beheerd in de admin-omgeving
+ * (/admin). Dit bestand wordt dan alleen gebruikt om de database de eerste keer te vullen,
+ * en als reserve wanneer de server tijdelijk niet bereikbaar is.
+ *
+ * Velden:
  *   id         unieke code, alleen kleine letters, cijfers en streepjes (wordt ook de link)
  *   name       naam van de wijn
  *   producer   wijnhuis
@@ -11,13 +15,18 @@
  *   grape      druif (optioneel)
  *   vintage    jaargang (optioneel)
  *   size       inhoud, bijv. "75 cl"
- *   unit       "fles" of "doos van 6"
+ *   unit       "fles", "doos van 6", "stuk" of "pallet"
  *   bottles    aantal flessen (telt mee voor de PostNL-limiet van 18 flessen)
  *   price      prijs in euro incl. btw. null = prijs op aanvraag (niet online te bestellen)
  *   oldPrice   oude prijs bij een actie (optioneel)
+ *   vat        btw-tarief (21 of 9). Leeg = automatisch (9% voor delicatessen en water)
  *   tags       ["nieuw", "actie", "bio", "uitgelicht"] (optioneel)
  *   pickupOnly true = alleen afhalen (bijv. verse producten)
- *   stock      false = tijdelijk uitverkocht
+ *   stock      aantal op voorraad. Leeg = voorraad wordt niet bijgehouden
+ *   minStock   bij dit aantal of minder krijg je een melding "bijna op" in de admin
+ *   ean        barcode, voor scannen in de kassa (optioneel)
+ *   webshop    false = alleen in de winkel te koop, niet online
+ *   active     false = tijdelijk uit het assortiment
  *   image      pad naar een foto, bijv. "assets/producten/montemercurio-messaggero.jpg" (optioneel)
  *   description korte omschrijving
  */

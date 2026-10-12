@@ -1,10 +1,32 @@
 /* Winkelwagen en gedeelde webshop-functies. Gebruikt op alle pagina's. */
 (function () {
-  var PRODUCTS = window.WWW_PRODUCTS || [];
+  // Startwaarde uit data/products.js; wordt vervangen door het live assortiment uit de admin.
+  var PRODUCTS = (window.WWW_PRODUCTS || []).slice();
   var CONFIG = window.WWW_CONFIG || {};
   var KEY = "wwwCart";
   var byId = {};
-  PRODUCTS.forEach(function (p) { byId[p.id] = p; });
+  function index() {
+    Object.keys(byId).forEach(function (k) { delete byId[k]; });
+    PRODUCTS.forEach(function (p) { byId[p.id] = p; });
+  }
+  index();
+
+  var state = { live: false, onlinePayments: !!CONFIG.onlinePayments };
+  var ready = fetch("/api/products", { headers: { Accept: "application/json" } })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (data) {
+      if (!data || !Array.isArray(data.products)) throw new Error("geen data");
+      PRODUCTS.length = 0;
+      Array.prototype.push.apply(PRODUCTS, data.products);
+      index();
+      state.live = true;
+      state.onlinePayments = !!data.onlinePayments;
+    })
+    .catch(function () { /* geen server (bijv. lokaal geopend): startassortiment gebruiken */ })
+    .then(function () { render(); return PRODUCTS; });
+
+  function soldOut(p) { return p.stock === false || (typeof p.stock === "number" && p.stock <= 0); }
+  function maxQty(p) { return typeof p.stock === "number" ? Math.max(0, Math.min(99, p.stock)) : 99; }
 
   var TYPES = {
     rood: "Rood", wit: "Wit", rose: "Rosé", mousserend: "Mousserend",
@@ -25,7 +47,7 @@
   function read() {
     try {
       var items = JSON.parse(localStorage.getItem(KEY) || "[]");
-      return Array.isArray(items) ? items.filter(function (i) { return byId[i.id] && i.qty > 0; }) : [];
+      return Array.isArray(items) ? items.filter(function (i) { return i && typeof i.id === "string" && i.qty > 0; }) : [];
     } catch (e) { return memory; }
   }
   var memory = [];
@@ -41,11 +63,13 @@
     count: function () { return read().reduce(function (s, i) { return s + i.qty; }, 0); },
     add: function (id, qty) {
       var p = byId[id];
-      if (!p || p.price == null || p.stock === false) return;
+      if (!p || p.price == null || soldOut(p)) return;
       var items = read();
       var found = items.find(function (i) { return i.id === id; });
-      if (found) found.qty = Math.min(99, found.qty + (qty || 1));
-      else items.push({ id: id, qty: qty || 1 });
+      var limit = maxQty(p);
+      if (found && found.qty >= limit) { toast(p, "Meer is er helaas niet op voorraad."); return; }
+      if (found) found.qty = Math.min(limit, found.qty + (qty || 1));
+      else items.push({ id: id, qty: Math.min(limit, qty || 1) });
       write(items);
       toast(p);
     },
@@ -54,7 +78,7 @@
       var found = items.find(function (i) { return i.id === id; });
       if (!found) return;
       if (qty <= 0) items = items.filter(function (i) { return i.id !== id; });
-      else found.qty = Math.min(99, qty);
+      else found.qty = Math.min(byId[id] ? maxQty(byId[id]) : 99, qty);
       write(items);
     },
     clear: function () { write([]); }
@@ -89,7 +113,8 @@
       if (t === "bio") out.push('<span class="badge badge-bio">Bio</span>');
     });
     if (p.pickupOnly) out.push('<span class="badge">Alleen afhalen</span>');
-    if (p.stock === false) out.push('<span class="badge badge-out">Uitverkocht</span>');
+    if (soldOut(p)) out.push('<span class="badge badge-out">Uitverkocht</span>');
+    else if (typeof p.stock === "number" && p.stock <= 3) out.push('<span class="badge badge-low">Nog ' + p.stock + "</span>");
     return out.length ? '<div class="badges">' + out.join("") + "</div>" : "";
   }
 
@@ -98,7 +123,7 @@
       return '<a class="btn ' + (cls || "") + '" href="mailto:' + esc(CONFIG.email) + "?subject=" +
         encodeURIComponent("Offerte: " + p.producer + " " + p.name) + '">Offerte aanvragen</a>';
     }
-    if (p.stock === false) return '<button class="btn ' + (cls || "") + '" disabled>Uitverkocht</button>';
+    if (soldOut(p)) return '<button class="btn ' + (cls || "") + '" disabled>Uitverkocht</button>';
     return '<button class="btn ' + (cls || "") + '" data-add="' + esc(p.id) + '">In winkelwagen</button>';
   }
 
@@ -141,7 +166,7 @@
   }
 
   function render() {
-    var items = read();
+    var items = read().filter(function (i) { return byId[i.id]; });
     countEls = countEls || document.querySelectorAll("[data-cart-count]");
     var count = items.reduce(function (s, i) { return s + i.qty; }, 0);
     countEls.forEach(function (el) { el.textContent = count; el.hidden = count === 0; });
@@ -184,14 +209,14 @@
   }
 
   var toastEl, toastTimer;
-  function toast(p) {
+  function toast(p, message) {
     if (!toastEl) {
       toastEl = document.createElement("div");
       toastEl.className = "toast";
       toastEl.setAttribute("role", "status");
       document.body.appendChild(toastEl);
     }
-    toastEl.innerHTML = "<span>✓ <strong>" + esc(p.producer) + "</strong> " + esc(p.name) + ' toegevoegd</span><button class="link-btn" data-cart-open>Bekijk winkelwagen</button>';
+    toastEl.innerHTML = (message ? "<span>" + esc(message) + "</span>" : "<span>✓ <strong>" + esc(p.producer) + "</strong> " + esc(p.name) + " toegevoegd</span>") + '<button class="link-btn" data-cart-open>Bekijk winkelwagen</button>';
     toastEl.classList.add("show");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 3500);
@@ -220,7 +245,7 @@
   render();
 
   window.WWW = {
-    Cart: Cart, PRODUCTS: PRODUCTS, CONFIG: CONFIG, TYPES: TYPES, byId: byId,
+    Cart: Cart, PRODUCTS: PRODUCTS, CONFIG: CONFIG, TYPES: TYPES, byId: byId, ready: ready, state: state, soldOut: soldOut,
     euro: euro, esc: esc, art: art, card: card, priceHtml: priceHtml, badges: badges, buyButton: buyButton
   };
 })();

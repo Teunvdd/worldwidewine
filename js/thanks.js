@@ -34,13 +34,13 @@
 
   setSteps(steps[saved.payment] || steps.betaalverzoek);
 
-  if (saved.payment === "online" && saved.paymentId) {
-    fetch("/.netlify/functions/payment-status?id=" + encodeURIComponent(saved.paymentId))
+  if (saved.payment === "online") {
+    fetch("/api/payment-status?order=" + encodeURIComponent(saved.number))
       .then(function (r) { return r.json(); })
       .then(function (s) {
-        if (s.status === "paid") {
+        if (s.status === "betaald") {
           setSteps("Je betaling is gelukt. " + (pickup ? "We laten je weten wanneer je bestelling klaarstaat." : "We maken je bestelling zo snel mogelijk klaar voor verzending."));
-        } else if (s.status === "open" || s.status === "pending") {
+        } else if (s.status === "open") {
           setSteps("Je betaling wordt nog verwerkt. Je ontvangt een bevestiging zodra die binnen is.");
         } else {
           $("thanks-title").textContent = "Betaling niet gelukt";

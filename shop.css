@@ -243,3 +243,4 @@
 .card-link:hover h3 a::before { transform: translateX(4px); }
 .legal ul { padding-left: 1.2rem; }
 .legal li { margin-bottom: .4rem; }
+.badge-low { background: #fbf3e2; color: #8a5a00; border-color: #e8c96b; }

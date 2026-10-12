@@ -350,11 +350,11 @@
   <script src="js/site.js"></script>
   <script src="js/shop.js"></script>
   <script>
-    (function () {
+    WWW.ready.then(function () {
       var el = document.getElementById("home-featured");
       var list = WWW.PRODUCTS.filter(function (p) { return (p.tags || []).indexOf("uitgelicht") >= 0; }).slice(0, 4);
       el.innerHTML = list.map(WWW.card).join("");
-    })();
+    });
   </script>
 </body>
 </html>
