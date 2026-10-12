@@ -243,7 +243,7 @@ body.pos-mode .main { padding: 0 !important; height: 100vh; }
 .pos-menu { position: relative; flex: none; }
 .pos-gear { width: 44px; padding: 0; display: grid; place-items: center; }
 .pos-gear svg { width: 22px; height: 22px; }
-.pos-menu-list { position: absolute; top: calc(100% + 8px); left: 0; z-index: 40; min-width: 240px; background: #fff; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.28); padding: 6px; display: grid; }
+.pos-menu-list { position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; min-width: 240px; background: #fff; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.28); padding: 6px; display: grid; }
 .pos-menu-list[hidden] { display: none; }
 .pos-menu-list button { display: flex; align-items: center; gap: .7rem; border: 0; background: none; border-radius: 7px; padding: .8rem .9rem; font: inherit; font-size: 1rem; font-weight: 500; color: var(--ink); text-align: left; cursor: pointer; min-height: 48px; }
 .pos-menu-list button[hidden] { display: none; }
