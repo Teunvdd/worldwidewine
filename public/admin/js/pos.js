@@ -10,13 +10,13 @@
   var ICON = {
     trash: svg("<path d='M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3'/>"),
     tag: svg("<path d='M3 12V4h8l10 10-8 8z'/><circle cx='7.5' cy='8.5' r='1.3'/>"),
-    receipt: svg("<path d='M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6'/>"),
+    keypad: svg("<path d='M5 5h2M11 5h2M17 5h2M5 11h2M11 11h2M17 11h2M5 17h2M11 17h2M17 17h2' stroke-width='3.4'/>"),
     user: svg("<circle cx='12' cy='8' r='4'/><path d='M4 21c1-4.5 4.5-6.5 8-6.5s7 2 8 6.5'/>")
   };
   var METHODS = [
-    { key: "pin", label: "Pin", icon: "▭" },
-    { key: "contant", label: "Contant", icon: "€" },
-    { key: "tikkie", label: "Tikkie", icon: "↗" }
+    { key: "pin", label: "Pin" },
+    { key: "contant", label: "Contant" },
+    { key: "tikkie", label: "Tikkie" }
   ];
 
   // ================================================================ Kassabeheer (#kassa)
@@ -309,7 +309,6 @@
               "<span class='po-tool-icon'>" + t.icon + "</span>" + t.label + "</button>";
           }).join("") +
             "<button class='po-tool po-tool-sep' data-act='ticket-discount' id='po-tdisc'" + (S.settings.allowDiscount === false ? " disabled" : "") + "><span class='po-tool-icon'>" + ICON.tag + "</span>Bonkorting</button>" +
-            "<button class='po-tool' data-act='clear'><span class='po-tool-icon'>" + ICON.receipt + "</span>Nieuwe bon</button>" +
           "</nav>" +
         "</div>" +
         "<div class='po-numpad' id='po-numpad' hidden></div>" +
@@ -348,6 +347,7 @@
   }
 
   function drawTicket() {
+    if (S.screen === "payment") return drawPayment();
     var box = root.querySelector("#po-lines");
     if (!box) return;
     var t = totals();
@@ -484,8 +484,11 @@
   function removeSelected() {
     return unlock("deleteLine").then(function (ok) {
       if (!ok) return;
+      // Na verwijderen de volgende regel selecteren (of de vorige als het de laatste was).
+      var i = S.ticket.items.findIndex(function (x) { return x.id === S.ticket.selected; });
       S.ticket.items = S.ticket.items.filter(function (x) { return x.id !== S.ticket.selected; });
-      S.ticket.selected = null; S.pad.buffer = ""; S.pad.mode = "qty"; S.pad.open = false;
+      var next = S.ticket.items[Math.min(i, S.ticket.items.length - 1)];
+      S.ticket.selected = next ? next.id : null; S.pad.buffer = ""; S.pad.mode = "qty"; S.pad.open = false;
       save(); drawTicket();
     });
   }
@@ -527,42 +530,35 @@
     var t = totals();
     if (!t.lines.length || t.errors.length) return;
     S.screen = "payment"; S.pad.open = false;
-    S.pay = { lines: [], selected: -1, buffer: "" };
+    S.pay = { lines: [], selected: -1, buffer: "", pad: false };
     draw();
   }
 
+  // Afrekenen: bovenin het bedrag, onderin links de betaalwijzen. De betaalregels (met toetsenblok)
+  // verschijnen in het midden zodra er een betaalwijze gekozen is.
   function paymentScreen() {
-    var t = totals();
-    return "<div class='pay2'>" +
-      "<section class='pay-methods'>" +
-        "<h2>Betaalwijze</h2>" +
-        methods().map(function (m) { return "<button class='pm-btn pm-" + m.key + "' data-method='" + m.key + "'><span>" + m.icon + "</span>" + e(m.label) + "</button>"; }).join("") +
-        "<div class='pay-lines' id='pay-lines'></div>" +
-      "</section>" +
-      "<section class='pay-center'>" +
-        "<div class='pay-due'><span>Te betalen</span><strong>" + eu(t.total) + "</strong></div>" +
-        "<div class='pay-status' id='pay-status'></div>" +
-        "<div class='quick-pay'>" +
-          "<button class='qp-btn' data-key='exact'>Gepast</button>" +
-          (S.settings.methods && S.settings.methods.contant === false ? "" : (S.settings.quickCash || [10, 20, 50]).map(function (v) { return "<button class='qp-btn' data-key='+" + v + "'>€ " + String(v).replace(".", ",") + "</button>"; }).join("")) +
+    return "<div class='pay3'>" +
+      "<header class='pay-head'>" +
+        "<button class='pay-nav' data-act='back'>« Terug</button>" +
+        "<h1>Betaling</h1>" +
+        "<button class='pay-nav pay-validate' data-act='validate' id='pay-validate'>Bevestig »</button>" +
+      "</header>" +
+      "<section class='pay-card' id='pay-card'></section>" +
+      "<div class='pay-mid'></div>" +
+      "<footer class='pay-foot'>" +
+        "<div class='pay-methods'>" + methods().map(function (m) {
+          return "<button class='pm-btn' data-method='" + m.key + "'>" + e(m.label) + "</button>";
+        }).join("") + "</div>" +
+        "<div class='pay-extra'>" +
+          "<button class='pm-extra' data-act='customer' id='pay-customer'></button>" +
         "</div>" +
-        "<div class='numpad numpad-pay'>" +
-          ["1", "2", "3", "back", "4", "5", "6", "C", "7", "8", "9", "00", "0", ","].map(function (k) {
-            return "<button class='np-key" + (k === "back" ? " np-back" : "") + (k === "0" || k === "," ? " np-wide" : "") + "' data-key='" + k + "'>" + (k === "back" ? "⌫" : k === "C" ? "Wis" : k) + "</button>";
-          }).join("") +
-        "</div>" +
-        "<div class='pay-actions'>" +
-          "<button class='btn btn-lg' data-act='back'>← Terug</button>" +
-          "<button class='btn btn-primary btn-lg pay-validate' data-act='validate' id='pay-validate'>Valideren</button>" +
-        "</div>" +
-        "<p class='muted small center'>" + (S.ticket.customer ? "Klant: " + e(S.ticket.customer.name || S.ticket.customer.email) : "Geen klant gekoppeld") + "</p>" +
-      "</section>" +
+      "</footer>" +
     "</div>";
   }
 
   function methods() {
     var on = S.settings.methods || { pin: true, contant: true, tikkie: true };
-    return METHODS.concat([{ key: "overig", label: S.settings.otherLabel || "Anders", icon: "★" }])
+    return METHODS.concat([{ key: "overig", label: S.settings.otherLabel || "Anders" }])
       .filter(function (m) { return on[m.key]; })
       .map(function (m) { return m.key === "overig" ? m : Object.assign({}, m, { label: A.PAYMENT[m.key] || m.label }); });
   }
@@ -585,19 +581,55 @@
       rounding: hasCash ? round(cashDue - cashPart) : 0, cashDue: cashDue };
   }
 
+  // Per betaalregel: wat er op dat moment nog openstond en wat er terug moet.
+  function payRows() {
+    var t = totals(), open = t.total;
+    return S.pay.lines.map(function (l) {
+      var due = Math.max(0, open);
+      if (l.method === "contant" && S.settings.roundCash) due = round(Math.round(due * 20) / 20);
+      var change = round((l.amount || 0) - due);
+      open = round(open - (l.amount || 0));
+      return { line: l, due: due, change: change > 0.004 ? change : 0 };
+    });
+  }
+
+  function num(v) { return Number(v || 0).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
   function drawPayment() {
     var st = payState();
-    root.querySelector("#pay-lines").innerHTML = S.pay.lines.map(function (l, i) {
-      return "<div class='pay-line" + (i === S.pay.selected ? " selected" : "") + "' data-pline='" + i + "'>" +
-        "<span>" + e(A.PAYMENT[l.method]) + "</span><strong>" + eu(l.amount || 0) + "</strong>" +
-        "<button class='pl-del' data-pdel='" + i + "' aria-label='Verwijderen'>×</button></div>";
-    }).join("") || "<p class='muted small'>Kies hierboven hoe de klant betaalt. Gesplitst betalen kan ook.</p>";
-    root.querySelector("#pay-status").innerHTML =
-      (st.rounding ? "<div class='ps-row muted'><span>Afronding contant</span><span>" + (st.rounding > 0 ? "+ " : "− ") + eu(Math.abs(st.rounding)) + "</span></div>" : "") +
-      "<div class='ps-row'><span>Betaald</span><strong>" + eu(st.paid) + "</strong></div>" +
-      (st.remaining > 0.004 ? "<div class='ps-row ps-remaining'><span>Nog te betalen</span><strong>" + eu(st.remaining) + "</strong></div>" : "") +
-      (st.change > 0.004 ? "<div class='ps-row ps-change'><span>" + (st.tooMuchCard ? "Te veel (alleen contant kan wisselgeld)" : "Wisselgeld") + "</span><strong>" + eu(st.change) + "</strong></div>" : "");
+    var quick = S.settings.methods && S.settings.methods.contant === false ? [] : (S.settings.quickCash || [10, 20, 50]);
+    var key = function (k, label, cls) { return "<button class='nk" + (cls || "") + "' data-key='" + k + "'>" + label + "</button>"; };
+    var pad = "<div class='pay-numpad'>" +
+      "<div class='pay-quick'>" + key("exact", "Gepast", " nk-q") + quick.map(function (v) { return key("+" + v, "€ " + String(v).replace(".", ","), " nk-q"); }).join("") + "</div>" +
+      "<div class='nk-keys'>" +
+        key("1", "1") + key("2", "2") + key("3", "3") + key("back", "⌫", " nk-back") +
+        key("4", "4") + key("5", "5") + key("6", "6") + key(",", ",") +
+        key("7", "7") + key("8", "8") + key("9", "9") + "<button class='nk nk-ok' data-act='pay-pad-ok'>OK</button>" +
+        key("C", "Wis", " nk-clr") + key("0", "0") + key("00", "00") +
+      "</div></div>";
+    var card = root.querySelector("#pay-card");
+    card.classList.toggle("has-lines", S.pay.lines.length > 0);
+    card.innerHTML = !S.pay.lines.length
+      ? "<strong class='pay-amount'>" + eu(st.total) + "</strong><p class='pay-hint'>Selecteer een betaalmethode aub.</p>"
+      : "<div class='pt-head'><span>Te betalen</span><span>Ontvangen</span><span>Wisselgeld</span><span>Methode</span></div>" +
+        payRows().map(function (r, i) {
+          var sel = i === S.pay.selected;
+          return "<div class='pt-row" + (sel ? " selected" : "") + "' data-pline='" + i + "'>" +
+            "<span class='pt-due'>" + num(r.due) + "</span>" +
+            "<span class='pt-got'>" + num(r.line.amount) + "<i class='pt-pad-ic'>" + ICON.keypad + "</i>" + (sel && S.pay.pad ? pad : "") + "</span>" +
+            "<span class='pt-change'>" + (r.change ? num(r.change) : "") + "</span>" +
+            "<span class='pt-method'>" + e(A.PAYMENT[r.line.method]) + "</span>" +
+            "<button class='pt-del' data-pdel='" + i + "' aria-label='Verwijderen'>×</button>" +
+          "</div>";
+        }).join("") +
+        (st.remaining > 0.004 ? "<p class='ps-remaining'>Nog te betalen " + eu(st.remaining) + "</p>"
+          : st.tooMuchCard ? "<p class='ps-remaining'>Te veel betaald; alleen contant kan wisselgeld geven.</p>"
+          : st.rounding ? "<p class='muted'>Afronding contant " + (st.rounding > 0 ? "+ " : "− ") + eu(Math.abs(st.rounding)) + "</p>" : "");
     root.querySelector("#pay-validate").disabled = !st.ok;
+    var c = S.ticket.customer;
+    var btn = root.querySelector("#pay-customer");
+    btn.innerHTML = "<span class='pm-extra-icon'>" + ICON.user + "</span><span class='pm-extra-label'>" + (c ? e(c.name || c.email) : "Klant") + "</span>";
+    btn.classList.toggle("active", !!c);
   }
 
   function addPayment(method) {
@@ -735,6 +767,7 @@
   function onClick(ev) {
     // Tik buiten het toetsenblok: toetsenblok dicht.
     if (S.pad && S.pad.open && !ev.target.closest(".po-numpad, .po-line, .np-mode")) closePad();
+    if (S.screen === "payment" && S.pay.pad && !ev.target.closest(".pt-row")) { S.pay.pad = false; S.pay.buffer = ""; drawPayment(); }
     var t = ev.target.closest("[data-act],[data-key],[data-add],[data-line],[data-type],[data-method],[data-pline],[data-pdel]");
     if (!t) return;
     if (t.dataset.add) return addProduct(t.dataset.add);
@@ -746,8 +779,12 @@
       return drawGrid();
     }
     if (t.dataset.method) return addPayment(t.dataset.method);
-    if (t.dataset.pdel) { ev.stopPropagation(); S.pay.lines.splice(Number(t.dataset.pdel), 1); S.pay.selected = S.pay.lines.length - 1; S.pay.buffer = ""; return drawPayment(); }
-    if (t.dataset.pline) { S.pay.selected = Number(t.dataset.pline); S.pay.buffer = ""; return drawPayment(); }
+    if (t.dataset.pdel) { ev.stopPropagation(); S.pay.lines.splice(Number(t.dataset.pdel), 1); S.pay.selected = S.pay.lines.length - 1; S.pay.buffer = ""; S.pay.pad = false; return drawPayment(); }
+    if (t.dataset.pline) {
+      var i = Number(t.dataset.pline);
+      if (i !== S.pay.selected || !S.pay.pad) { S.pay.selected = i; S.pay.buffer = ""; S.pay.pad = true; drawPayment(); }
+      return;
+    }
     switch (t.dataset.act) {
       case "fullscreen": return A.isFullscreen() ? A.exitFullscreen() : A.enterFullscreen();
       case "exit":
@@ -766,6 +803,7 @@
         });
       case "open-session": return doOpenSession(t);
       case "pad-ok": return closePad();
+      case "pay-pad-ok": S.pay.pad = false; S.pay.buffer = ""; return drawPayment();
       case "pay": return goPay();
       case "back": S.screen = "products"; return draw();
       case "validate": return validate(t);
@@ -773,11 +811,6 @@
       case "new": S.screen = "products"; S.q = ""; root.querySelector("#pos-q").value = ""; return draw();
       case "customer": return customerDialog();
       case "ticket-discount": return ticketDiscountDialog();
-      case "clear":
-        if (!S.ticket.items.length) return;
-        return A.confirm("Nieuwe bon?", "De huidige bon wordt leeggemaakt.", "Leegmaken", true).then(function (ok) {
-          if (ok) { S.ticket = freshTicket(); save(); drawTicket(); }
-        });
     }
   }
 
@@ -831,6 +864,7 @@
       ev.preventDefault();
       if (S.screen === "products" && S.pad.open) closePad();
       else if (S.screen === "products") goPay();
+      else if (S.screen === "payment" && S.pay.pad) { S.pay.pad = false; S.pay.buffer = ""; drawPayment(); }
       else if (S.screen === "payment") { var b = root.querySelector("#pay-validate"); if (b && !b.disabled) validate(b); }
       else if (S.screen === "receipt") { S.screen = "products"; draw(); }
       else if (S.screen === "open") { var o = root.querySelector("[data-act=open-session]"); if (o) doOpenSession(o); }
@@ -840,6 +874,7 @@
     if (ev.key === "," || ev.key === ".") { ev.preventDefault(); return padKey(","); }
     if (ev.key === "Delete") { ev.preventDefault(); return padKey("C"); }
     if (ev.key === "Escape" && S.pad.open) return closePad();
+    if (ev.key === "Escape" && S.screen === "payment" && S.pay.pad) { S.pay.pad = false; S.pay.buffer = ""; return drawPayment(); }
     if (ev.key === "Escape" && S.screen === "payment") { S.screen = "products"; return draw(); }
     if (ev.key === "ArrowUp" || ev.key === "ArrowDown") {
       if (S.screen !== "products" || !S.ticket.items.length) return;
