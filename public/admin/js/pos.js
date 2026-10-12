@@ -10,7 +10,6 @@
   var ICON = {
     trash: svg("<path d='M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3'/>"),
     tag: svg("<path d='M3 12V4h8l10 10-8 8z'/><circle cx='7.5' cy='8.5' r='1.3'/>"),
-    receipt: svg("<path d='M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6'/>"),
     user: svg("<circle cx='12' cy='8' r='4'/><path d='M4 21c1-4.5 4.5-6.5 8-6.5s7 2 8 6.5'/>")
   };
   var METHODS = [
@@ -309,7 +308,6 @@
               "<span class='po-tool-icon'>" + t.icon + "</span>" + t.label + "</button>";
           }).join("") +
             "<button class='po-tool po-tool-sep' data-act='ticket-discount' id='po-tdisc'" + (S.settings.allowDiscount === false ? " disabled" : "") + "><span class='po-tool-icon'>" + ICON.tag + "</span>Bonkorting</button>" +
-            "<button class='po-tool' data-act='clear'><span class='po-tool-icon'>" + ICON.receipt + "</span>Nieuwe bon</button>" +
           "</nav>" +
         "</div>" +
         "<div class='po-numpad' id='po-numpad' hidden></div>" +
@@ -484,8 +482,11 @@
   function removeSelected() {
     return unlock("deleteLine").then(function (ok) {
       if (!ok) return;
+      // Na verwijderen de volgende regel selecteren (of de vorige als het de laatste was).
+      var i = S.ticket.items.findIndex(function (x) { return x.id === S.ticket.selected; });
       S.ticket.items = S.ticket.items.filter(function (x) { return x.id !== S.ticket.selected; });
-      S.ticket.selected = null; S.pad.buffer = ""; S.pad.mode = "qty"; S.pad.open = false;
+      var next = S.ticket.items[Math.min(i, S.ticket.items.length - 1)];
+      S.ticket.selected = next ? next.id : null; S.pad.buffer = ""; S.pad.mode = "qty"; S.pad.open = false;
       save(); drawTicket();
     });
   }
@@ -773,11 +774,6 @@
       case "new": S.screen = "products"; S.q = ""; root.querySelector("#pos-q").value = ""; return draw();
       case "customer": return customerDialog();
       case "ticket-discount": return ticketDiscountDialog();
-      case "clear":
-        if (!S.ticket.items.length) return;
-        return A.confirm("Nieuwe bon?", "De huidige bon wordt leeggemaakt.", "Leegmaken", true).then(function (ok) {
-          if (ok) { S.ticket = freshTicket(); save(); drawTicket(); }
-        });
     }
   }
 
