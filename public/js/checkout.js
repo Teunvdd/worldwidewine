@@ -103,24 +103,82 @@ window.WWW.ready.then(loadShopInfo).then(function (info) {
   }
 
   // ---- Afhalen: dag en tijd kiezen ----
+  // Agenda: maanden met de dagen waarop afgehaald kan worden, daarnaast de tijden van de gekozen dag.
   var days = info ? info.pickupDays : ORDER.pickupDays(CONFIG);
-  function dayOptions(list) {
-    return '<option value="">Kies een dag…</option>' + list.map(function (d) {
-      return '<option value="' + d.date + '">' + d.label.charAt(0).toUpperCase() + d.label.slice(1) + "</option>";
+  var byDate = {};
+  days.forEach(function (d) { byDate[d.date] = d; });
+  var MONTHS = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];
+  var cap = function (t) { return t.charAt(0).toUpperCase() + t.slice(1); };
+  var iso = function (y, m, d) { return y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0"); };
+  var monthOf = function (date) { var a = date.split("-").map(Number); return { y: a[0], m: a[1] - 1 }; };
+  var todayIso = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
+  var calMonth = days.length ? monthOf(days[0].date) : monthOf(todayIso);
+  var firstMonth = calMonth, lastMonth = days.length ? monthOf(days[days.length - 1].date) : calMonth;
+  var mIndex = function (x) { return x.y * 12 + x.m; };
+
+  function renderCalendar() {
+    var y = calMonth.y, m = calMonth.m, chosen = value("afhaaldag");
+    var startWd = (new Date(Date.UTC(y, m, 1)).getUTCDay() + 6) % 7; // maandag = 0
+    var count = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    var cells = "";
+    for (var i = 0; i < startWd; i++) cells += "<span class='cal-day is-empty'></span>";
+    for (var d = 1; d <= count; d++) {
+      var date = iso(y, m, d), ok = !!byDate[date];
+      var cls = "cal-day" + (ok ? " is-open" : "") + (date === chosen ? " is-selected" : "") + (date === todayIso ? " is-today" : "");
+      cells += ok ? "<button type='button' class='" + cls + "' data-day='" + date + "' aria-pressed='" + (date === chosen) + "' aria-label='" + W.esc(cap(byDate[date].label)) + "'>" + d + "</button>"
+        : "<span class='" + cls + "' aria-hidden='true'>" + d + "</span>";
+    }
+    $("pick-cal").innerHTML =
+      "<div class='cal-head'><button type='button' class='cal-nav' data-cal='-1' aria-label='Vorige maand'" + (mIndex(calMonth) <= mIndex(firstMonth) ? " disabled" : "") + ">‹</button>" +
+        "<strong>" + cap(MONTHS[m]) + " " + y + "</strong>" +
+        "<button type='button' class='cal-nav' data-cal='1' aria-label='Volgende maand'" + (mIndex(calMonth) >= mIndex(lastMonth) ? " disabled" : "") + ">›</button></div>" +
+      "<div class='cal-grid'>" + ["ma", "di", "wo", "do", "vr", "za", "zo"].map(function (w) { return "<span class='cal-wd'>" + w + "</span>"; }).join("") + cells + "</div>";
+  }
+
+  function renderSlots() {
+    var day = byDate[value("afhaaldag")], chosen = value("afhaaltijd");
+    if (!days.length) { $("pick-slots").innerHTML = "<p class='slots-empty'>Er zijn op dit moment geen afhaalmomenten beschikbaar. Bel ons op 06 83 17 27 04, dan maken we samen een afspraak.</p>"; return; }
+    if (!day) { $("pick-slots").innerHTML = "<p class='slots-empty'>Kies eerst een dag in de agenda.</p>"; return; }
+    var parts = [["Ochtend", 0, 12], ["Middag", 12, 17], ["Avond", 17, 24]];
+    $("pick-slots").innerHTML = "<p class='slots-day'>" + W.esc(cap(day.label)) + "</p>" + parts.map(function (p) {
+      var list = day.times.filter(function (t) { var h = Number(t.slice(0, 2)); return h >= p[1] && h < p[2]; });
+      return list.length ? "<p class='slots-part'>" + p[0] + "</p><div class='slot-list'>" + list.map(function (t) {
+        return "<button type='button' class='slot" + (t === chosen ? " is-selected" : "") + "' data-time='" + t + "' aria-pressed='" + (t === chosen) + "'>" + t + "</button>";
+      }).join("") + "</div>" : "";
     }).join("");
   }
+
+  function renderPickSummary() {
+    var m = pickupMoment(), el = $("pick-summary");
+    el.hidden = !m;
+    el.innerHTML = m ? "✓ Je haalt je bestelling op <strong>" + W.esc(m) + "</strong>." : "";
+  }
+
+  function chooseDay(date) {
+    form.elements.afhaaldag.value = date;
+    var day = byDate[date];
+    if (!day || day.times.indexOf(form.elements.afhaaltijd.value) < 0) form.elements.afhaaltijd.value = "";
+    renderCalendar(); renderSlots(); renderPickSummary();
+  }
+
   function renderPickupDays() {
-    form.elements.afhaaldag.innerHTML = dayOptions(days);
-    renderPickupTimes();
+    if (days.length && !byDate[value("afhaaldag")]) form.elements.afhaaldag.value = days[0].date; // eerste mogelijke dag alvast open
+    renderCalendar(); renderSlots(); renderPickSummary();
   }
-  function renderPickupTimes() {
-    var day = days.find(function (d) { return d.date === form.elements.afhaaldag.value; });
-    var sel = form.elements.afhaaltijd, cur = sel.value;
-    sel.innerHTML = day ? '<option value="">Kies een tijd…</option>' + day.times.map(function (t) { return "<option>" + t + "</option>"; }).join("")
-      : '<option value="">Kies eerst een dag</option>';
-    sel.disabled = !day;
-    if (day && day.times.indexOf(cur) >= 0) sel.value = cur;
-  }
+
+  $("pick").addEventListener("click", function (e) {
+    var nav = e.target.closest("[data-cal]"), day = e.target.closest("[data-day]"), slot = e.target.closest("[data-time]");
+    if (nav) {
+      var n = mIndex(calMonth) + Number(nav.dataset.cal);
+      calMonth = { y: Math.floor(n / 12), m: n % 12 };
+      renderCalendar();
+    } else if (day) chooseDay(day.dataset.day);
+    else if (slot) {
+      form.elements.afhaaltijd.value = slot.dataset.time;
+      renderSlots(); renderPickSummary();
+      $("pick").classList.remove("is-missing");
+    }
+  });
   function pickupMoment() {
     var day = days.find(function (d) { return d.date === value("afhaaldag"); });
     return day && value("afhaaltijd") ? ORDER.pickupLabel(day, value("afhaaltijd")) : "";
@@ -162,7 +220,6 @@ window.WWW.ready.then(loadShopInfo).then(function (info) {
 
   form.addEventListener("change", function (e) {
     if (e.target.name === "bezorging") { renderFields(); renderPayments(); renderSummary(); }
-    if (e.target.name === "afhaaldag") renderPickupTimes();
   });
   // Ingelogd via Mijn account: gegevens alvast invullen.
   try {
@@ -223,6 +280,11 @@ window.WWW.ready.then(loadShopInfo).then(function (info) {
     }
     var order = computeOrder(W.Cart.items(), value("bezorging"), W.PRODUCTS, CONFIG, { postcode: value("postcode") });
     if (order.errors.length) return showError(order.errors.join(" "));
+    if (order.delivery.pickup && (!value("afhaaldag") || !value("afhaaltijd"))) {
+      $("pick").classList.add("is-missing");
+      $("pick").scrollIntoView({ behavior: "smooth", block: "center" });
+      return showError("Kies in de agenda een dag en tijd waarop je je bestelling komt ophalen.");
+    }
 
     var data = {};
     ["naam", "email", "telefoon", "adres", "postcode", "plaats", "afhaaldag", "afhaaltijd", "opmerkingen", "bezorging", "betaling"]

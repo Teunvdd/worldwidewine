@@ -186,7 +186,7 @@ In de admin onder **Producten** staan de knoppen **Exporteren** en **Importeren*
 
 ### Afrekenen: afhalen en bezorgen
 Bij het afrekenen kiest de klant:
-- **Afhalen in de winkel** (Westzijde 358, Zaandam): de klant kiest meteen een **dag en tijd** binnen de afhaaltijden (standaard om het halfuur, vroegst twee uur na het bestellen, tot zes weken vooruit). Het afhaalmoment staat in de bestelling, de bevestigingsmail en de admin.
+- **Afhalen in de winkel** (Westzijde 358, Zaandam): de klant kiest in een **agenda** een dag en daarna een **tijd** binnen de afhaaltijden (standaard om het halfuur, vroegst twee uur na het bestellen, tot zes weken vooruit). Het afhaalmoment staat in de bestelling, de bevestigingsmail en de admin.
 - **Bezorgen in Amsterdam en omstreken**: zodra de klant zijn postcode invult zie je of we daar zelf bezorgen. Buiten het gebied kan de bestelling niet met deze optie worden geplaatst (ook de server controleert dit).
 - **Verzenden met PostNL** door heel Nederland, tot 18 flessen.
 

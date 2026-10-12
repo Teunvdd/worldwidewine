@@ -438,3 +438,32 @@
 .toggle input:checked + .toggle-ui::after { transform: translateX(18px); }
 .toggle input:focus-visible + .toggle-ui { outline: 3px solid var(--gold); outline-offset: 2px; }
 .spinner-sm { width: 16px; height: 16px; border-width: 2px; vertical-align: -3px; margin-right: .5rem; }
+
+/* ---------- Afhalen: agenda met tijden ---------- */
+.pick { border: 1px solid var(--line); border-radius: 14px; padding: 1.2rem; background: #fff; transition: border-color .2s, box-shadow .2s; }
+.pick.is-missing { border-color: var(--wine-3); box-shadow: 0 0 0 3px rgba(184, 74, 34, .15); }
+.pick-title { margin: 0 0 1rem; font-weight: 600; }
+.pick-grid { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+@media (max-width: 640px) { .pick-grid { grid-template-columns: 1fr; } }
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .6rem; }
+.cal-head strong { font-family: var(--display, inherit); font-size: 1.05rem; }
+.cal-nav { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: #fff; color: var(--ink); font-size: 1.2rem; line-height: 1; cursor: pointer; }
+.cal-nav:hover:not(:disabled) { background: var(--cream-2); }
+.cal-nav:disabled { opacity: .3; cursor: default; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-wd { text-align: center; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: .2rem 0 .35rem; }
+.cal-day { aspect-ratio: 1; display: grid; place-items: center; border-radius: 10px; font-size: .9rem; color: #c4b6ac; font-variant-numeric: tabular-nums; position: relative; }
+.cal-day.is-empty { visibility: hidden; }
+button.cal-day { border: 1px solid var(--line); background: var(--cream); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s; }
+button.cal-day:hover { border-color: var(--wine); }
+.cal-day.is-today::after { content: ""; position: absolute; bottom: 5px; width: 4px; height: 4px; border-radius: 50%; background: var(--wine); }
+button.cal-day.is-selected { background: var(--wine); border-color: var(--wine); color: #fff; }
+button.cal-day.is-selected::after { background: #fff; }
+.slots-day { margin: 0 0 .4rem; font-weight: 700; font-size: 1.05rem; }
+.slots-part { margin: .8rem 0 .4rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.slot-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: .4rem; }
+.slot { padding: .55rem 0; border-radius: 9px; border: 1px solid var(--line); background: #fff; color: var(--ink); font: inherit; font-weight: 600; font-size: .9rem; cursor: pointer; font-variant-numeric: tabular-nums; transition: background .15s, border-color .15s; }
+.slot:hover { border-color: var(--wine); }
+.slot.is-selected { background: var(--wine); border-color: var(--wine); color: #fff; }
+.slots-empty { margin: 0; color: var(--muted); font-size: .92rem; padding: .4rem 0; }
+.pick-summary { margin: 1rem 0 0; padding: .7rem 1rem; border-radius: 10px; background: #e6f3ea; color: #2f7a4a; font-size: .95rem; }
