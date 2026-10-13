@@ -729,3 +729,16 @@ test("duidelijke foutmeldingen bij verkeerde Supabase-instellingen", async () =>
   const { error } = await createClient(stack.url, stack.anonKey, { auth: { persistSession: false } }).from("products").select("id").limit(1);
   assert.match(explain(error), /niet de anon\/publishable key/);
 });
+
+// Laatste test: verwijdert alle producten.
+test("alle producten verwijderen: het startassortiment komt niet terug, daarna importeren werkt", async () => {
+  const all = await shop.getProducts();
+  assert.ok(all.length > 0);
+  for (const p of all) await shop.deleteProduct(p.id);
+  // Lege lijst blijft leeg: het startassortiment wordt niet opnieuw geplaatst.
+  assert.deepStrictEqual(await shop.getProducts(), []);
+  assert.deepStrictEqual(await shop.getProducts(), []);
+  const res = await shop.importProducts([{ id: "test-import-wijn", producer: "Testhuis", name: "Testwijn", type: "Rood", price: 12.5, stock: 0 }]);
+  assert.strictEqual(res.created, 1);
+  assert.deepStrictEqual((await shop.getProducts()).map((p) => p.id), ["test-import-wijn"]);
+});
