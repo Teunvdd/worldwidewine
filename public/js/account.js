@@ -186,7 +186,7 @@ window.WWW.ready.then(function () {
           "<p class='form-error' role='alert' hidden></p>" +
           "<button class='btn btn-block' type='submit'>Gegevens opslaan</button></form>" +
         "<section class='account-card'><h2>Vragen?</h2><p class='muted small'>Bel of app ons, of mail met je bestelnummer erbij.</p>" +
-          "<p><a href='tel:+31683172704'>06 83 17 27 04</a><br><a href='https://wa.me/31683172704' target='_blank' rel='noopener'>WhatsApp</a><br><a href='mailto:info@worldwidewine.nl'>info@worldwidewine.nl</a></p></section>" +
+          "<p><a href='tel:+31683172704'>+31 6 83 17 27 04</a><br><a href='https://wa.me/31683172704' target='_blank' rel='noopener'>WhatsApp</a><br><a href='mailto:info@worldwidewine.nl'>info@worldwidewine.nl</a></p></section>" +
         "<button class='btn btn-ghost btn-block' id='logout' type='button'>Uitloggen</button>" +
       "</aside></div>";
 

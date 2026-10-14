@@ -137,7 +137,7 @@ window.WWW.ready.then(loadShopInfo).then(function (info) {
 
   function renderSlots() {
     var day = byDate[value("afhaaldag")], chosen = value("afhaaltijd");
-    if (!days.length) { $("pick-slots").innerHTML = "<p class='slots-empty'>Er zijn op dit moment geen afhaalmomenten beschikbaar. Bel ons op 06 83 17 27 04, dan maken we samen een afspraak.</p>"; return; }
+    if (!days.length) { $("pick-slots").innerHTML = "<p class='slots-empty'>Er zijn op dit moment geen afhaalmomenten beschikbaar. Bel ons op +31 6 83 17 27 04, dan maken we samen een afspraak.</p>"; return; }
     if (!day) { $("pick-slots").innerHTML = "<p class='slots-empty'>Kies eerst een dag in de agenda.</p>"; return; }
     var parts = [["Ochtend", 0, 12], ["Middag", 12, 17], ["Avond", 17, 24]];
     $("pick-slots").innerHTML = "<p class='slots-day'>" + W.esc(cap(day.label)) + "</p>" + parts.map(function (p) {
