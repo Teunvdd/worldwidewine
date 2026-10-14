@@ -265,7 +265,60 @@ var A = (function () {
     return "<svg class='p-img p-art " + (cls || "") + "' viewBox='0 0 120 140' role='img' aria-hidden='true'>" + grad + shape + cases + "</svg>";
   }
 
+  // ---- Pagina's voor lange lijsten (producten, voorraad, klanten, bestellingen) ----
+  // state = { page: 1 } per lijst; het aantal per pagina wordt onthouden in de browser.
+  var PER_OPTIONS = [20, 50, 100];
+  function perPage() {
+    var n = 20;
+    try { n = Number(localStorage.getItem("wwwAdminPerPage")) || 20; } catch (e) {}
+    return PER_OPTIONS.indexOf(n) >= 0 ? n : 20;
+  }
+  // Geeft de items van de huidige pagina en de html van de paginaknoppen.
+  function paginate(list, state) {
+    var per = perPage(), pages = Math.max(1, Math.ceil(list.length / per));
+    state.page = Math.min(Math.max(1, state.page || 1), pages);
+    var start = (state.page - 1) * per;
+    return { items: list.slice(start, start + per), html: pagerHtml(list.length, state.page, per, pages) };
+  }
+  function pagerHtml(total, page, per, pages) {
+    if (total <= PER_OPTIONS[0]) return "";
+    var nums = [], last = 0;
+    for (var i = 1; i <= pages; i++) {
+      if (i === 1 || i === pages || Math.abs(i - page) <= 1) {
+        if (i - last > 1) nums.push("<span class='pager-gap'>…</span>");
+        nums.push("<button type='button' class='pager-btn" + (i === page ? " is-current" : "") + "' data-page='" + i + "'" + (i === page ? " aria-current='page'" : "") + ">" + i + "</button>");
+        last = i;
+      }
+    }
+    var from = (page - 1) * per + 1, to = Math.min(total, page * per);
+    return "<nav class='pager' aria-label='Pagina’s'>" +
+      "<span class='pager-info'>" + from + "–" + to + " van " + total + "</span>" +
+      "<div class='pager-pages'><button type='button' class='pager-btn' data-page='" + (page - 1) + "'" + (page <= 1 ? " disabled" : "") + " aria-label='Vorige pagina'>‹</button>" +
+        nums.join("") +
+        "<button type='button' class='pager-btn' data-page='" + (page + 1) + "'" + (page >= pages ? " disabled" : "") + " aria-label='Volgende pagina'>›</button></div>" +
+      "<label class='pager-per'>Per pagina <select data-per>" + PER_OPTIONS.map(function (n) { return "<option" + (n === per ? " selected" : "") + ">" + n + "</option>"; }).join("") + "</select></label>" +
+    "</nav>";
+  }
+  // Koppelt de knoppen in box aan state en tekent de lijst opnieuw met redraw().
+  function bindPager(box, state, redraw) {
+    box.addEventListener("click", function (ev) {
+      var b = ev.target.closest("[data-page]");
+      if (!b || b.disabled) return;
+      state.page = Number(b.dataset.page);
+      redraw();
+      var top = box.closest(".view-list") || $("#view");
+      if (top && top.getBoundingClientRect().top < 0) top.scrollIntoView({ block: "start" });
+    });
+    box.addEventListener("change", function (ev) {
+      if (!ev.target.matches("[data-per]")) return;
+      try { localStorage.setItem("wwwAdminPerPage", ev.target.value); } catch (e) {}
+      state.page = 1;
+      redraw();
+    });
+  }
+
   return {
+    paginate: paginate, bindPager: bindPager,
     $: $, $$: $$, esc: esc, euro: euro, date: date, parseNum: parseNum,
     api: api, load: load, cacheOf: cacheOf, invalidate: invalidate, toast: toast, modal: modal, closeModal: closeModal, closeModalSilently: closeModalSilently,
     confirm: confirmBox, formData: formData, busy: busy, register: register, route: route, start: start,

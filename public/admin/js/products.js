@@ -2,6 +2,7 @@
 (function () {
   var e = A.esc, eu = A.euro;
   var filters = { q: "", type: "", cat: "", show: "" };
+  var pg = { page: 1 };
   var cats = []; // productcategorieën (voor de kassa); null = tabel ontbreekt nog
   var COLORS = ["#ce542b", "#a9441f", "#7a1f2b", "#c0414f", "#e0a33a", "#5c6b2c", "#2f7a4a", "#2c6e8f", "#5b4a8a", "#6e625c"];
 
@@ -29,7 +30,8 @@
         "<div class='bulk-bar' id='p-bulk' hidden><strong id='p-bulk-n'></strong>" +
           "<button class='btn btn-sm' data-bulk='active'>Actief maken</button><button class='btn btn-sm' data-bulk='inactive'>Niet actief</button>" +
           "<button class='btn btn-sm btn-danger-ghost' data-bulk='delete'>Verwijderen</button><button class='link' data-bulk='none'>Selectie wissen</button></div>" +
-        "<div class='card card-flush'><table class='table table-hover'><thead><tr><th class='sel-col'><input type='checkbox' id='p-all' aria-label='Alles selecteren'></th><th>Product</th><th>Soort / categorie</th><th class='num'>Prijs</th><th class='num'>Voorraad</th><th>Zichtbaar</th></tr></thead><tbody id='p-rows'></tbody></table></div>";
+        "<div class='card card-flush'><table class='table table-hover'><thead><tr><th class='sel-col'><input type='checkbox' id='p-all' aria-label='Alles selecteren'></th><th>Product</th><th>Soort / categorie</th><th class='num'>Prijs</th><th class='num'>Voorraad</th><th>Zichtbaar</th></tr></thead><tbody id='p-rows'></tbody></table></div>" +
+        "<div id='p-pager'></div>";
 
       var selected = {}, shown = [];
       function draw() {
@@ -44,8 +46,10 @@
           if (filters.show === "actie" && !p.oldPrice) return false;
           return !q || [p.name, p.producer, p.ean, p.region, p.country, p.id].join(" ").toLowerCase().indexOf(q) >= 0;
         }).sort(function (a, b) { return (a.producer + a.name).localeCompare(b.producer + b.name, "nl"); });
-        shown = list;
-        el.querySelector("#p-rows").innerHTML = list.map(function (p) {
+        var paged = A.paginate(list, pg);
+        shown = paged.items; // ‘alles selecteren’ geldt voor de producten op deze pagina
+        el.querySelector("#p-pager").innerHTML = paged.html;
+        el.querySelector("#p-rows").innerHTML = paged.items.map(function (p) {
           var vis = p.active === false ? "<span class='tag tag-off'>Niet actief</span>" : p.webshop === false ? "<span class='tag tag-winkel'>Alleen winkel</span>" : "<span class='tag tag-webshop'>Webshop + winkel</span>";
           return "<tr class='clickable" + (selected[p.id] ? " is-selected" : "") + "' data-id='" + e(p.id) + "'><td class='sel-col'><input type='checkbox' data-sel aria-label='Selecteren'" + (selected[p.id] ? " checked" : "") + "></td><td><div class='p-cell'><span class='thumb'>" + A.productArt(p) + "</span><span><span class='muted small'>" + e(p.producer) + "</span><br><strong>" + e(p.name) + "</strong>" + (p.vintage ? " <span class='muted'>" + p.vintage + "</span>" : "") + "</span></div></td>" +
             "<td>" + e(A.typeLabel(p.type)) + "<br>" + catTag(p) + "<span class='muted small'>" + e(p.unit) + (p.caseSize ? " · ook per doos van " + p.caseSize : "") + "</span></td>" +
@@ -64,6 +68,7 @@
         all.indeterminate = n > 0 && n < shown.length;
       }
       draw();
+      A.bindPager(el.querySelector("#p-pager"), pg, draw);
       el.querySelector("#p-all").addEventListener("change", function () {
         var on = this.checked;
         shown.forEach(function (p) { if (on) selected[p.id] = true; else delete selected[p.id]; });
@@ -93,11 +98,11 @@
           .then(function (ok) { if (ok) go(); });
       });
 
-      el.querySelector("#p-q").addEventListener("input", function () { filters.q = this.value; draw(); });
-      el.querySelector("#p-type").addEventListener("change", function () { filters.type = this.value; draw(); });
-      el.querySelector("#p-show").addEventListener("change", function () { filters.show = this.value; draw(); });
+      el.querySelector("#p-q").addEventListener("input", function () { filters.q = this.value; pg.page = 1; draw(); });
+      el.querySelector("#p-type").addEventListener("change", function () { filters.type = this.value; pg.page = 1; draw(); });
+      el.querySelector("#p-show").addEventListener("change", function () { filters.show = this.value; pg.page = 1; draw(); });
       var pc = el.querySelector("#p-cat");
-      if (pc) pc.addEventListener("change", function () { filters.cat = this.value; draw(); });
+      if (pc) pc.addEventListener("change", function () { filters.cat = this.value; pg.page = 1; draw(); });
       el.querySelector("#p-new").addEventListener("click", function () { edit(null); });
       el.querySelector("#p-export").addEventListener("click", function () { exportExcel(products); });
       var importFile = el.querySelector("#p-import-file");

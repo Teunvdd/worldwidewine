@@ -464,3 +464,13 @@ button.cal-day.is-selected::after { background: #fff; }
 .slot.is-selected { background: var(--wine); border-color: var(--wine); color: #fff; }
 .slots-empty { margin: 0; color: var(--muted); font-size: .92rem; padding: .4rem 0; }
 .pick-summary { margin: 1rem 0 0; padding: .7rem 1rem; border-radius: 10px; background: #e6f3ea; color: #2f7a4a; font-size: .95rem; }
+
+/* ---------- Pagina's in de webshop ---------- */
+.pager { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: .35rem; margin: 2rem 0 .5rem; }
+.pager:empty { display: none; }
+.pager-btn { min-width: 42px; height: 42px; padding: 0 .8rem; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; font-variant-numeric: tabular-nums; transition: background .15s, border-color .15s; }
+.pager-btn:hover:not(:disabled) { border-color: var(--wine); }
+.pager-btn:disabled { opacity: .35; cursor: default; }
+.pager-btn.is-current { background: var(--wine); border-color: var(--wine); color: #fff; }
+.pager-gap { color: var(--muted); padding: 0 .2rem; }
+@media (max-width: 560px) { .pager-label { display: none; } .pager-step { padding: 0; } }
