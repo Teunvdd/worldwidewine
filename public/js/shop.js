@@ -23,7 +23,13 @@
       state.onlinePayments = !!data.onlinePayments;
     })
     .catch(function () { /* geen server (bijv. lokaal geopend): startassortiment gebruiken */ })
-    .then(function () { render(); return PRODUCTS; });
+    .then(function () {
+      // Bestaande winkelwagen (van een eerder bezoek) ook omzetten naar dozen waar dat kan.
+      var items = read(), changed = false;
+      items.map(function (i) { return i.id; }).forEach(function (id) { if (packBoxes(items, id)) changed = true; });
+      if (changed) write(items); else render();
+      return PRODUCTS;
+    });
 
   function soldOut(p) { return p.stock === false || (typeof p.stock === "number" && p.stock <= 0); }
 
@@ -75,6 +81,24 @@
     document.dispatchEvent(new CustomEvent("cart:change"));
   }
 
+  // Losse flessen automatisch omzetten naar dozen zodra er een hele doos in zit en de doos niet duurder is.
+  // De voorraad blijft gelijk (zelfde aantal flessen). Geeft het bespaarde bedrag terug (0 = niets omgezet).
+  function packBoxes(items, id) {
+    var p = byId[id], n = caseSize(p), price = casePrice(p);
+    if (!p || !n || price == null || p.price == null || price > p.price * n) return 0;
+    var bottles = items.find(function (i) { return i.id === id && !i.box; });
+    if (!bottles || bottles.qty < n) return 0;
+    var boxes = Math.floor(bottles.qty / n);
+    bottles.qty -= boxes * n;
+    var box = items.find(function (i) { return i.id === id && i.box; });
+    if (box) box.qty += boxes; else items.push({ id: id, qty: boxes, box: true });
+    for (var k = items.length - 1; k >= 0; k--) if (items[k].qty <= 0) items.splice(k, 1);
+    return Math.round((p.price * n - price) * boxes * 100) / 100 || 0.001;
+  }
+  function packedMessage(p, saved) {
+    return "Omgezet naar dozen van " + caseSize(p) + (saved >= 0.01 ? ": je bespaart " + euro(saved) : "");
+  }
+
   var Cart = {
     items: read,
     count: function () { return read().reduce(function (s, i) { return s + i.qty; }, 0); },
@@ -89,8 +113,9 @@
       if ((found ? found.qty : 0) >= limit) { toast(p, "Meer is er helaas niet op voorraad."); return; }
       if (found) found.qty = Math.min(limit, found.qty + (qty || 1));
       else items.push(box ? { id: id, qty: Math.min(limit, qty || 1), box: true } : { id: id, qty: Math.min(limit, qty || 1) });
+      var saved = box ? 0 : packBoxes(items, id);
       write(items);
-      toast(p, null, box);
+      toast(p, saved ? packedMessage(p, saved) : null, box);
     },
     set: function (key, qty) {
       var items = read();
@@ -98,7 +123,9 @@
       if (!found) return;
       if (qty <= 0) items = items.filter(function (i) { return keyOf(i) !== key; });
       else found.qty = Math.min(byId[found.id] ? maxQty(byId[found.id], found.box, items) : 99, qty);
+      var saved = qty > 0 && !found.box ? packBoxes(items, found.id) : 0;
       write(items);
+      if (saved) toast(byId[found.id], packedMessage(byId[found.id], saved));
     },
     clear: function () { write([]); }
   };
