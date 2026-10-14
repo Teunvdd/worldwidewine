@@ -194,7 +194,7 @@
     var cats = A.load("categories", true).catch(function () { return []; }); // tabel ontbreekt nog: indelen op soort
     return Promise.all([A.api("GET", "pos/session"), A.load("products", true), cats]).then(function (res) {
       S.categories = res[2] || [];
-      S.session = res[0].session; S.lastClosingCash = res[0].suggestedOpeningCash != null ? res[0].suggestedOpeningCash : (res[0].lastClosingCash || 0); S.products = res[1];
+      S.session = res[0].session; S.lastClosingCash = res[0].suggestedOpeningCash != null ? res[0].suggestedOpeningCash : (res[0].lastClosingCash || 0); S.products = res[1]; lastRefresh = Date.now();
       S.settings = res[0].settings || {};
       A.posSettings = S.settings;
       A.PAYMENT.overig = S.settings.otherLabel || "Anders";
@@ -366,6 +366,24 @@
       return q.split(/\s+/).every(function (w) { return hay.indexOf(w) >= 0; });
     }).sort(function (a, b) { return (a.producer + a.name).localeCompare(b.producer + b.name, "nl"); });
   }
+
+  // Producten (prijzen, voorraad, foto's) opnieuw ophalen, zodat wijzigingen in de admin ook in een
+  // kassa verschijnen die de hele dag open staat: na elke verkoop, als het scherm weer actief wordt en elke 2 minuten.
+  var lastRefresh = 0;
+  function refreshProducts() {
+    lastRefresh = Date.now();
+    return A.load("products", true).then(function (list) {
+      var changed = JSON.stringify(list) !== JSON.stringify(S.products);
+      S.products = list;
+      if (changed && S.screen === "products") drawGrid();
+    }).catch(function () {});
+  }
+  function refreshIfOpen() {
+    if (location.hash === "#pos" && !document.hidden && Date.now() - lastRefresh > 20000) refreshProducts();
+  }
+  document.addEventListener("visibilitychange", refreshIfOpen);
+  window.addEventListener("focus", refreshIfOpen);
+  setInterval(function () { if (Date.now() - lastRefresh > 110000) refreshIfOpen(); }, 30000);
 
   function drawGrid() {
     var grid = root && root.querySelector("#pp-grid");
@@ -753,7 +771,7 @@
       S.screen = "receipt"; draw();
       if (S.settings.autoPrint) A.printReceipt(res.order);
       A.invalidate("products", "orders", "customers");
-      A.load("products", true).then(function (list) { S.products = list; });
+      refreshProducts();
     }).catch(function (err) { A.busy(btn, false); A.toast(err.message, "error"); });
   }
 
