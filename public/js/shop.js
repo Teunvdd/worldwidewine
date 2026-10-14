@@ -34,14 +34,6 @@
   function keyOf(i) { return i.id + (i.box ? "|doos" : ""); }
   function unitSize(p, box) { return box ? caseSize(p) || 1 : 1; }
   function unitPrice(p, box) { return box ? casePrice(p) : p.price; }
-  // Kortingspercentage van een doos ten opzichte van losse flessen; null als een doos niet goedkoper is.
-  function caseDeal(p) {
-    var n = caseSize(p), price = casePrice(p);
-    if (!n || price == null || p.price == null) return null;
-    var save = Math.round((p.price * n - price) * 100) / 100;
-    if (save < 0.01) return null;
-    return { pct: Math.round(save / (p.price * n) * 100) };
-  }
   function caseSoldOut(p) { return soldOut(p) || (typeof p.stock === "number" && p.stock < caseSize(p)); }
   // Maximaal aantal van deze regel: de voorraad (in flessen) min wat de andere regel van hetzelfde product al gebruikt.
   function maxQty(p, box, items) {
@@ -133,8 +125,7 @@
   }
 
   function badges(p) {
-    var out = [], deal = caseDeal(p);
-    if (deal && !caseSoldOut(p)) out.push('<span class="badge badge-case">' + BOX_ICON + " Doos " + (deal.pct ? "−" + deal.pct + "%" : "voordeel") + "</span>");
+    var out = [];
     (p.tags || []).forEach(function (t) {
       if (t === "actie") out.push('<span class="badge badge-sale">Actie</span>');
       if (t === "nieuw") out.push('<span class="badge badge-new">Nieuw</span>');
@@ -173,8 +164,9 @@
           '<span class="buy-txt"><strong>Per fles</strong><small>' + esc(p.size || "1 fles") + "</small></span>" +
           '<span class="buy-price">' + euro(p.price) + "</span></button>" +
         '<button class="buy-opt buy-opt-box" role="menuitem" data-add-box="' + esc(p.id) + '"' + (off ? " disabled" : "") + '><span class="buy-ic">' + BOX_ICON + "</span>" +
-          '<span class="buy-txt"><strong>Per doos van ' + n + "</strong><small>" + (off ? "Niet genoeg op voorraad" : euro(perBottle) + " per fles" + (save ? " · " + save + "% voordeel" : "")) + "</small></span>" +
-          '<span class="buy-price">' + euro(price) + "</span></button>" +
+          '<span class="buy-txt"><strong>Per doos van ' + n + "</strong><small>" + (off ? "Niet genoeg op voorraad" : euro(perBottle) + " per fles") + "</small>" +
+            (save && !off ? '<span class="buy-save">' + "−" + save + "% · bespaar " + euro(Math.round((p.price * n - price) * 100) / 100) + "</span>" : "") + "</span>" +
+          '<span class="buy-price">' + (save && !off ? '<s class="buy-was">' + euro(p.price * n) + "</s>" : "") + euro(price) + "</span></button>" +
       "</div></div>";
   }
 
