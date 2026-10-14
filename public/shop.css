@@ -146,6 +146,30 @@
 .badge-new { background: var(--peach); color: var(--ink); border-color: var(--peach); }
 .badge-bio { background: #4f6130; color: #fff; border-color: #4f6130; }
 .badge-out { background: #444; color: #fff; border-color: #444; }
+.badge-case { display: inline-flex; align-items: center; gap: .3em; background: var(--dark); color: var(--peach); border-color: var(--dark); }
+.badge-case svg { width: 1.1em; height: 1.1em; }
+
+/* Doosvoordeel: opvallende, klikbare balk onder de productnaam */
+.case-deal { display: flex; align-items: center; gap: .6rem; width: 100%; margin: .2rem 0 .8rem; padding: .55rem .65rem; border: 1.5px dashed var(--brand); border-radius: 10px; background: #fdf0e8; color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: background .15s, border-color .15s; }
+.case-deal:hover { background: #fbe2d5; border-style: solid; }
+.case-deal:focus-visible { outline: 2px solid var(--wine); outline-offset: 2px; }
+.case-deal-ic { flex: none; display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; background: var(--brand); color: #fff; font-size: 1.05rem; }
+.case-deal-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.case-deal-txt strong { font-size: .86rem; color: var(--wine-2); }
+.case-deal-txt small { font-size: .74rem; color: var(--muted); }
+.case-deal:not(.case-deal-lg) { gap: .4rem; padding: .45rem .55rem .45rem .7rem; }
+.case-deal:not(.case-deal-lg) .case-deal-ic { display: none; }
+.case-deal:not(.case-deal-lg) .case-deal-txt > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 560px) {
+  .case-deal:not(.case-deal-lg) .case-deal-txt strong { font-size: .78rem; }
+  .case-deal:not(.case-deal-lg) .case-deal-pct { font-size: .75rem; }
+}
+.case-deal-pct { flex: none; padding: .3em .55em; border-radius: 999px; background: var(--brand); color: #fff; font-family: var(--display); font-weight: 800; font-size: .85rem; transform: rotate(-4deg); }
+.case-deal-lg { margin: .4rem 0 1rem; padding: .8rem .9rem; }
+.case-deal-lg .case-deal-ic { width: 2.6rem; height: 2.6rem; font-size: 1.3rem; }
+.case-deal-lg .case-deal-txt strong { font-size: 1rem; }
+.case-deal-lg .case-deal-txt small { font-size: .82rem; }
+.case-deal-lg .case-deal-pct { font-size: 1.05rem; }
 
 .empty { text-align: center; padding: 3rem 1rem; color: var(--muted); }
 .shop-note { margin-top: 2.5rem; color: var(--muted); font-size: .92rem; text-align: center; }

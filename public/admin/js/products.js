@@ -188,6 +188,11 @@
             field("Flessen per doos", "caseSize", p.caseSize || 6, "inputmode='numeric'") +
             field("Prijs per doos (€)", "casePrice", p.casePrice != null ? String(p.casePrice).replace(".", ",") : "", "inputmode='decimal'") +
           "</div>" +
+          "<div class='case-quick' id='p-case-quick'>" +
+            "<button type='button' class='case-q' data-case-off='0'>Flesprijs × aantal</button>" +
+            "<button type='button' class='case-q' data-case-off='5'>5% korting</button>" +
+            "<button type='button' class='case-q' data-case-off='10'>10% korting</button>" +
+          "</div>" +
           "<p class='muted small case-help' id='p-case-help'></p>" +
         "</fieldset>" +
         "<fieldset class='span-2 checks'><legend>Instellingen</legend>" +
@@ -204,18 +209,53 @@
       "</form>", { wide: true });
 
     var form = body.querySelector("form");
-    // Doosvelden alleen aan als "Ook per doos" aangevinkt is; de standaardprijs volgt uit de flesprijs.
+    // Doosvelden alleen aan als "Ook per doos" aangevinkt is. De doosprijs wordt automatisch
+    // flesprijs × aantal (eventueel met 5% of 10% korting) en rekent mee zolang je hem niet zelf intypt.
+    var caseOff = null; // gekozen korting in % (0, 5, 10), of null als de doosprijs met de hand is ingevuld
+    function caseFull() {
+      var n = Math.floor(A.parseNum(form.caseSize.value)) || 0, price = A.parseNum(form.price.value);
+      return n >= 2 && price != null ? Math.round(price * n * 100) / 100 : null;
+    }
+    function caseAt(off) { var full = caseFull(); return full == null ? null : Math.round(full * (100 - off)) / 100; }
+    function setCase(off) {
+      caseOff = off;
+      var v = caseAt(off);
+      form.casePrice.value = v == null ? "" : String(v.toFixed(2)).replace(".", ",");
+    }
+    (function () { // bestaande doosprijs herkennen als een van de knoppen
+      var cur = A.parseNum(form.casePrice.value);
+      if (cur == null) { caseOff = 0; return; }
+      [0, 5, 10].forEach(function (o) { if (caseOff == null && caseAt(o) != null && Math.abs(caseAt(o) - cur) < 0.005) caseOff = o; });
+    })();
     function caseUi() {
-      var on = form.caseOn.checked;
+      var on = form.caseOn.checked, full = caseFull(), cur = A.parseNum(form.casePrice.value);
       form.caseSize.disabled = form.casePrice.disabled = !on;
       body.querySelector("#p-case").classList.toggle("is-off", !on);
-      var n = Math.floor(A.parseNum(form.caseSize.value)) || 0, price = A.parseNum(form.price.value);
-      var auto = n >= 2 && price != null ? A.euro(Math.round(price * n * 100) / 100) : null;
-      form.casePrice.placeholder = auto ? "leeg = " + auto : "leeg = flesprijs × aantal";
+      body.querySelectorAll("[data-case-off]").forEach(function (b) {
+        var o = Number(b.getAttribute("data-case-off")), v = caseAt(o);
+        b.disabled = !on || v == null;
+        b.classList.toggle("is-active", on && caseOff === o && v != null);
+        b.innerHTML = (o ? o + "% korting" : "Flesprijs × aantal") + (v != null ? " <strong>" + A.euro(v) + "</strong>" : "");
+      });
+      form.casePrice.placeholder = full != null ? "leeg = " + A.euro(full) : "leeg = flesprijs × aantal";
+      var n = Math.floor(A.parseNum(form.caseSize.value)) || 0, price = cur != null ? cur : full;
+      var pct = full && price != null ? Math.round((1 - price / full) * 1000) / 10 : 0;
       body.querySelector("#p-case-help").textContent = !on ? "Vink aan als klanten dit product ook per doos kunnen kopen. De voorraad blijft in flessen."
-        : "Een doos boekt " + (n >= 2 ? n : "het aantal") + " flessen af van de voorraad." + (auto ? " Zonder doosprijs kost een doos " + auto + "." : "");
+        : "Een doos boekt " + (n >= 2 ? n : "het aantal") + " flessen af van de voorraad." +
+          (price != null && n >= 2 ? " Per fles " + A.euro(price / n) + (pct > 0 ? ", dat is " + String(pct).replace(".", ",") + "% korting; de webshop laat dit voordeel zien." : pct < 0 ? ", duurder dan losse flessen." : ", geen korting.") : "");
     }
-    ["caseOn", "caseSize", "price"].forEach(function (n) { form[n].addEventListener("input", caseUi); form[n].addEventListener("change", caseUi); });
+    form.caseOn.addEventListener("change", function () {
+      if (form.caseOn.checked && !form.casePrice.value.trim()) setCase(caseOff == null ? 0 : caseOff);
+      caseUi();
+    });
+    ["caseSize", "price"].forEach(function (n) {
+      ["input", "change"].forEach(function (ev) { form[n].addEventListener(ev, function () { if (form.caseOn.checked && caseOff != null) setCase(caseOff); caseUi(); }); });
+    });
+    form.casePrice.addEventListener("input", function () { caseOff = form.casePrice.value.trim() ? null : 0; caseUi(); });
+    body.querySelector("#p-case-quick").addEventListener("click", function (ev) {
+      var b = ev.target.closest("[data-case-off]");
+      if (b && !b.disabled) { setCase(Number(b.getAttribute("data-case-off"))); caseUi(); }
+    });
     caseUi();
     var pendingImage; // undefined = ongewijzigd, "" = verwijderen, anders data-URL
     function useFile(file) {

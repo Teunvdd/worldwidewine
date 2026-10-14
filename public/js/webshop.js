@@ -252,6 +252,7 @@ window.WWW.ready.then(function () {
         '<p class="product-producer">' + W.esc(p.producer) + "</p>" +
         '<h2 id="pm-title">' + W.esc(p.name) + "</h2>" +
         '<p class="pm-price">' + W.priceHtml(p) + ' <small>' + W.esc(p.unit) + "</small></p>" +
+        W.caseDealHtml(p, true) +
         "<p>" + W.esc(p.description) + "</p>" +
         '<dl class="specs">' + rows.map(function (r) { return "<dt>" + r[0] + "</dt><dd>" + W.esc(r[1]) + "</dd>"; }).join("") + "</dl>" +
         '<div class="pm-actions">' + W.buyButton(p) + "</div>" +
