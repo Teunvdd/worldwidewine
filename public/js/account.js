@@ -33,17 +33,14 @@ window.WWW.ready.then(function () {
 
   // ---- Inloggen ----
   function showLogin() {
-    document.getElementById("account-lead").hidden = false;
+    document.getElementById("account-head").hidden = true;
     box.innerHTML =
       "<div class='account-login'><form class='account-card' id='code-form' novalidate>" +
-        "<h2>Inloggen</h2><p class='muted'>Vul het e-mailadres in waarmee je bij ons bestelt. We sturen je een code om in te loggen.</p>" +
+        "<h1>Inloggen</h1><p class='muted'>Vul je e-mailadres in. We sturen je een code van zes cijfers; een wachtwoord is niet nodig.</p>" +
         "<label class='field'>E-mailadres<input type='email' name='email' autocomplete='email' required value='" + esc(state.email) + "'></label>" +
         "<p class='form-error' role='alert' hidden></p>" +
         "<button class='btn btn-block' type='submit'>Stuur mij een code</button>" +
-      "</form>" +
-      "<div class='account-why'><h3>Wat vind je in Mijn account?</h3><ul class='checklist'>" +
-        "<li>Al je bestellingen, uit de webshop en de winkel</li><li>Wanneer je je bestelling kunt afhalen of hoe hij wordt bezorgd</li>" +
-        "<li>De status van je bestelling</li><li>Je gegevens en je voorkeur voor de nieuwsbrief</li></ul></div></div>";
+      "</form></div>";
     var form = box.querySelector("#code-form");
     form.email.focus();
     form.addEventListener("submit", function (e) {
@@ -58,9 +55,10 @@ window.WWW.ready.then(function () {
   }
 
   function showCode() {
+    document.getElementById("account-head").hidden = true;
     box.innerHTML =
       "<div class='account-login'><form class='account-card' id='login-form' novalidate>" +
-        "<h2>Vul je code in</h2><p class='muted'>We hebben een code van zes cijfers gestuurd naar <strong>" + esc(state.email) + "</strong>. Kijk ook even bij je ongewenste e-mail. De code is 15 minuten geldig.</p>" +
+        "<h1>Vul je code in</h1><p class='muted'>We hebben een code van zes cijfers gestuurd naar <strong>" + esc(state.email) + "</strong>. Kijk ook even bij je ongewenste e-mail. De code is 15 minuten geldig.</p>" +
         (state.devCode ? "<p class='notice'>Testomgeving zonder e-mail: je code is <strong>" + esc(state.devCode) + "</strong></p>" : "") +
         "<label class='field'>Code<input name='code' class='code-input' inputmode='numeric' autocomplete='one-time-code' maxlength='6' pattern='[0-9]{6}' required placeholder='••••••'></label>" +
         "<p class='form-error' role='alert' hidden></p>" +
@@ -163,7 +161,7 @@ window.WWW.ready.then(function () {
     var upcoming = orders.filter(active);
     var first = (p.name || "").split(" ")[0];
     document.getElementById("account-title").textContent = first ? "Hoi " + first + "!" : "Welkom!";
-    document.getElementById("account-lead").hidden = true;
+    document.getElementById("account-head").hidden = false;
     box.innerHTML =
       "<div class='account-grid'><div class='account-main'>" +
         upcoming.map(highlight).join("") +
@@ -186,7 +184,7 @@ window.WWW.ready.then(function () {
           "<p class='form-error' role='alert' hidden></p>" +
           "<button class='btn btn-block' type='submit'>Gegevens opslaan</button></form>" +
         "<section class='account-card'><h2>Vragen?</h2><p class='muted small'>Bel of app ons, of mail met je bestelnummer erbij.</p>" +
-          "<p><a href='tel:+31683172704'>06 83 17 27 04</a><br><a href='https://wa.me/31683172704' target='_blank' rel='noopener'>WhatsApp</a><br><a href='mailto:info@worldwidewine.nl'>info@worldwidewine.nl</a></p></section>" +
+          "<p><a href='tel:+31683172704'>+31 6 83 17 27 04</a><br><a href='https://wa.me/31683172704' target='_blank' rel='noopener'>WhatsApp</a><br><a href='mailto:info@worldwidewine.nl'>info@worldwidewine.nl</a></p></section>" +
         "<button class='btn btn-ghost btn-block' id='logout' type='button'>Uitloggen</button>" +
       "</aside></div>";
 
