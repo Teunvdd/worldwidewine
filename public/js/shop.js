@@ -34,6 +34,14 @@
   function keyOf(i) { return i.id + (i.box ? "|doos" : ""); }
   function unitSize(p, box) { return box ? caseSize(p) || 1 : 1; }
   function unitPrice(p, box) { return box ? casePrice(p) : p.price; }
+  // Kortingspercentage van een doos ten opzichte van losse flessen; null als een doos niet goedkoper is.
+  function caseDeal(p) {
+    var n = caseSize(p), price = casePrice(p);
+    if (!n || price == null || p.price == null) return null;
+    var save = Math.round((p.price * n - price) * 100) / 100;
+    if (save < 0.01) return null;
+    return { pct: Math.round(save / (p.price * n) * 100) };
+  }
   function caseSoldOut(p) { return soldOut(p) || (typeof p.stock === "number" && p.stock < caseSize(p)); }
   // Maximaal aantal van deze regel: de voorraad (in flessen) min wat de andere regel van hetzelfde product al gebruikt.
   function maxQty(p, box, items) {
@@ -125,7 +133,8 @@
   }
 
   function badges(p) {
-    var out = [];
+    var out = [], deal = caseDeal(p);
+    if (deal && !caseSoldOut(p)) out.push('<span class="badge badge-case">' + BOX_ICON + " Doos " + (deal.pct ? "−" + deal.pct + "%" : "voordeel") + "</span>");
     (p.tags || []).forEach(function (t) {
       if (t === "actie") out.push('<span class="badge badge-sale">Actie</span>');
       if (t === "nieuw") out.push('<span class="badge badge-new">Nieuw</span>');

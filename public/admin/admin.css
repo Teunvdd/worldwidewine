@@ -83,6 +83,12 @@ textarea { resize: vertical; }
 .case-fields { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
 .case-box.is-off .case-fields { opacity: .5; }
 .case-help { margin: 0; }
+.case-quick { display: flex; flex-wrap: wrap; gap: .4rem; }
+.case-q { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: .4rem .9rem; font: inherit; font-size: .88rem; cursor: pointer; min-height: 36px; }
+.case-q strong { margin-left: .25rem; font-weight: 600; }
+.case-q:hover:not(:disabled) { border-color: var(--dark); }
+.case-q.is-active { background: var(--dark); border-color: var(--dark); color: #fff; }
+.case-q:disabled { opacity: .5; cursor: default; }
 .actions { display: flex; gap: .6rem; justify-content: flex-end; align-items: center; flex-wrap: wrap; margin-top: 1.2rem; }
 .error { background: var(--bad-bg); color: var(--bad); border-radius: 8px; padding: .6rem .8rem; font-size: .9rem; }
 .note { background: var(--warn-bg); border-radius: 8px; padding: .6rem .8rem; font-size: .9rem; white-space: pre-wrap; }

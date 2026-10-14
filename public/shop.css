@@ -146,6 +146,8 @@
 .badge-new { background: var(--peach); color: var(--ink); border-color: var(--peach); }
 .badge-bio { background: #4f6130; color: #fff; border-color: #4f6130; }
 .badge-out { background: #444; color: #fff; border-color: #444; }
+.badge-case { display: inline-flex; align-items: center; gap: .3em; background: var(--dark); color: var(--peach); border-color: var(--dark); }
+.badge-case svg { width: 1.1em; height: 1.1em; }
 
 .empty { text-align: center; padding: 3rem 1rem; color: var(--muted); }
 .shop-note { margin-top: 2.5rem; color: var(--muted); font-size: .92rem; text-align: center; }
