@@ -375,7 +375,7 @@ body.pos-mode .main { padding: 0 !important; height: 100vh; }
 .np-clear { font-size: .9rem; color: var(--bad); }
 
 .pos-products { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: .8rem 1rem 0; }
-.chips { display: flex; gap: .4rem; overflow-x: auto; padding-bottom: .7rem; flex: none; }
+.chips { display: flex; flex-wrap: wrap; gap: .4rem; padding-bottom: .7rem; flex: none; }
 .chip { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: .5rem 1.1rem; font: inherit; font-size: .95rem; font-weight: 500; cursor: pointer; white-space: nowrap; min-height: 44px; }
 .chip.active { background: var(--cc, var(--dark)); color: #fff; border-color: var(--cc, var(--dark)); }
 .chip-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--cc); margin-right: .45rem; vertical-align: 0; }
