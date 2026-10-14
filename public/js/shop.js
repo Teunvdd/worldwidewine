@@ -165,7 +165,7 @@
           '<span class="buy-price">' + euro(p.price) + "</span></button>" +
         '<button class="buy-opt buy-opt-box" role="menuitem" data-add-box="' + esc(p.id) + '"' + (off ? " disabled" : "") + '><span class="buy-ic">' + BOX_ICON + "</span>" +
           '<span class="buy-txt"><strong>Per doos van ' + n + "</strong><small>" + (off ? "Niet genoeg op voorraad" : euro(perBottle) + " per fles") + "</small>" +
-            (save && !off ? '<span class="buy-save">' + "−" + save + "% · bespaar " + euro(Math.round((p.price * n - price) * 100) / 100) + "</span>" : "") + "</span>" +
+            (save && !off ? '<span class="buy-save">' + save + "% voordeel</span>" : "") + "</span>" +
           '<span class="buy-price">' + (save && !off ? '<s class="buy-was">' + euro(p.price * n) + "</s>" : "") + euro(price) + "</span></button>" +
       "</div></div>";
   }
