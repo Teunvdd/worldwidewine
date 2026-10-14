@@ -34,13 +34,13 @@
   function keyOf(i) { return i.id + (i.box ? "|doos" : ""); }
   function unitSize(p, box) { return box ? caseSize(p) || 1 : 1; }
   function unitPrice(p, box) { return box ? casePrice(p) : p.price; }
-  // Doosvoordeel ten opzichte van losse flessen; null als een doos niet goedkoper is.
+  // Kortingspercentage van een doos ten opzichte van losse flessen; null als een doos niet goedkoper is.
   function caseDeal(p) {
     var n = caseSize(p), price = casePrice(p);
     if (!n || price == null || p.price == null) return null;
     var save = Math.round((p.price * n - price) * 100) / 100;
     if (save < 0.01) return null;
-    return { n: n, price: price, perBottle: price / n, save: save, pct: Math.round(save / (p.price * n) * 100) };
+    return { pct: Math.round(save / (p.price * n) * 100) };
   }
   function caseSoldOut(p) { return soldOut(p) || (typeof p.stock === "number" && p.stock < caseSize(p)); }
   // Maximaal aantal van deze regel: de voorraad (in flessen) min wat de andere regel van hetzelfde product al gebruikt.
@@ -178,18 +178,6 @@
       "</div></div>";
   }
 
-  // Opvallende balk onder het product als een doos voordeliger is; een klik legt meteen een doos in de winkelwagen.
-  function caseDealHtml(p, big) {
-    var d = caseDeal(p);
-    if (!d || soldOut(p) || caseSoldOut(p)) return "";
-    return '<button type="button" class="case-deal' + (big ? " case-deal-lg" : "") + '" data-add-box="' + esc(p.id) + '" title="Doos van ' + d.n + ' in winkelwagen">' +
-      '<span class="case-deal-ic">' + BOX_ICON + "</span>" +
-      '<span class="case-deal-txt"><strong>' + (big ? "Per doos van " + d.n + ": " : "Doos van " + d.n + ": ") + euro(d.price) + "</strong>" +
-        "<small>" + euro(d.perBottle) + " per fles" + (big ? " · je bespaart " + euro(d.save) : "") + "</small></span>" +
-      (d.pct ? '<span class="case-deal-pct">−' + d.pct + "%</span>" : "") +
-    "</button>";
-  }
-
   function closeBuyMenus(except) {
     document.querySelectorAll(".buy-split.open").forEach(function (el) {
       if (el === except) return;
@@ -207,7 +195,6 @@
         '<p class="product-producer">' + esc(p.producer) + "</p>" +
         '<h3 class="product-name"><a href="webshop.html#' + esc(p.id) + '" data-open="' + esc(p.id) + '">' + esc(p.name) + "</a></h3>" +
         '<p class="product-meta">' + esc(meta) + "</p>" +
-        caseDealHtml(p) +
         '<div class="product-foot"><div class="product-price">' + priceHtml(p) +
           '<small>' + esc(p.unit === "fles" ? p.size : p.unit) + "</small></div>" +
           buyButton(p, "btn-small") + "</div>" +
@@ -341,7 +328,7 @@
 
   window.WWW = {
     Cart: Cart, PRODUCTS: PRODUCTS, CONFIG: CONFIG, TYPES: TYPES, typeLabel: typeLabel, byId: byId, ready: ready, state: state, soldOut: soldOut,
-    euro: euro, esc: esc, art: art, card: card, priceHtml: priceHtml, badges: badges, buyButton: buyButton, caseDeal: caseDeal, caseDealHtml: caseDealHtml,
+    euro: euro, esc: esc, art: art, card: card, priceHtml: priceHtml, badges: badges, buyButton: buyButton,
     caseSize: caseSize, casePrice: casePrice, BOX_ICON: BOX_ICON
   };
 })();
