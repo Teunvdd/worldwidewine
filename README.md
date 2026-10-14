@@ -228,6 +228,11 @@ Op de website staat een pagina **Nieuws** (`nieuws.html`, ook in het menu en de 
 - Je ziet hem in de kassa én in de webshop.
 - Producten zonder foto krijgen een getekende fles in de kleur van de wijnsoort.
 
+## Database leegmaken
+Wil je opnieuw beginnen (bijv. vóór het importeren van het echte assortiment)? Voer dan **`supabase/leegmaken.sql`** uit in Supabase → SQL Editor. Dat verwijdert alle producten, bestellingen, kassabonnen, klanten, voorraadmutaties, kassadiensten, nieuwsberichten, kassacategorieën en inlogcodes. De instellingen (kassa, openingstijden, afhaaltijden, bezorggebied) blijven staan. Dit kan niet ongedaan worden gemaakt.
+
+Het startassortiment (de 25 voorbeeldproducten) wordt maar één keer geplaatst: na het leegmaken of na het verwijderen van alle producten komt het niet terug.
+
 ## Lokaal draaien en testen
 
 Vereist Node.js 22 of nieuwer.
