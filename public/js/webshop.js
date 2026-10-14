@@ -247,7 +247,7 @@ window.WWW.ready.then(function () {
       ["Druivensoort", p.grape], ["Oogstjaar", p.vintage], ["Inhoud", p.size],
       ["Alcohol", p.alcohol != null ? String(p.alcohol).replace(".", ",") + "% vol." : null]
     ].filter(function (r) { return r[1]; });
-    return '<div class="pm-media">' + W.art(p, "lg") + W.badges(p) + "</div>" +
+    return '<div class="pm-media' + (p.image ? " has-photo" : "") + '">' + W.art(p, "lg") + W.badges(p) + "</div>" +
       '<div class="pm-body">' +
         '<p class="product-producer">' + W.esc(p.producer) + "</p>" +
         '<h2 id="pm-title">' + W.esc(p.name) + "</h2>" +
@@ -266,6 +266,7 @@ window.WWW.ready.then(function () {
     if (!p) return;
     lastFocus = document.activeElement;
     $("pm").innerHTML = detail(p);
+    $("pm").classList.remove("is-expanded");
     modal.hidden = false;
     modal.querySelector(".modal-panel").scrollTop = 0;
     // Lange omschrijving inkorten tot een paar regels, met "Lees meer".
@@ -276,6 +277,7 @@ window.WWW.ready.then(function () {
       if (more.hidden) desc.classList.remove("is-clamped");
       more.onclick = function () {
         var open = desc.classList.toggle("is-clamped") === false;
+        $("pm").classList.toggle("is-expanded", open);
         more.textContent = open ? "Minder tonen" : "Lees meer";
         more.setAttribute("aria-expanded", String(open));
       };

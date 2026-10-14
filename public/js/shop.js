@@ -24,8 +24,13 @@
     })
     .catch(function () { /* geen server (bijv. lokaal geopend): startassortiment gebruiken */ })
     .then(function () {
-      // Bestaande winkelwagen (van een eerder bezoek) ook omzetten naar dozen waar dat kan.
+      // Bestaande winkelwagen (van een eerder bezoek) opschonen: producten die niet meer bestaan eruit,
+      // en losse flessen omzetten naar dozen waar dat kan.
       var items = read(), changed = false;
+      if (state.live) {
+        var known = items.filter(function (i) { return byId[i.id]; });
+        if (known.length !== items.length) { items = known; changed = true; }
+      }
       items.map(function (i) { return i.id; }).forEach(function (id) { if (packBoxes(items, id)) changed = true; });
       if (changed) write(items); else render();
       return PRODUCTS;
@@ -343,7 +348,10 @@
   window.addEventListener("storage", function (e) { if (e.key === KEY) render(); });
 
   buildDrawer();
-  render();
+  list.innerHTML = '<div class="loading"><span class="spinner"></span>Laden…</div>';
+  drawer.querySelector(".drawer-foot").hidden = true;
+  // Nog niet tekenen met het startassortiment: dat gebeurt zodra het live assortiment binnen is (zie ready),
+  // anders telt de winkelwagen even producten mee die niet meer bestaan.
 
   window.WWW = {
     Cart: Cart, PRODUCTS: PRODUCTS, CONFIG: CONFIG, TYPES: TYPES, typeLabel: typeLabel, byId: byId, ready: ready, state: state, soldOut: soldOut,
