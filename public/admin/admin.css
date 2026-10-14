@@ -381,17 +381,17 @@ body.pos-mode .main { padding: 0 !important; height: 100vh; }
 .chip-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--cc); margin-right: .45rem; vertical-align: 0; }
 .chip.active .chip-dot { background: #fff; }
 .pp-grid { flex: 1; overflow-y: auto; display: grid; grid-auto-rows: max-content; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .7rem; align-content: start; padding-bottom: 1rem; }
-.pp-card { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; padding: 0; font: inherit; text-align: left; cursor: pointer; transition: transform .08s, box-shadow .15s; }
+.pp-card { display: block; width: 100%; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; padding: 0; font: inherit; text-align: left; cursor: pointer; transition: transform .08s, box-shadow .15s; }
 .pp-card:hover { box-shadow: var(--shadow); }
 .pp-card:active { transform: scale(.97); }
 .pp-card.flash { animation: flash .45s ease; }
 @keyframes flash { 0% { box-shadow: 0 0 0 4px var(--brand); } 100% { box-shadow: none; } }
-/* Vierkant fotovak via padding (niet aspect-ratio): Safari rekent dat in deze kaart anders als 0 hoog */
-.pp-img { position: relative; display: block; flex: none; height: 0; padding-top: 100%; background: #f6ede5; }
-.pp-img .p-img { position: absolute; inset: 0; }
+/* Fotovak met een vaste hoogte (geen aspect-ratio of padding-truc): zo tonen ook Safari en iPad de foto en prijs */
+.pp-img { position: relative; display: block; height: var(--pp-img-h, 150px); overflow: hidden; background: #f6ede5; }
+.pp-img .p-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 .pp-img img.p-img { object-fit: cover; }
-.pp-price { position: absolute; top: .45rem; right: .45rem; background: rgba(31, 26, 23, .82); color: #fff; font-weight: 700; font-size: .85rem; border-radius: 6px; padding: .15rem .45rem; font-variant-numeric: tabular-nums; }
-.pp-stock { position: absolute; bottom: .45rem; left: .45rem; background: var(--ok-bg); color: var(--ok); font-size: .72rem; font-weight: 700; border-radius: 999px; padding: .1rem .5rem; }
+.pp-price { position: absolute; z-index: 1; top: .45rem; right: .45rem; background: rgba(31, 26, 23, .82); color: #fff; font-weight: 700; font-size: .85rem; border-radius: 6px; padding: .15rem .45rem; font-variant-numeric: tabular-nums; }
+.pp-stock { position: absolute; z-index: 1; bottom: .45rem; left: .45rem; background: var(--ok-bg); color: var(--ok); font-size: .72rem; font-weight: 700; border-radius: 999px; padding: .1rem .5rem; }
 .pp-stock.low { background: var(--warn-bg); color: var(--warn); }
 .pp-stock.out { background: var(--bad-bg); color: var(--bad); }
 /* Per doos: label op de kaart, keuze fles/doos en de doos op de bon */
@@ -408,7 +408,7 @@ body.pos-mode .main { padding: 0 !important; height: 100vh; }
 .ch-ic { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; font-size: 1.35rem; background: #f1ebe6; color: #5a504a; }
 .ch-box .ch-ic { background: #fbe2d5; color: var(--wine); }
 .po-case { display: inline-flex; align-items: center; gap: .25rem; padding: .02rem .45rem; border-radius: 999px; background: #fbe2d5; color: var(--wine); font-weight: 600; font-size: .85rem; }
-.pp-name { display: block; flex: none; padding: .5rem .6rem .65rem; font-weight: 600; font-size: .88rem; line-height: 1.25; }
+.pp-name { display: block; padding: .5rem .6rem .65rem; font-weight: 600; font-size: .88rem; line-height: 1.25; }
 .pp-name small { display: block; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pp-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.5em; }
 
@@ -591,11 +591,11 @@ body.pos-mode .main { padding: 0 !important; height: 100vh; }
 /* Betaalscherm: snelknoppen en numpad */
 
 /* Kaartgrootte en compacte kaarten */
-.pp-grid.size-klein { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
-.pp-grid.size-groot { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.pp-grid.size-klein { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); --pp-img-h: 115px; }
+.pp-grid.size-groot { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); --pp-img-h: 200px; }
 .pp-grid.size-klein .pp-name { font-size: .8rem; }
 .pp-grid.no-images .pp-card { min-height: 0; }
-.pp-noimg { position: relative; display: block; flex: none; height: 34px; background: var(--c, #f6ede5); }
+.pp-noimg { position: relative; display: block; height: 34px; background: var(--c, #f6ede5); }
 .pp-grid.no-images .pp-price { top: .4rem; left: .5rem; right: auto; background: transparent; color: var(--ink); padding: 0; font-size: .95rem; }
 .pp-grid.no-images .pp-stock { bottom: auto; top: .45rem; left: auto; right: .5rem; }
 .pm-overig span { background: #8a6d3b; }
