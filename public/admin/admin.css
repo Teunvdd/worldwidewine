@@ -679,3 +679,16 @@ input[type=radio], input[type=checkbox] { min-height: 0; padding: 0; width: auto
   .wk-table .wk-badge { grid-row: 1; grid-column: 2; }
   .wk-title { min-width: 0; }
 }
+
+/* ---------- Pagina's in lange lijsten ---------- */
+.pager { display: flex; align-items: center; justify-content: space-between; gap: .8rem 1.2rem; flex-wrap: wrap; margin: -0.4rem 0 1.2rem; font-size: .88rem; }
+.pager-info { color: var(--muted); font-variant-numeric: tabular-nums; }
+.pager-pages { display: flex; align-items: center; gap: .25rem; flex-wrap: wrap; }
+.pager-btn { min-width: 34px; height: 34px; padding: 0 .55rem; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; font-weight: 500; cursor: pointer; font-variant-numeric: tabular-nums; }
+.pager-btn:hover:not(:disabled) { background: var(--line-2); }
+.pager-btn:disabled { opacity: .4; cursor: default; }
+.pager-btn.is-current { background: var(--wine); border-color: var(--wine); color: #fff; font-weight: 700; }
+.pager-gap { color: var(--muted); padding: 0 .2rem; }
+.pager-per { display: inline-flex; align-items: center; gap: .45rem; color: var(--muted); }
+.pager-per select { min-height: 34px; padding: .2rem 1.6rem .2rem .55rem; }
+@media (max-width: 640px) { .pager { justify-content: center; } .pager-info { width: 100%; text-align: center; } }

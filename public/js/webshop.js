@@ -95,6 +95,41 @@ window.WWW.ready.then(function () {
 
   function norm(s) { return String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
 
+  // ---- Pagina's: 24 wijnen per pagina ----
+  var PER = 24, current = [], page = 1;
+  function pagerHtml(total) {
+    var pages = Math.ceil(total / PER);
+    if (pages <= 1) return "";
+    var out = [], last = 0;
+    for (var i = 1; i <= pages; i++) {
+      if (i === 1 || i === pages || Math.abs(i - page) <= 1) {
+        if (i - last > 1) out.push('<span class="pager-gap">…</span>');
+        out.push('<button type="button" class="pager-btn' + (i === page ? " is-current" : "") + '" data-page="' + i + '"' + (i === page ? ' aria-current="page"' : "") + ">" + i + "</button>");
+        last = i;
+      }
+    }
+    return '<button type="button" class="pager-btn pager-step" data-page="' + (page - 1) + '"' + (page <= 1 ? " disabled" : "") + ' aria-label="Vorige pagina">‹<span class="pager-label"> Vorige</span></button>' +
+      out.join("") +
+      '<button type="button" class="pager-btn pager-step" data-page="' + (page + 1) + '"' + (page >= pages ? " disabled" : "") + ' aria-label="Volgende pagina"><span class="pager-label">Volgende </span>›</button>';
+  }
+  function show() {
+    var pages = Math.max(1, Math.ceil(current.length / PER));
+    page = Math.min(Math.max(1, page), pages);
+    $("grid").innerHTML = current.slice((page - 1) * PER, page * PER).map(W.card).join("");
+    $("pager").innerHTML = pagerHtml(current.length);
+    var from = (page - 1) * PER + 1, to = Math.min(current.length, page * PER);
+    $("result-count").textContent = current.length === 1 ? "1 product"
+      : current.length > PER ? from + "–" + to + " van " + current.length + " producten" : current.length + " producten";
+  }
+  $("pager").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-page]");
+    if (!b || b.disabled) return;
+    page = Number(b.dataset.page);
+    show();
+    var top = document.querySelector(".results");
+    if (top.getBoundingClientRect().top < 0) top.scrollIntoView({ block: "start" });
+  });
+
   function apply() {
     var q = norm($("q").value.trim());
     var f = {};
@@ -126,9 +161,10 @@ window.WWW.ready.then(function () {
       list.sort(function (a, b) { return score(a) - score(b); });
     }
 
-    $("grid").innerHTML = list.map(W.card).join("");
+    current = list;
+    page = 1;
+    show();
     $("empty").hidden = list.length > 0;
-    $("result-count").textContent = list.length === 1 ? "1 product" : list.length + " producten";
   }
 
   function reset() {

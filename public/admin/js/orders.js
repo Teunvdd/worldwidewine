@@ -2,6 +2,7 @@
 (function () {
   var e = A.esc, eu = A.euro;
   var filters = { q: "", channel: "", status: "open", months: 3 };
+  var pg = { page: 1 };
 
   var NEXT = {
     nieuw: ["betaald", "klaar", "verzonden", "afgerond", "geannuleerd"],
@@ -36,11 +37,14 @@
           select("o-status", filters.status, [["open", "Te verwerken"], ["", "Alle statussen"]].concat(Object.keys(A.STATUS).map(function (s) { return [s, A.STATUS[s]]; }))) +
           select("o-months", String(filters.months), [["1", "Deze maand"], ["3", "3 maanden"], ["12", "12 maanden"], ["24", "24 maanden"]]) +
         "</div>" +
-        "<div class='card card-flush'><table class='table table-hover'><thead><tr><th>Bestelling</th><th>Klant</th><th>Bezorging / betaling</th><th>Status</th><th class='num'>Totaal</th></tr></thead><tbody id='o-rows'></tbody></table></div>";
+        "<div class='card card-flush'><table class='table table-hover'><thead><tr><th>Bestelling</th><th>Klant</th><th>Bezorging / betaling</th><th>Status</th><th class='num'>Totaal</th></tr></thead><tbody id='o-rows'></tbody></table></div>" +
+        "<div id='o-pager'></div>";
 
       function draw() {
         var list = orders.filter(matches);
-        el.querySelector("#o-rows").innerHTML = list.length ? list.map(function (o) {
+        var paged = A.paginate(list, pg);
+        el.querySelector("#o-pager").innerHTML = paged.html;
+        el.querySelector("#o-rows").innerHTML = list.length ? paged.items.map(function (o) {
           return "<tr class='clickable' data-order='" + e(o.number) + "'>" +
             "<td><strong>" + e(o.number) + "</strong><span class='tag tag-" + o.channel + "'>" + (o.channel === "winkel" ? "Winkel" : "Webshop") + "</span><br><span class='muted small'>" + A.date(o.createdAt, true) + "</span></td>" +
             "<td>" + e((o.customer && (o.customer.name || o.customer.email)) || "—") + "</td>" +
@@ -49,11 +53,12 @@
         }).join("") : "<tr><td colspan='5' class='empty-inline'>Geen bestellingen gevonden.</td></tr>";
       }
       draw();
+      A.bindPager(el.querySelector("#o-pager"), pg, draw);
 
-      el.querySelector("#o-q").addEventListener("input", function () { filters.q = this.value; draw(); });
-      el.querySelector("#o-channel").addEventListener("change", function () { filters.channel = this.value; draw(); });
-      el.querySelector("#o-status").addEventListener("change", function () { filters.status = this.value; draw(); });
-      el.querySelector("#o-months").addEventListener("change", function () { filters.months = Number(this.value); A.route(); });
+      el.querySelector("#o-q").addEventListener("input", function () { filters.q = this.value; pg.page = 1; draw(); });
+      el.querySelector("#o-channel").addEventListener("change", function () { filters.channel = this.value; pg.page = 1; draw(); });
+      el.querySelector("#o-status").addEventListener("change", function () { filters.status = this.value; pg.page = 1; draw(); });
+      el.querySelector("#o-months").addEventListener("change", function () { filters.months = Number(this.value); pg.page = 1; A.route(); });
       el.querySelector("#o-rows").addEventListener("click", function (ev) {
         var tr = ev.target.closest("[data-order]");
         if (tr) A.showOrder(tr.dataset.order, function () { A.route(); });

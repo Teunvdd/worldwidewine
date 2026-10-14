@@ -2,6 +2,7 @@
 (function () {
   var e = A.esc, eu = A.euro;
   var q = "";
+  var pg = { page: 1 };
 
   function render(el) {
     return A.load("customers", true).then(function (customers) {
@@ -9,21 +10,25 @@
         "<header class='page-head'><div><h1>Klanten</h1><p class='muted'>" + customers.length + " klanten · webshopklanten worden automatisch toegevoegd</p></div>" +
         "<button class='btn btn-primary' id='c-new'>+ Nieuwe klant</button></header>" +
         "<div class='toolbar'><input type='search' id='c-q' placeholder='Zoek op naam, e-mail, telefoon of plaats' value='" + e(q) + "'></div>" +
-        "<div class='card card-flush'><table class='table table-hover'><thead><tr><th>Klant</th><th>Contact</th><th>Plaats</th><th class='num'>Bestellingen</th><th class='num'>Besteed</th><th>Laatst</th></tr></thead><tbody id='c-rows'></tbody></table></div>";
+        "<div class='card card-flush'><table class='table table-hover'><thead><tr><th>Klant</th><th>Contact</th><th>Plaats</th><th class='num'>Bestellingen</th><th class='num'>Besteed</th><th>Laatst</th></tr></thead><tbody id='c-rows'></tbody></table></div>" +
+        "<div id='c-pager'></div>";
 
       function draw() {
         var v = q.toLowerCase();
         var list = customers.filter(function (c) {
           return !v || [c.name, c.email, c.phone, c.city, c.company].join(" ").toLowerCase().indexOf(v) >= 0;
         }).sort(function (a, b) { return ((b.stats && b.stats.last) || b.createdAt || "") < ((a.stats && a.stats.last) || a.createdAt || "") ? -1 : 1; });
-        el.querySelector("#c-rows").innerHTML = list.map(function (c) {
+        var paged = A.paginate(list, pg);
+        el.querySelector("#c-pager").innerHTML = paged.html;
+        el.querySelector("#c-rows").innerHTML = paged.items.map(function (c) {
           return "<tr class='clickable' data-id='" + e(c.id) + "'><td><strong>" + e(c.name || "—") + "</strong>" + (c.company ? "<br><span class='muted small'>" + e(c.company) + "</span>" : "") + "</td>" +
             "<td class='small'>" + e(c.email || "") + "<br>" + e(c.phone || "") + "</td><td>" + e(c.city || "") + "</td>" +
             "<td class='num'>" + c.stats.orders + "</td><td class='num'>" + eu(c.stats.spent) + "</td><td class='small muted'>" + A.date(c.stats.last) + "</td></tr>";
         }).join("") || "<tr><td colspan='6' class='empty-inline'>Geen klanten gevonden.</td></tr>";
       }
       draw();
-      el.querySelector("#c-q").addEventListener("input", function () { q = this.value; draw(); });
+      A.bindPager(el.querySelector("#c-pager"), pg, draw);
+      el.querySelector("#c-q").addEventListener("input", function () { q = this.value; pg.page = 1; draw(); });
       el.querySelector("#c-new").addEventListener("click", function () { edit(null); });
       el.querySelector("#c-rows").addEventListener("click", function (ev) {
         var tr = ev.target.closest("[data-id]");

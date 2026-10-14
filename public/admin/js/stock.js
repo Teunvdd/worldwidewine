@@ -2,6 +2,7 @@
 (function () {
   var e = A.esc;
   var q = "", onlyLow = false;
+  var pg = { page: 1 };
 
   function render(el) {
     return Promise.all([A.load("products", true), A.api("GET", "stock/log")]).then(function (res) {
@@ -13,6 +14,7 @@
           "<label class='check'><input type='checkbox' id='s-low'" + (onlyLow ? " checked" : "") + "> Alleen bijna op / uitverkocht</label>" +
         "</div>" +
         "<div class='card card-flush'><table class='table'><thead><tr><th>Product</th><th class='num'>Nu</th><th>Wijzigen</th></tr></thead><tbody id='s-rows'></tbody></table></div>" +
+        "<div id='s-pager'></div>" +
         "<section class='card'><header class='card-head'><h2>Laatste mutaties</h2></header>" +
         (log.length ? "<table class='table'><thead><tr><th>Wanneer</th><th>Product</th><th>Reden</th><th class='num'>Mutatie</th><th class='num'>Na</th></tr></thead><tbody>" +
           log.slice(0, 60).map(function (m) {
@@ -27,7 +29,9 @@
           if (onlyLow && !(typeof p.stock === "number" && p.stock <= (p.minStock == null ? 6 : p.minStock))) return false;
           return !v || [p.name, p.producer, p.ean].join(" ").toLowerCase().indexOf(v) >= 0;
         }).sort(function (a, b) { return (a.producer + a.name).localeCompare(b.producer + b.name, "nl"); });
-        el.querySelector("#s-rows").innerHTML = list.map(function (p) {
+        var paged = A.paginate(list, pg);
+        el.querySelector("#s-pager").innerHTML = paged.html;
+        el.querySelector("#s-rows").innerHTML = paged.items.map(function (p) {
           return "<tr data-id='" + e(p.id) + "'><td><span class='muted small'>" + e(p.producer) + "</span><br><strong>" + e(p.name) + "</strong> <span class='muted small'>" + e(p.unit) + "</span></td>" +
             "<td class='num'>" + A.stockBadge(p) + "</td>" +
             "<td><div class='stock-edit'><input type='number' step='1' inputmode='numeric' placeholder='aantal' aria-label='Aantal'>" +
@@ -39,9 +43,10 @@
         }).join("") || "<tr><td colspan='3' class='empty-inline'>Geen producten gevonden.</td></tr>";
       }
       draw();
+      A.bindPager(el.querySelector("#s-pager"), pg, draw);
 
-      el.querySelector("#s-q").addEventListener("input", function () { q = this.value; draw(); });
-      el.querySelector("#s-low").addEventListener("change", function () { onlyLow = this.checked; draw(); });
+      el.querySelector("#s-q").addEventListener("input", function () { q = this.value; pg.page = 1; draw(); });
+      el.querySelector("#s-low").addEventListener("change", function () { onlyLow = this.checked; pg.page = 1; draw(); });
       el.querySelector("#s-rows").addEventListener("keydown", function (ev) {
         if (ev.key === "Enter" && ev.target.matches("input")) { ev.preventDefault(); ev.target.closest("tr").querySelector("[data-act=set]").click(); }
       });
