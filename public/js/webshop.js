@@ -252,9 +252,10 @@ window.WWW.ready.then(function () {
         '<p class="product-producer">' + W.esc(p.producer) + "</p>" +
         '<h2 id="pm-title">' + W.esc(p.name) + "</h2>" +
         '<p class="pm-price">' + W.priceHtml(p) + ' <small>' + W.esc(p.unit) + "</small></p>" +
-        "<p>" + W.esc(p.description) + "</p>" +
-        '<dl class="specs">' + rows.map(function (r) { return "<dt>" + r[0] + "</dt><dd>" + W.esc(r[1]) + "</dd>"; }).join("") + "</dl>" +
         '<div class="pm-actions">' + W.buyButton(p) + "</div>" +
+        (p.description ? '<div class="pm-desc" id="pm-desc"><p>' + W.esc(p.description) + "</p></div>" +
+          '<button type="button" class="link-btn pm-more" id="pm-more" aria-controls="pm-desc" aria-expanded="false" hidden>Lees meer</button>' : "") +
+        '<dl class="specs">' + rows.map(function (r) { return "<dt>" + r[0] + "</dt><dd>" + W.esc(r[1]) + "</dd>"; }).join("") + "</dl>" +
         (p.pickupOnly ? '<p class="muted">Dit product is alleen af te halen in Zaandam of Weesp.</p>' : "") +
         (p.price != null && !p.pickupOnly ? '<p class="muted">Gratis afhalen · bezorging in de regio · PostNL door heel Nederland</p>' : "") +
       "</div>";
@@ -266,6 +267,19 @@ window.WWW.ready.then(function () {
     lastFocus = document.activeElement;
     $("pm").innerHTML = detail(p);
     modal.hidden = false;
+    modal.querySelector(".modal-panel").scrollTop = 0;
+    // Lange omschrijving inkorten tot een paar regels, met "Lees meer".
+    var desc = $("pm-desc"), more = $("pm-more");
+    if (desc && more) {
+      desc.classList.add("is-clamped");
+      more.hidden = desc.scrollHeight <= desc.clientHeight + 2;
+      if (more.hidden) desc.classList.remove("is-clamped");
+      more.onclick = function () {
+        var open = desc.classList.toggle("is-clamped") === false;
+        more.textContent = open ? "Minder tonen" : "Lees meer";
+        more.setAttribute("aria-expanded", String(open));
+      };
+    }
     document.body.classList.add("no-scroll");
     document.title = p.producer + " " + p.name + " — WorldWideWine.nl";
     if (push) history.pushState(null, "", "#" + id);
