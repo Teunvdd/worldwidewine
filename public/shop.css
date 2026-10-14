@@ -114,7 +114,7 @@
 .buy-split.open .buy-more svg:last-child { transform: rotate(180deg); }
 .buy-menu { position: absolute; z-index: 30; top: calc(100% + 8px); right: 0; width: 290px; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 16px 40px rgba(40,25,15,.18); padding: 6px; display: grid; gap: 4px; animation: pop .15s ease; }
 .buy-menu[hidden] { display: none; }
-.buy-split.up .buy-menu, .pm-actions .buy-menu { top: auto; bottom: calc(100% + 8px); }
+.buy-split.up .buy-menu { top: auto; bottom: calc(100% + 8px); }
 .pm-actions .buy-menu { left: 0; right: auto; }
 .buy-opt { display: flex; align-items: center; gap: .65rem; width: 100%; border: 0; border-radius: 10px; background: none; padding: .6rem .65rem; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
 .buy-opt:hover:not(:disabled) { background: var(--cream-2); }
@@ -199,7 +199,15 @@
 .specs { display: grid; grid-template-columns: auto 1fr; gap: .35rem 1.25rem; margin: 1.25rem 0 1.5rem; font-size: .92rem; }
 .specs dt { color: var(--muted); }
 .specs dd { margin: 0; font-weight: 500; }
-.pm-actions { margin-bottom: 1rem; }
+.pm-actions { margin: 1rem 0 1.25rem; }
+.pm-desc p { margin: 0; }
+.pm-desc.is-clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; line-clamp: 5; overflow: hidden; }
+.pm-more { margin-top: .35rem; font-weight: 600; }
+@media (min-width: 701px) {
+  /* Foto blijft in beeld als de tekst langer is dan het venster */
+  .pm-media { position: sticky; top: 0; align-self: start; height: min(560px, calc(100vh - 32px)); min-height: 0; }
+  .pm { background: linear-gradient(to right, var(--cream-2) calc(100% / 2.25), transparent 0); }
+}
 @media (max-width: 700px) {
   .pm { grid-template-columns: 1fr; }
   .pm-media { min-height: 260px; }
